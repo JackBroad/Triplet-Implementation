@@ -3,7 +3,7 @@ module test_regression
   use triplet_mod
   use funit
   implicit none
-  double precision:: regression_tolerance=1e-5
+  double precision:: regression_tolerance=1e-9
 
 contains
 
@@ -20,7 +20,7 @@ contains
 
 
    @test
-   subroutine test_sum()
+   subroutine test_JobsPerNode()
      integer:: nDist=3, nProc=1, nTrips=1
      integer:: distsPerProc, tripsPerProc
 
@@ -31,18 +31,42 @@ contains
      @assertEqual(tripsPerProc, 1,'Triplets per processor #1')
 
 
+     !Build test!
      nDist=6
      nProc=2
      nTrips=4
+
+     !Run calculation
      call getDistsAndTripletsPerProcNonAdd(nDist,nTrips,nProc,distsPerProc,tripsPerProc)
+
+     ! check output
      @assertEqual(distsPerProc, 3 ,'Distances per processor #2')
      @assertEqual(tripsPerProc, 2,'Triplets per processor #2')
 
-  end subroutine test_sum
+   end subroutine test_JobsPerNode
 
 
 
+   @test
+   subroutine test_initialise()
+     implicit none
+     double precision, allocatable:: posAt(:,:), alpha(:)
+     double precision, allocatable:: trainData(:,:)
+     double precision:: hyperParams(3) 
+     integer:: N_tp, nArgs, N_a, N_tri, udSize
 
+     double precision:: hyperParams_Expected(3)
+
+     hyperParams_Expected(1:3) =  (/ 0.10109332178237054d0,5.0651896159484985d-5, 1.2319522830243570d-15 /)
+
+     call initialise(posAt, trainData, alpha, hyperParams, N_tp, nArgs, N_a, N_tri, udSize)
+     
+     @assertEqual(N_tp, 337,'Test initialise: N_tp')
+     @assertEqual(hyperParams, hyperParams_Expected,   regression_tolerance,'hyperparameters')
+     
+ 
+     end subroutine test_initialise
+   
 
   !===========================================================================================
   @test
