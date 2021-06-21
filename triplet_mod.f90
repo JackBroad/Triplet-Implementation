@@ -494,13 +494,14 @@ subroutine updateExponentialsNonAdd(nJob,nTP,nArgument,nAt,ecol,ind,change,dists
                                     updateExp)
   implicit none
   integer, intent(in) :: nJob, nTP, nArgument, nAt, ind(nAt,nAt), change(nJob,2)
-  integer, intent(in) :: triplets(nJob,3), nPer, perms(nPer,3)
+  integer, intent(in) :: triplets(nJob,3), nPer, perms(nPer,3), ecol
   double precision, intent(in) :: dists(nJob), expData(nTP,ecol)
+  double precision, intent(in) :: trainingData(nTP,nArgument)
   double precision, intent(out) :: updateExp(nTP,ecol)
-  integer :: i, j, k, a, b, g, aIn, bIn, gIn, rowPerm(3)
-  double precision :: expon
+  integer :: i, j, k, l, a, b, g, aIn, bIn, gIn, rowPerm(3)
+  double precision :: expon, lengthscale
 
-  do i = 1, nJobs
+  do i = 1, nJob
 
     ! Find indices of the two atoms that comprise the ith changed pair
     a = change(i,1)

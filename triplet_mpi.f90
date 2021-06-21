@@ -192,14 +192,14 @@ do i = 1, N_move
 !  print *, 'Done'
 
   ! Update the values of the changed exponentials in expMatrix
-  call updateExponentialsNonAdd()
+!  call updateExponentialsNonAdd()
 
 !  print *, 'Updating the triplet energies'
-  call updateTripletsNonAdd()
+!  call updateTripletsNonAdd()
 !  print *, 'Done'
 
-!  end if
-!end do
+  end if
+end do
 !moveTime = MPI_Wtime() - moveTime
 
 
