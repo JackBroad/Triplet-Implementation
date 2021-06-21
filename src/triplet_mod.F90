@@ -39,7 +39,7 @@ subroutine initialise(posAt, trainData, alpha, hyperParams, N_tp, nArgs, N_a, N_
   close(3)
 
   ! Read in the number of atoms
-  open(4, file='AtomicPositions400.txt', status='old')
+  open(4, file='AtomicPositions5.txt', status='old')
   read(4,*) N_a
 
   ! Get the atomic positions

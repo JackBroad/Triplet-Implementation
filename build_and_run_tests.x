@@ -1,7 +1,6 @@
 #!/bin/bash -f
 
-#rm testDir/tests
+rm tests/test_regression
 
 make -f testsMakefile
-
-./testDir/tests
+mpirun --mca shmem posix --oversubscribe -np 2 tests/test_regression

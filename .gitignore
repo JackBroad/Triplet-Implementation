@@ -2,7 +2,7 @@ TrainingData/oldData/
 2CO2-Ar_PES.out.dSYM/
 tests/*.F90
 tests/*.inc
-tests/test_myFunction
+tests/test_regression
 *.gcda
 *.gcno
 *.gcov
