@@ -1,4 +1,5 @@
 module triplet_mpi_mod
+  use mpi_variables
   use triplet_mod
   implicit none
   include 'mpif.h'
@@ -15,16 +16,14 @@ contains
     double precision :: moveTime, dist
     integer, allocatable :: triMat(:,:), triScatter(:,:), disIntMat(:,:)
     integer, allocatable :: newExpInt(:,:), changeTriMat(:,:)
-    integer :: processRank, clusterSize, ierror, N_a, root, newSize, N_tp, N_p
+    !integer :: processRank, clusterSize, ierror, N_a, root, newSize, N_tp, N_p
+    integer :: N_a, root, newSize, N_tp, N_p
     integer :: dataSize, barError, udSize, nArgs, Perm(6,3), kP(3), N_tri, nSum
     integer :: triInt, eCols, i, N_move, move, triPerAt
 
 
     ! Call functions to initialise MPI
     totTime = MPI_Wtime()
-    call MPI_INIT(ierror)
-    call MPI_COMM_SIZE(MPI_COMM_WORLD, clusterSize, ierror)
-    call MPI_COMM_RANK(MPI_COMM_WORLD, processRank, ierror)
 
 
     ! Declare constants and rows of permutation matrix
@@ -230,7 +229,7 @@ contains
 
 
     ! Finalise MPI and print times taken for each step of calculation
-    call MPI_FINALIZE(ierror)
+
     totTime = MPI_Wtime() - totTime
     if (processRank .eq. root) then
 

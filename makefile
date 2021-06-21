@@ -1,6 +1,6 @@
 VPATH = ./ src/
 # Find all source files, create a list of corresponding object files
-SRCS=  triplet_mod.F90 triplet_mpi.F90 main.F90
+SRCS=  MPI_Variables.F90 triplet_mod.F90 triplet_mpi.F90 main.F90
 OBJS=$(patsubst %.F90,%.o,$(SRCS))
 
 # Ditto for mods (They will be in both lists)
