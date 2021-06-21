@@ -15,4 +15,4 @@ triplet_mpi.exe
 deltaGamma*.txt
 myJob.sh
 tmp*
-
+*.a
