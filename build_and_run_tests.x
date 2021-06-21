@@ -1,7 +1,7 @@
 #!/bin/bash -f
 
-#rm testDir/tests
+rm tests/test_regression
 
 make -f testsMakefile
 
-./testDir/tests
+./tests/test_regression

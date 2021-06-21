@@ -1,4 +1,4 @@
-FC := gfortran
+FC :=  mpif90
 
 
 ifeq (nagfor,$(findstring nagfor,$(FC)))
@@ -6,14 +6,14 @@ ifeq (nagfor,$(findstring nagfor,$(FC)))
 endif
 export FFLAGS
 
-
 FFLAGS += $(PFUNIT_EXTRA_FFLAGS)
 
 
 
 
 all:
-	$(MAKE) -C testDir all
+	$(MAKE) -C src all
+	$(MAKE) -C tests all
 
 
 %.o : %.F90
@@ -22,4 +22,5 @@ all:
 
 
 clean:
-	$(MAKE) -C testDir clean
+	$(MAKE) -C src clean
+	$(MAKE) -C tests clean

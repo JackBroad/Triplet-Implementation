@@ -1,0 +1,44 @@
+module test_regression
+  use mpi
+  use triplet_mod
+  use funit
+  implicit none
+  double precision:: regression_tolerance=1e-5
+
+contains
+
+  !@test
+  !subroutine initialise()
+    !call MPI_INIT(ierror)
+    !call MPI_COMM_SIZE(MPI_COMM_WORLD, size_Of_Cluster, ierror)
+    !call MPI_COMM_RANK(MPI_COMM_WORLD, process_Rank, ierror)
+
+    !@assertEqual(root, 0 ,'Initialisation')
+  !end subroutine initialise
+  !===========================================================================================
+
+
+
+   @test
+   subroutine test_sum()
+     integer:: nDist=3, nProc=1, nTrips=1
+     integer:: distsPerProc, tripsPerProc
+
+     call getDistsAndTripletsPerProcNonAdd(nDist,nTrips,nProc,distsPerProc,tripsPerProc)
+     @assertEqual(distsPerProc, 3 ,'Distances per processor')
+
+  end subroutine test_sum
+
+
+
+
+
+  !===========================================================================================
+  @test
+  !subroutine test_finalize()
+  !  call MPI_FINALIZE(ierror)
+  !end subroutine test_finalize
+
+
+
+end module test_regression
