@@ -1,0 +1,25 @@
+FC := gfortran
+
+
+ifeq (nagfor,$(findstring nagfor,$(FC)))
+  FFLAGS += -fpp
+endif
+export FFLAGS
+
+
+FFLAGS += $(PFUNIT_EXTRA_FFLAGS)
+
+
+
+
+all:
+	$(MAKE) -C testDir all
+
+
+%.o : %.F90
+	$(FC) -c $(FFLAGS) $<
+
+
+
+clean:
+	$(MAKE) -C testDir clean
