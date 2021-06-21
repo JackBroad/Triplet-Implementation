@@ -24,8 +24,19 @@ contains
      integer:: nDist=3, nProc=1, nTrips=1
      integer:: distsPerProc, tripsPerProc
 
+     print *,'========================Regression tests============================'
+     
      call getDistsAndTripletsPerProcNonAdd(nDist,nTrips,nProc,distsPerProc,tripsPerProc)
-     @assertEqual(distsPerProc, 3 ,'Distances per processor')
+     @assertEqual(distsPerProc, 3,'Distances per processor #1')
+     @assertEqual(tripsPerProc, 1,'Triplets per processor #1')
+
+
+     nDist=6
+     nProc=2
+     nTrips=4
+     call getDistsAndTripletsPerProcNonAdd(nDist,nTrips,nProc,distsPerProc,tripsPerProc)
+     @assertEqual(distsPerProc, 3 ,'Distances per processor #2')
+     @assertEqual(tripsPerProc, 2,'Triplets per processor #2')
 
   end subroutine test_sum
 

@@ -3,5 +3,4 @@
 rm tests/test_regression
 
 make -f testsMakefile
-
-./tests/test_regression
+mpirun --mca shmem posix --oversubscribe -np 2 tests/test_regression
