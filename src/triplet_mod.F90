@@ -385,13 +385,13 @@ subroutine extractChangedExps(num,atInd,Xdg, change,dists)
   print *, change(4,:)
   print *, '                   '
 
-  !print *, 'These were extracted from the following X_dg:'
-  !print *, Xdg(1,:)
-  !print *, Xdg(2,:)
-  !print *, Xdg(3,:)
-  !print *, Xdg(4,:)
-  !print *, Xdg(5,:)
-  !print *, '                   '
+  print *, 'These were extracted from the following X_dg:'
+  print *, Xdg(1,:)
+  print *, Xdg(2,:)
+  print *, Xdg(3,:)
+  print *, Xdg(4,:)
+  print *, Xdg(5,:)
+  print *, '                   '
 
   !print *, 'The distances extracted were:'
   !print *, dists
@@ -401,12 +401,15 @@ return
 end subroutine extractChangedExps
 
 
-subroutine getChangedTriplets(atom,nAt, changedTriplets,nPerAt)
+subroutine getChangedTriplets(atom,nAt,Xdg, changedTriplets,nPerAt, &
+                              changedTriDists)
   implicit none
   integer, intent(in) :: atom, nAt
+  double precision, intent(in) :: Xdg(nAt,nAt)
   integer, intent(out) :: nPerAt
   integer, allocatable, intent(out) :: changedTriplets(:,:)
-  integer :: a, b, al, be, ga, counter
+  double precision, allocatable, intent(out) :: changedTriDists(:,:)
+  integer :: a, b, al, be, ga, counter, i
 
   ! Determine the number of triplets each atom is involved in
   nPerAt = 0
@@ -418,8 +421,9 @@ subroutine getChangedTriplets(atom,nAt, changedTriplets,nPerAt)
   print *, 'The number of triplets each atom is part of is', nPerAt
   print *, '                     '
 
-  ! Allocate array of changed triplets
+  ! Allocate array of changed triplets and distances thereof
   allocate(changedTriplets(nPerAt,3))
+  allocate(changedTriDists(nPerAt,3))
 
   ! Fill changed triplet array
   counter = 0
@@ -478,9 +482,23 @@ subroutine getChangedTriplets(atom,nAt, changedTriplets,nPerAt)
     end do
   end if
 
+  do i = 1, nPerAt
+
+    changedTriDists(i,1) = Xdg(changedTriplets(i,1),changedTriplets(i,2))
+    changedTriDists(i,2) = Xdg(changedTriplets(i,1),changedTriplets(i,3))
+    changedTriDists(i,3) = Xdg(changedTriplets(i,2),changedTriplets(i,3))
+
+  end do
+
   print *, 'The affected triplets are:'
   do counter = 1, nPerAt
     print *, changedTriplets(counter,:)
+  end do
+  print *, '                          '
+
+  print *, 'The distances therein are:'
+  do counter = 1, nPerAt
+    print *, changedTriDists(counter,:)
   end do
   print *, '============================================'
   print *, '                          '

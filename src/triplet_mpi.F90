@@ -12,6 +12,7 @@ contains
     double precision, allocatable :: trainData(:,:), expData(:,:), expMatrix(:,:)
     double precision, allocatable :: posArray(:,:), uVec(:), uFull(:), newPosAt(:,:)
     double precision, allocatable :: newX_dg(:,:), newDists(:), newExpons(:)
+    double precision, allocatable :: changeTriDist(:,:)
     double precision :: hyperParams(3), expTime, sumTime, totTime, setUpTime, U
     double precision :: moveTime, dist
     integer, allocatable :: triMat(:,:), triScatter(:,:), disIntMat(:,:)
@@ -190,7 +191,8 @@ contains
 
           !  print *, 'Finding the triplets that were affected...'
           ! Determine which triplets have undergone a change
-          call getChangedTriplets(move,N_a, changeTriMat,triPerAt)
+          call getChangedTriplets(move,N_a,X_dg, changeTriMat,triPerAt, &
+                                  changeTriDist)
           !  print *, 'Done'
 
           ! Update the values of the changed exponentials in expMatrix
@@ -214,16 +216,16 @@ contains
     deallocate(uVec)
     deallocate(triScatter)
     deallocate(disIntMat)
-    !deallocate(newPosAt)
-    !deallocate(newExpInt)
-    !deallocate(newDists)
+    deallocate(newPosAt)
+    deallocate(newExpInt)
+    deallocate(newDists)
     if (processRank .eq. root) then
 
        deallocate(X_dg)
        deallocate(UD_dg)
        deallocate(triMat)
        deallocate(uFull)
-       !  deallocate(newX_dg)
+       deallocate(newX_dg)
 
     end if
 
