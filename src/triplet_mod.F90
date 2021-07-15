@@ -7,8 +7,9 @@ contains
 
 ! Subroutine to read in matrix of atomic positions and return all requisite
 ! constants
-subroutine initialise(posAt, trainData, alpha, hyperParams, N_tp, nArgs, N_a, N_tri, udSize)
+subroutine initialise(fileName, posAt,trainData,alpha,hyperParams,N_tp,nArgs,N_a,N_tri,udSize)
   implicit none
+  character (len=40), intent(in) :: fileName
   double precision, allocatable, intent(out) :: posAt(:,:), alpha(:)
   double precision, allocatable, intent(out) :: trainData(:,:)
   double precision, intent(out) :: hyperParams(3)
@@ -23,14 +24,14 @@ subroutine initialise(posAt, trainData, alpha, hyperParams, N_tp, nArgs, N_a, N_
   close(1)
 
   ! Get the no of TPs and alpha values for each
-  open(2, file='alpha.txt', status='old')
+  open(2, file='smallAlpha.txt', status='old')
   read(2,*) N_tp
   allocate(alpha(N_tp))
   read(2,*) (alpha(j), j=1,N_tp)
   close(2)
 
   ! Read in nArgs and the distances for each TP
-  open(3, file='trainingSet.txt', status='old')
+  open(3, file='smallTrainingSet.txt', status='old')
   read(3,*) nArgs
   allocate(trainData(N_tp,nArgs))
   do k = 1, N_tp
@@ -39,7 +40,7 @@ subroutine initialise(posAt, trainData, alpha, hyperParams, N_tp, nArgs, N_a, N_
   close(3)
 
   ! Read in the number of atoms
-  open(4, file='AtomicPositions5.txt', status='old')
+  open(4, file=fileName, status='old')
   read(4,*) N_a
 
   ! Get the atomic positions
@@ -67,11 +68,10 @@ subroutine makeXdgNonAdd(nAt,posArray, X_dg)
   implicit none
   integer, intent(in) :: nAt
   double precision, intent(in) :: posArray(nAt,nAt)
-  double precision, allocatable, intent(out) :: X_dg(:,:)
+  double precision, intent(out) :: X_dg(nAt,nAt)
   integer :: i, j
 
   ! Find X_dg for the atomic positions in posArray
-  allocate(X_dg(nAt,nAt))
   do i = 1, nAt
     do j = 1, nAt
       if (i .eq. j) then
@@ -157,22 +157,28 @@ end subroutine getDistsAndTripletsPerProcNonAdd
 
 
 ! Calculates the exponentials required to find the non-additive energy
-subroutine calculateExponentialsNonAdd(nJobs,nTP,nArguments,procData,trainingData, &
-                                       lengthscale, exponentials)
+subroutine calculateExponentialsNonAdd(nJobs,nTP,nArguments,trainingData, &
+                                       lengthscale,dists,nAt, exponentials)
   implicit none
-  integer, intent(in) :: nJobs, nTP, nArguments
-  double precision, intent(in) :: procData(nJobs), trainingData(nTP,nArguments)
-  double precision, intent(in) :: lengthscale
-  double precision, intent(out) :: exponentials(nTP,nJobs*nArguments)
-  integer :: i, j, k
-  double precision :: expon
+  integer, intent(in) :: nJobs, nTP, nArguments, nAt
+  double precision, intent(in) :: trainingData(nTP,nArguments)
+  double precision, intent(in) :: lengthscale, dists(nJobs)
+  double precision, intent(out) :: exponentials(nArguments,nJobs,nTP)
+  integer :: i, j, k, atOne, atTwo
+  double precision :: expon, dist, num, denom
 
   do i = 1, nJobs
-    do j = 1, nTP
-      do k = 1, nArguments
+      do j = 1, nTP
+        do k = 1, nArguments
 
-        expon = (procData(i) - trainingData(j,k))**2 / 2/lengthscale**2
-        exponentials(j,k+(i-1)*nArguments) = exp(-1*expon)
+          num = dists(i) - trainingData(j,k)
+          num = num**2
+
+          denom = lengthscale**2
+          denom = 2*denom
+
+          expon = num / denom
+          exponentials(k,i,j) = exp(-1*expon)
 
       end do
     end do
@@ -215,7 +221,7 @@ subroutine tripletEnergiesNonAdd(triData,intMat,nJob,nTP,nAt,nPerm,nArg,permMat,
   implicit none
   integer, intent(in) :: nJob, nTP, nAt, nPerm, nArg, expCols
   integer, intent(in) :: triData(3,nJob), intMat(nAt,nAt), permMat(nPerm,nArg)
-  double precision, intent(in) :: expMat(nTP,expCols), alphaVec(nTP), sigVar
+  double precision, intent(in) :: expMat(nArg,expCols,nTP), alphaVec(nTP), sigVar
   double precision, intent(out) :: uVector(nJob)
   integer :: triInt, alp, bet, gam, alDis, beDis, gaDis, r, s, kP(nArg)
   integer :: alInt, beInt, gaInt
@@ -227,11 +233,16 @@ subroutine tripletEnergiesNonAdd(triData,intMat,nJob,nTP,nAt,nPerm,nArg,permMat,
     alp = triData(1,triInt)
     bet = triData(2,triInt)
     gam = triData(3,triInt)
+    !print *, '=================='
+    !print *, alp, bet, gam
+    !print*, ' '
 
     ! Convert these into the indices of the IA distances that describe the triplet
     alDis = intMat(alp,bet)
     beDis = intMat(alp,gam)
     gaDis = intMat(bet,gam)
+    !print *, alDis, beDis, gaDis
+    !print *, ' '
 
     ! Need to add to alpha sum for each TP so set to zero out of TP loop
     alphaSum = 0
@@ -247,13 +258,8 @@ subroutine tripletEnergiesNonAdd(triData,intMat,nJob,nTP,nAt,nPerm,nArg,permMat,
         ! Take sth row of permutation matrix
         kP = permMat(s,1:3)
 
-        ! Find where to look in expMatrix for exponentials
-        alInt = kP(1) + (alDis-1)*nArg
-        beInt = kP(2) + (beDis-1)*nArg
-        gaInt = kP(3) + (gaDis-1)*nArg
-
         ! Find the product of the relevant exps under this permutation
-        expProd = expMat(r,alInt) * expMat(r,beInt) * expMat(r,gaInt)
+        expProd = expMat(kP(1),alDis,r) * expMat(kP(2),beDis,r) * expMat(kP(3),gaDis,r)
 
         ! Add the product to the sum for this training point
         expSum = expSum + expProd
@@ -262,7 +268,7 @@ subroutine tripletEnergiesNonAdd(triData,intMat,nJob,nTP,nAt,nPerm,nArg,permMat,
 
       ! Multiply the sum by the relevant alpha value and add the result to all
       ! previous results
-      alphaSum = alphaSum + expSum * alphaVec(r)
+      alphaSum = alphaSum + (expSum*alphaVec(r))
 
     end do
 
@@ -283,7 +289,7 @@ subroutine totalEnergyNonAdd(uVector,nTri, uFinal)
   double precision, intent(out) :: uFinal
   integer :: i
 
-  uFinal = 0.0
+  uFinal = 0d0
   do i = 1, nTri
 
     uFinal = uFinal + uVector(i)
@@ -326,8 +332,9 @@ subroutine moveAt(pos,num,dMax,  newPos,mover)
     end do
   end do
 
-  !print *, "Moving atom", mover
-  !print *, "                 "
+  print *, '========================'
+  print *, "Moving atom", mover
+  print *, "                 "
 
   !print *, "Its old position was:"
   !print *, pos(mover,:)
@@ -348,25 +355,21 @@ subroutine extractChangedExps(num,atInd,Xdg, change,dists)
   implicit none
   integer, intent(in) :: num, atInd
   double precision, intent(in) :: Xdg(num,num)
-  integer, intent(out) :: change(num-1,2)
+  integer, intent(out) :: change(2,num-1)
   double precision, intent(out) :: dists(num-1)
   integer :: i, j
-
-  print *, '============================================'
-  print *, 'Moved atom', atInd
-  print *, '                     '
 
   do i = 1, num
 
     if (i .lt. atInd) then
 
-      change(i,1) = i
-      change(i,2) = atInd
+      change(1,i) = i
+      change(2,i) = atInd
 
     else if (i .gt. atInd) then
 
-      change(i-1,1) = atInd
-      change(i-1,2) = i
+      change(1,i-1) = atInd
+      change(2,i-1) = i
 
     end if
 
@@ -374,56 +377,40 @@ subroutine extractChangedExps(num,atInd,Xdg, change,dists)
 
   do j = 1, num-1
 
-    dists(j) = Xdg(change(j,1),change(j,2))
+    dists(j) = Xdg(change(1,j),change(2,j))
 
   end do
-
-  print *, 'This changed the following distances:'
-  print *, change(1,:)
-  print *, change(2,:)
-  print *, change(3,:)
-  print *, change(4,:)
-  print *, '                   '
-
-  print *, 'These were extracted from the following X_dg:'
-  print *, Xdg(1,:)
-  print *, Xdg(2,:)
-  print *, Xdg(3,:)
-  print *, Xdg(4,:)
-  print *, Xdg(5,:)
-  print *, '                   '
-
-  !print *, 'The distances extracted were:'
-  !print *, dists
-  !print *, '                   '
 
 return
 end subroutine extractChangedExps
 
 
-subroutine getChangedTriplets(atom,nAt,Xdg, changedTriplets,nPerAt, &
-                              changedTriDists)
+subroutine getTriPerAtom(nAt, nPer)
   implicit none
-  integer, intent(in) :: atom, nAt
-  double precision, intent(in) :: Xdg(nAt,nAt)
-  integer, intent(out) :: nPerAt
-  integer, allocatable, intent(out) :: changedTriplets(:,:)
-  double precision, allocatable, intent(out) :: changedTriDists(:,:)
-  integer :: a, b, al, be, ga, counter, i
+  integer, intent(in) :: nAt
+  integer, intent(out) :: nPer
+  integer :: a, b
 
   ! Determine the number of triplets each atom is involved in
-  nPerAt = 0
+  nPer = 0
   do a = 2, nAt-1
     do b = a+1, nAt
-      nPerAt = nPerAt + 1
+      nPer = nPer + 1
     end do
   end do
-  print *, 'The number of triplets each atom is part of is', nPerAt
-  print *, '                     '
 
-  ! Allocate array of changed triplets and distances thereof
-  allocate(changedTriplets(nPerAt,3))
-  allocate(changedTriDists(nPerAt,3))
+return
+end subroutine getTriPerAtom
+
+
+subroutine getChangedTriplets(atom,nAt,Xdg,nPerAt, changedTriplets, &
+                              changedTriDists)
+  implicit none
+  integer, intent(in) :: atom, nAt, nPerAt
+  double precision, intent(in) :: Xdg(nAt,nAt)
+  integer, intent(out) :: changedTriplets(3,nPerAt)
+  double precision, intent(out) :: changedTriDists(3,nPerAt)
+  integer :: a, b, al, be, ga, counter, i
 
   ! Fill changed triplet array
   counter = 0
@@ -433,9 +420,9 @@ subroutine getChangedTriplets(atom,nAt,Xdg, changedTriplets,nPerAt, &
       do ga = be+1, nAt
 
         counter = counter + 1
-        changedTriplets(counter,1) = al
-        changedTriplets(counter,2) = be
-        changedTriplets(counter,3) = ga
+        changedTriplets(1,counter) = al
+        changedTriplets(2,counter) = be
+        changedTriplets(3,counter) = ga
 
       end do
     end do
@@ -445,9 +432,9 @@ subroutine getChangedTriplets(atom,nAt,Xdg, changedTriplets,nPerAt, &
       do be = al+1, nAt-1
 
         counter = counter + 1
-        changedTriplets(counter,1) = al
-        changedTriplets(counter,2) = be
-        changedTriplets(counter,3) = ga
+        changedTriplets(1,counter) = al
+        changedTriplets(2,counter) = be
+        changedTriplets(3,counter) = ga
 
       end do
     end do
@@ -458,23 +445,23 @@ subroutine getChangedTriplets(atom,nAt,Xdg, changedTriplets,nPerAt, &
           if (al .eq. atom) then
 
             counter = counter + 1
-            changedTriplets(counter,1) = al
-            changedTriplets(counter,2) = be
-            changedTriplets(counter,3) = ga
+            changedTriplets(1,counter) = al
+            changedTriplets(2,counter) = be
+            changedTriplets(3,counter) = ga
 
           else if (be .eq. atom) then
 
             counter = counter + 1
-            changedTriplets(counter,1) = al
-            changedTriplets(counter,2) = be
-            changedTriplets(counter,3) = ga
+            changedTriplets(1,counter) = al
+            changedTriplets(2,counter) = be
+            changedTriplets(3,counter) = ga
 
           else if (ga .eq. atom) then
 
             counter = counter + 1
-            changedTriplets(counter,1) = al
-            changedTriplets(counter,2) = be
-            changedTriplets(counter,3) = ga
+            changedTriplets(1,counter) = al
+            changedTriplets(2,counter) = be
+            changedTriplets(3,counter) = ga
 
           end if
         end do
@@ -484,67 +471,191 @@ subroutine getChangedTriplets(atom,nAt,Xdg, changedTriplets,nPerAt, &
 
   do i = 1, nPerAt
 
-    changedTriDists(i,1) = Xdg(changedTriplets(i,1),changedTriplets(i,2))
-    changedTriDists(i,2) = Xdg(changedTriplets(i,1),changedTriplets(i,3))
-    changedTriDists(i,3) = Xdg(changedTriplets(i,2),changedTriplets(i,3))
+    changedTriDists(1,i) = Xdg(changedTriplets(1,i),changedTriplets(2,i))
+    changedTriDists(2,i) = Xdg(changedTriplets(1,i),changedTriplets(3,i))
+    changedTriDists(3,i) = Xdg(changedTriplets(2,i),changedTriplets(3,i))
 
   end do
-
-  print *, 'The affected triplets are:'
-  do counter = 1, nPerAt
-    print *, changedTriplets(counter,:)
-  end do
-  print *, '                          '
-
-  print *, 'The distances therein are:'
-  do counter = 1, nPerAt
-    print *, changedTriDists(counter,:)
-  end do
-  print *, '============================================'
-  print *, '                          '
 
 return
 end subroutine getChangedTriplets
 
 
-subroutine updateExponentialsNonAdd(nJob,nTP,nArgument,nAt,ecol,ind,change,dists, &
-                                    expData,trainingData,triplets,nPer,perms, &
-                                    updateExp)
+subroutine findChangedTriIndex(nPerAt,nAt,atom, triIndex)
   implicit none
-  integer, intent(in) :: nJob, nTP, nArgument, nAt, ind(nAt,nAt), change(nJob,2)
-  integer, intent(in) :: triplets(nJob,3), nPer, perms(nPer,3), ecol
-  double precision, intent(in) :: dists(nJob), expData(nTP,ecol)
+  integer, intent(in) :: nPerAt, nAt, atom
+  integer, intent(out) :: triIndex(nPerAt)
+  integer :: al, be, ga, i, counter
+
+  counter = 0
+  i = 0
+  do al = 1, nAt-2
+    do be = al+1, nAt-1
+      do ga = be+1, nAt
+
+        i = i + 1
+
+        if (al .eq. atom) then
+
+          counter = counter + 1
+          triIndex(counter) = i
+
+        else if (be .eq. atom) then
+
+          counter = counter + 1
+          triIndex(counter) = i
+
+        else if (ga .eq. atom) then
+
+          counter = counter + 1
+          triIndex(counter) = i
+
+        end if
+      end do
+    end do
+  end do
+
+return
+end subroutine findChangedTriIndex
+
+
+subroutine findChangedDistsPerTrip(nPerAt,changedTri,atom, indPerTrip)
+  implicit none
+  integer, intent(in) :: nPerAt, changedTri(3,nPerAt), atom
+  integer, intent(out) :: indPerTrip(2,nPerAt)
+  integer :: i, al, be, ga, j
+
+  do i = 1, nPerAt
+
+    al = changedTri(1,i)
+    be = changedTri(2,i)
+    ga = changedTri(3,i)
+
+    if (al .eq. atom) then
+
+      indPerTrip(1,i) = 1
+      indPerTrip(2,i) = 2
+
+    else if (be .eq. atom) then
+
+      indPerTrip(1,i) = 1
+      indPerTrip(2,i) = 3
+
+    else !if (ga .eq. atom) then
+
+      indPerTrip(1,i) = 2
+      indPerTrip(2,i) = 3
+
+    end if
+  end do
+
+return
+end subroutine findChangedDistsPerTrip
+
+
+subroutine updateExponentialsNonAdd(nJob,nTP,nArgument,dists,ind,triIndVec, &
+                                    trainingData,lengthscale,triPerAt,nDat, &
+                                    pR, updateExp)
+  implicit none
+  integer, intent(in) :: nJob, nTP, nArgument, triPerAt, nDat, pR
+  integer, intent(in) :: ind(2,nJob), triIndVec(triPerAt)
+  double precision, intent(in) :: dists(3,nJob), lengthscale
   double precision, intent(in) :: trainingData(nTP,nArgument)
-  double precision, intent(out) :: updateExp(nTP,ecol)
-  integer :: i, j, k, l, a, b, g, aIn, bIn, gIn, rowPerm(3)
-  double precision :: expon, lengthscale
+  double precision, intent(out) :: updateExp(nTP,nDat*nArgument)
+  double precision :: expon
+  integer :: i, j, k, l, triInd, m, n, minInd, maxInd, countDone, countJobs, o
+  integer :: first
 
-  do i = 1, nJob
+  minInd = pR*nDat + 1
+  maxInd = (pR+1)*nDat
 
-    ! Find indices of the two atoms that comprise the ith changed pair
-    a = change(i,1)
-    b = change(i,2)
-    !g = triplets(i,3)
+  countDone = 0
+  do m = 1, triPerAt
+    if (triIndVec(m) .lt. minInd) then
 
-    ! Find the index of this pairwise interaction
-    aIn = ind(a,b)
-    !bIn = ind(a,g)
-    !gIn = ind(b,g)
+      countDone = countDone + 1
+
+    end if
+  end do
+  first = triIndVec(countDone+1)
+
+  countJobs = 0
+  do n = 1, triPerAt
+    if (triIndVec(n) .ge. minInd) then
+      if (triIndVec(n) .le. maxInd) then
+
+        countJobs = countJobs + 1
+
+      end if
+    end if
+  end do
+
+  if (pR .eq. 0) then
+  print *, ' '
+!  print *, 'The indices of the affected triplets are:'
+!  print *, triIndVec
+!  print *, 'minInd is', minInd
+!  print *, 'maxInd is', maxInd
+!  print *, 'Max no. of triplets per node is', triPerAt
+!  print *, 'No. of preceding triplets already re-calculated on other procs is', &
+!           countDone
+!  print *, 'No. of changed triplets to be calced by this proc is', countJobs
+!  print *, 'No. of changed triplets left to be calced by procs w/ higher rank is', &
+!           triPerAt-(countDone+countJobs) 
+!  print *, ' '
+  end if
+
+  do i = countDone+1, countDone+countJobs
+
+    ! Find col index of last element of first altered triplet in the full expMatrix
+    triInd = triIndVec(i)
+
+    ! Convert to first index of the same triplet in same matrix
+    triInd = 3*triInd - 2
+    
+    ! Convert to index of same triplet in expData for current process
+    triInd = triInd - (pR*nArgument*nDat)
 
     do j = 1, nTP
-      do k = 1, nArgument
+      do k = 1, 2
 
-        ! Calculate the new exponenitial for this interaction
-        expon = (dists(i) - trainingData(j,k))**2 / 2/lengthscale**2
-        expon = exp(-1*expon)
+        l = ind(k,i)
 
-        ! Update expMatrix for all triplets where this interaction appears
-        do l = 1, nPer
+        if (pR .eq. 0) then
+        if (i .eq. first) then
+          if (j .eq. 1) then
+            if (k .eq. 1) then
+            !print *, ' '
+            !print *, 'First triplet was', first
+            !print *, 'On triplet', triIndVec(i)
+            !print *, 'Looking at distances', ind(1,i), 'and', ind(2,i), 'in this triplet'
+            !print *, 'These had new values of', dists(ind(1,i),i), 'and', dists(ind(2,i),i)
+            !print *, 'The old exponentials (from old dists not those above) were:'
+            !print *, updateExp(j,(triInd-1)*nArgument+1), updateExp(j,(triInd-1)*nArgument+2) &
+            !       , updateExp(j,(triInd-1)*nArgument+3)
+            print *, ' '
+            end if
+          end if
+        end if
+        end if
 
-          rowPerm = perms(l,:)
+        ! Calculate the new exponenitial and add to updated expMatrix
+        expon = (dists(l,i) - trainingData(j,l))**2 / 2/lengthscale**2
+        updateExp(j,(triInd-1)*nArgument+l) = exp(-1*expon)
 
-        end do
-        !updateExp(j,k+(i-1)*nArguments) = exp(-1*expon)
+        if (pR .eq. 0) then
+        if (i .eq. first) then
+          if (j .eq. 1) then
+            if (k .eq. 2) then
+            print *, ' '
+            !print *, 'The new exponentials are:'
+            !print *, updateExp(j,(triInd-1)*nArgument+1), updateExp(j,(triInd-1)*nArgument+2) &
+            !       , updateExp(j,(triInd-1)*nArgument+3)
+            !print *, ' '
+            end if
+          end if
+        end if
+        end if
 
       end do
     end do
@@ -552,28 +663,6 @@ subroutine updateExponentialsNonAdd(nJob,nTP,nArgument,nAt,ecol,ind,change,dists
 
 return
 end subroutine updateExponentialsNonAdd
-
-
-subroutine updateTripletsNonAdd(nJob,nAt,triplets,intMat)
-  implicit none
-  integer, intent(in) :: nJob, nAt, intMat(nAt,nAt)
-  double precision, intent(in) :: triplets(nJob,3)
-  integer :: i, a, b, g, aIn, bIn, gIn
-
-  do i = 1, nJob
-
-    a = triplets(i,1)
-    b = triplets(i,2)
-    g = triplets(i,3)
-
-    aIn = intMat(a,b)
-    bIn = intMat(a,g)
-    gIn = intMat(b,g)
-
-  end do
-
-return
-end subroutine updateTripletsNonAdd
 
 
 end module triplet_mod

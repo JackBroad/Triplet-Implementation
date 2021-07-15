@@ -9,7 +9,7 @@ program tryMPI
   call MPI_COMM_RANK(MPI_COMM_WORLD, processRank, ierror)
   
 
-  call triplet_mpi()
+  call triplet_mpi(fileName='AtomicPositions400.txt')
 
 
   call MPI_FINALIZE(ierror)

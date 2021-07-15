@@ -1,2 +1,2 @@
 make
-mpirun -np  2 ./triplet.out
+mpirun -np  10 ./triplet.out

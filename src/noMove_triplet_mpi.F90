@@ -18,7 +18,7 @@ contains
     double precision, allocatable :: oldTriDists(:,:), changeExpMat(:,:,:)
     double precision, allocatable :: newUvec(:), newUfull(:)
     double precision :: hyperParams(3), expTime, sumTime, totTime, setUpTime, U
-    double precision :: moveTime, dist, deltaU
+    double precision :: moveTime, dist
     integer, allocatable :: triMat(:,:), triScatter(:,:), disIntMat(:,:)
     integer, allocatable :: newExpInt(:,:), changeTriMat(:,:), tripIndex(:)
     integer, allocatable :: indPerTrip(:,:), scatterTripInd(:), scatterTrip(:,:)
@@ -194,117 +194,127 @@ contains
     allocate(newUvec(triPerProc))
     allocate(newUfull(triPerAt))
     allocate(changedTriDists(3,triPerAt))
-    do i = 1, N_move
+    !do i = 1, N_move
 
-       newExpMat = expMatrix
+     !  newExpMat = expMatrix
 
        ! Set up on root
-       if (processRank .eq. root) then
+     !  if (processRank .eq. root) then
 
           ! Move an atom
-          call moveAt(posArray,N_a,dist, newPosAt,move)
+      !    call moveAt(posArray,N_a,dist, newPosAt,move)
 
           ! Re-calculate X_dg for the new atomic positions
-          call makeXdgNonAdd(N_a,newPosAt, newX_dg)
+       !   call makeXdgNonAdd(N_a,newPosAt, newX_dg)
 
           ! Find the indices of the affected exponentials
-          call extractChangedExps(N_a,move,newX_dg, newExpInt,newDists)
+        !  call extractChangedExps(N_a,move,newX_dg, newExpInt,newDists)
 
           ! Determine which triplets have undergone a change
-          call getChangedTriplets(move,N_a,newX_dg,triPerAt, &
-                                  changedTriplets,changedTriDists)
-          call findChangedTriIndex(triPerAt,N_a,move, tripIndex)
-          call findChangedDistsPerTrip(triPerAt,changedTriplets,move, indPerTrip)
+         ! call getChangedTriplets(move,N_a,newX_dg,triPerAt, &
+         !                         changedTriplets,changedTriDists)
+          !call findChangedTriIndex(triPerAt,N_a,move, tripIndex)
+          !call findChangedDistsPerTrip(triPerAt,changedTriplets,move, indPerTrip)
 
-          print *, ' '
-          print *, 'N_tri =', N_tri
-          print *, 'N_dist =', udSize
-          print *, 'N_changed =', N_a-1
-          print *, expMatrix(1:3,1,1)
-          print *, newExpMat(1:3,1,1)
-          print *, ' '
+        !  print *, ' '
+        !  print *, 'N_tri =', N_tri
+        !  print *, 'N_dist =', udSize
+        !  print *, 'N_changed =', N_a-1
+          !print *, expMatrix(1:3,1,1)
+          !print *, newExpMat(1:3,1,1)
+         ! print *, ' '
 
-       end if
+       !end if
 
        ! Scatter all requisite data from move set-up on root to all procs
-       call MPI_Scatter(changedTriplets, triPerProc*3, MPI_INT, scatterTrip, &
-                        triPerProc*3, MPI_INT, root, MPI_COMM_WORLD, ierror)
-       if (processRank .eq. root) then
-         print *, 'trips scattered'
-       end if
-       call MPI_Bcast(newExpInt, 2*((N_a-1)/clusterSize), MPI_INT, root, MPI_COMM_WORLD, &
-                      ierror)
-       if (processRank .eq. root) then
-         print *, 'expInts broadcasted'
-       end if
-       call MPI_Scatter(newDists, (N_a-1)/clusterSize, MPI_DOUBLE_PRECISION, &
-                        scatterDists, (N_a-1)/clusterSize, MPI_DOUBLE_PRECISION, &
-                        root, MPI_COMM_WORLD, ierror)
-       if (processRank .eq. root) then
-         print *, 'distances scattered'
-       end if
-       call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
-       if (processRank .eq. root) then
-         print *, 'broadcast done'
-       end if
-       call MPI_BARRIER(MPI_COMM_WORLD, barError)
-       if (processRank .eq. root) then
-         print *, 'barrier passed'
-       end if
-       call MPI_Bcast(tripIndex, triPerAt, MPI_INT, root, MPI_COMM_WORLD, ierror)
-       call MPI_Bcast(indPerTrip, 2*triPerAt, MPI_INT, root, MPI_COMM_WORLD, &
-                      ierror)
-       call MPI_Bcast(changedTriDists, 3*triPerAt, MPI_DOUBLE_PRECISION, root, &
-                      MPI_COMM_WORLD, ierror)
-       call MPI_Bcast(oldTriDists, 3*triPerAt, MPI_DOUBLE_PRECISION, root, &
-                      MPI_COMM_WORLD, ierror)
+       !call MPI_Scatter(changedTriplets, triPerProc*3, MPI_INT, scatterTrip, &
+       !                 triPerProc*3, MPI_INT, root, MPI_COMM_WORLD, ierror)
+       !if (processRank .eq. root) then
+       !  print *, 'trips scattered'
+       !end if
+       !call MPI_Bcast(newExpInt, 2*((N_a-1)/clusterSize), MPI_INT, root, MPI_COMM_WORLD, &
+       !               ierror)
+       !if (processRank .eq. root) then
+       !  print *, 'expInts broadcasted'
+       !end if
+       !call MPI_Scatter(newDists, (N_a-1)/clusterSize, MPI_DOUBLE_PRECISION, &
+       !                 scatterDists, (N_a-1)/clusterSize, MPI_DOUBLE_PRECISION, &
+       !                 root, MPI_COMM_WORLD, ierror)
+       !if (processRank .eq. root) then
+       !  print *, 'distances scattered'
+       !end if
+       !call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
+       !if (processRank .eq. root) then
+       !  print *, 'broadcast done'
+       !end if
+       !call MPI_BARRIER(MPI_COMM_WORLD, barError)
+       !if (processRank .eq. root) then
+       !  print *, 'barrier passed'
+       !end if
+       !call MPI_Bcast(tripIndex, triPerAt, MPI_INT, root, MPI_COMM_WORLD, ierror)
+       !call MPI_Bcast(indPerTrip, 2*triPerAt, MPI_INT, root, MPI_COMM_WORLD, &
+       !               ierror)
+       !call MPI_Bcast(changedTriDists, 3*triPerAt, MPI_DOUBLE_PRECISION, root, &
+       !               MPI_COMM_WORLD, ierror)
+       !call MPI_Bcast(oldTriDists, 3*triPerAt, MPI_DOUBLE_PRECISION, root, &
+       !               MPI_COMM_WORLD, ierror)
        
        ! Update exponentials in changed triplets
-       call calculateExponentialsNonAdd(((N_a-1)/clusterSize),N_tp,nArgs,trainData, &
-                                        hyperParams(1),scatterDists,N_a, changeExpData)
-       if (processRank .eq. root) then
-         print *, 'exps re-calculated'
-       end if 
+       !call calculateExponentialsNonAdd(((N_a-1)/clusterSize),N_tp,nArgs,trainData, &
+       !                                 hyperParams(1),scatterDists,N_a, changeExpData)
+       !if (processRank .eq. root) then
+       !  print *, 'exps re-calculated'
+       !end if 
 
        ! Gather in all updated exps and broadcast the resultant matrix to all procs
-       call MPI_Gather(changeExpData, N_tp*nArgs*((N_a-1)/clusterSize), &
-                       MPI_DOUBLE_PRECISION, changeExpMat, N_tp*nArgs*((N_a-1)/clusterSize), &
-                       MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-       if (processRank .eq. root) then
-         print *, 'exps re-gathered'
-       end if
-       call MPI_Bcast(changeExpMat, N_tp*nArgs*((N_a-1)/clusterSize), &
-                      MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-       call MPI_BARRIER(MPI_COMM_WORLD, barError)
-       if (processRank .eq. root) then
-         print *, 'exps re-broadcasted'
-       end if
+       !call MPI_Gather(changeExpData, N_tp*nArgs*((N_a-1)/clusterSize), &
+       !                MPI_DOUBLE_PRECISION, changeExpMat, N_tp*nArgs*((N_a-1)/clusterSize), &
+       !                MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+       !if (processRank .eq. root) then
+       !  print *, 'exps re-gathered'
+       !end if
+       !call MPI_Bcast(changeExpMat, N_tp*nArgs*((N_a-1)/clusterSize), &
+       !                MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+       !call MPI_BARRIER(MPI_COMM_WORLD, barError)
+       !if (processRank .eq. root) then
+       !  print *, 'exps re-broadcasted'
+       !end if
 
        ! Calculate the non-additive energies for the changed triplets and gather
-       call tripletEnergiesNonAdd(scatterTrip,disIntMat,triPerProc,N_tp,N_a,N_p,nArgs,Perm, &
-                                  N_a-1,changeExpMat,alpha,hyperParams(2), newUvec)
-       call MPI_Gather(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, triPerProc, &
-                       MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+       !call tripletEnergiesNonAdd(scatterTrip,disIntMat,triPerProc,N_tp,N_a,N_p,nArgs,Perm, &
+       !                           N_a-1,changeExpMat,alpha,hyperParams(2), newUvec)
+       !call MPI_Gather(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, triPerProc, &
+       !                MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
 
        ! Find total change in non-add energy from moving atom
-       deltaU = 0d0
-       if (processRank .eq. root) then
+       !U = 0d0
+       !if (processRank .eq. root) then
 
-         call totalEnergyNonAdd(newUfull,triPerAt, deltaU)
-         print *, "The change in non-additive energy after the move is", deltaU
-         print *, '=========================='
+       !  call totalEnergyNonAdd(newUfull,triPerAt, U)
+       !  print *, "The change in non-additive energy after the move is", U
+       !  print *, '=========================='
 
-       end if
+       !end if
+
+       !if (processRank .eq. root) then
+
+       !  print *, ' '
+         !print *, expMatrix(1,1:nArgs*N_tri)
+        ! print *, newExpMat(1,1:nArgs*N_tri)
+       !  print *, '=========================='
+       !  print *, ' '
+
+       !end if
 
        ! Update expData (accept all moves for now so auto-update in each loop)
-       do j = 1, N_a-1
+       !do j = 1, N_a-1
 
-         indj = disIntMat(newExpInt(1,j),newExpInt(2,j))
-         expMatrix(1:nArgs,indj,1:N_tp) = changeExpMat(1:nArgs,j,1:N_tp)
+        ! indj = disIntMat(newExpInt(1,j),newExpInt(2,j))
+        ! expMatrix(1:nArgs,indj,1:N_tp) = changeExpMat(1:nArgs,j,1:N_tp)
 
-       end do
+       !end do
 
-    end do
+    !end do
     moveTime = MPI_Wtime() - moveTime
 
 

@@ -4,7 +4,13 @@ module test_regression
   use triplet_mod
   use funit
   implicit none
-  double precision:: regression_tolerance=1e-9
+  double precision :: regression_tolerance=1e-9, low_tol=1e-6
+  double precision, allocatable :: posAt(:,:), alpha(:)
+  double precision, allocatable :: trainData(:,:)
+  double precision, allocatable :: expData(:,:,:)
+  double precision :: hyperParams(3)
+  integer, allocatable :: disMat(:,:)
+  integer :: N_tp, nArgs, N_a, N_tri, udSize
 
 contains
 
@@ -46,7 +52,8 @@ contains
        ! check output
        @assertEqual(distsPerProc, 3 ,'Distances per processor #2')
        @assertEqual(tripsPerProc, 2,'Triplets per processor #2')
-    endif
+
+    end if
 
   end subroutine test_JobsPerNode
 
@@ -55,29 +62,238 @@ contains
   @test
   subroutine test_initialise()
     implicit none
-    double precision, allocatable:: posAt(:,:), alpha(:)
-    double precision, allocatable:: trainData(:,:)
-    double precision:: hyperParams(3) 
-    integer:: N_tp, nArgs, N_a, N_tri, udSize
+    character(len=40) :: name='AtomicPositionsTest.txt'
+    double precision:: hyperParams_Ex(3), posAt_Ex(3,3)
 
-    double precision:: hyperParams_Expected(3)
+    hyperParams_Ex(1:3) =  (/ 0.10109332178237054d0, 5.0651896159484985d-5, &
+                            1.2319522830243570d-15 /)
+    posAt_Ex(1,1:3) = (/ 2d0, 2d0, 2d0/)
+    posAt_Ex(2,1:3) = (/ 4.598076211353316d0, 2d0, 0.5d0 /)
+    posAt_Ex(3,1:3) = (/ 4.598076211353316d0, 2d0, 3.5d0 /)
 
+    call initialise(name, posAt,trainData,alpha,hyperParams,N_tp,nArgs,N_a, &
+                    N_tri,udSize)
 
     if( processRank == root ) then
 
-       hyperParams_Expected(1:3) =  (/ 0.10109332178237054d0,5.0651896159484985d-5, 1.2319522830243570d-15 /)
+       @assertEqual(N_tp, 3, 'Test initialise: no. of TPs')
+       @assertEqual(hyperParams, hyperParams_Ex, regression_tolerance, 'Test initialise: hyperparameters')
+       @assertEqual(N_a, 3, 'Test initialise: no. of atoms')
+       @assertEqual(nArgs, 3, 'Test initialise: no. of arguments')
+       @assertEqual(N_tri, 1, 'Test initialise: no. of triplets')
+       @assertEqual(udSize, 3, 'Test initialise: no. of distances in total')
+       @assertEqual(posAt, posAt_Ex, regression_tolerance, 'Test initialise: atomic positions')
 
-       call initialise(posAt, trainData, alpha, hyperParams, N_tp, nArgs, N_a, N_tri, udSize)
-
-       @assertEqual(N_tp, 337,'Test initialise: N_tp')
-       @assertEqual(hyperParams, hyperParams_Expected,   regression_tolerance,'hyperparameters')
-
-    endif
-
+    end if
 
   end subroutine test_initialise
 
+  @test
+  subroutine test_Xdg()
+    implicit none
+    double precision :: Xdg(N_a,N_a), Xdg_Ex(N_a,N_a), ud_Ex(3)
+    double precision, allocatable :: upperDiag(:)
 
+    call makeXdgNonAdd(N_a,posAt, Xdg)
+    call makeUDdgNonAdd(N_a,udSize,Xdg, upperDiag)
+
+    if( processRank == root ) then
+
+      Xdg_Ex(1,1:N_a) = (/ 0d0, (1d0/3d0), (1d0/3d0) /)
+      Xdg_Ex(2,1:N_a) = (/ (1d0/3d0), 0d0, (1d0/3d0) /)
+      Xdg_Ex(3,1:N_a) = (/ (1d0/3d0), (1d0/3d0), 0d0 /)
+
+      @assertEqual(Xdg, Xdg_Ex, regression_tolerance, 'Test X_dg: delta-gamma matrix')
+
+      ud_Ex = (/ (1d0/3d0), (1d0/3d0), (1d0/3d0) /)
+
+      @assertEqual(upperDiag, ud_Ex, regression_tolerance, 'Test X_dg: upper diagonal')
+
+    end if
+
+  end subroutine test_Xdg
+
+  @test
+  subroutine test_disIntMat()
+    implicit none
+    integer :: disMat_Ex(N_a,N_a)
+
+    disMat_Ex(1,1:N_a) = (/ 0, 1, 2 /)
+    disMat_Ex(2,1:N_a) = (/ 1, 0, 3 /)
+    disMat_Ex(3,1:N_a) = (/ 2, 3, 0 /)
+
+    call makeDisIntMatNonAdd(N_a, disMat)
+
+    if( processRank == root ) then
+
+      @assertEqual(disMat, disMat_Ex, 'Test disIntMat')
+
+    end if
+
+  end subroutine test_disIntMat
+
+  @test
+  subroutine test_triMat()
+    implicit none
+    integer :: nTri=4, nAt=4
+    integer, allocatable :: triMat_Ex(:,:), triMatrix(:,:)
+
+    allocate(triMatrix(nArgs,nTri),triMat_Ex(nArgs,nTri))
+
+    if( processRank == root ) then
+
+      triMat_Ex(1:3,1) = (/1,2,3/)
+      triMat_Ex(1:3,2) = (/1,2,4/)
+      triMat_Ex(1:3,3) = (/1,3,4/)
+      triMat_Ex(1:3,4) = (/2,3,4/)
+
+      call makeTripletMatrix(nAt,nTri, triMatrix)
+
+      @assertEqual(triMatrix, triMat_Ex, 'Test triplet matrix')
+
+    end if
+
+  end subroutine test_triMat
+
+  @test
+  subroutine test_scatter()
+    implicit none
+    integer :: bigVec(4), procVec(2), bigMat(2,2), root=0
+    integer :: procVec_Ex(2)
+
+    if( processRank == root ) then
+
+      bigVec(1:4) = (/ 1,2,3,4 /)
+      bigMat(1,1:2) = (/ 1,2 /)
+      bigMat(2,1:2) = (/ 3,4 /)
+
+    end if
+
+    call MPI_Scatter(bigVec, 2, MPI_INT, procVec, 2, MPI_INT, root, MPI_COMM_WORLD, ierror)
+
+    if( processRank == root ) then
+
+      procVec_Ex(1) = 1
+      procVec_Ex(2) = 2
+      @assertEqual(procVec, procVec_Ex, 'Test scatter')
+
+    else if( processRank == 1) then
+
+      procVec_Ex(1) = 3
+      procVec_Ex(2) = 4
+      @assertEqual(procVec, procVec_Ex, 'Test scatter')
+
+    end if
+
+    call MPI_Scatter(bigMat, 2, MPI_INT, procVec, 2, MPI_INT, root, MPI_COMM_WORLD, ierror)
+
+    if( processRank == root ) then
+
+      procVec_Ex(1) = 1
+      procVec_Ex(2) = 3
+      @assertEqual(procVec, procVec_Ex, 'Test scatter')
+
+    else if( processRank == 1) then
+
+      procVec_Ex(1) = 2
+      procVec_Ex(2) = 4
+      @assertEqual(procVec, procVec_Ex, 'Test scatter')
+
+    end if
+
+  end subroutine test_scatter
+
+  @test
+  subroutine test_gather()
+    implicit none
+    integer :: bigMat(3,2), procVec(3), bigMat_Ex(3,2)
+
+    if( processRank == root) then
+
+      procVec(1) = 1
+      procVec(2) = 2
+      procVec(3) = 3
+
+    else if( processRank == 1) then
+
+      procVec(1) = 4
+      procVec(2) = 5
+      procVec(3) = 6
+
+    end if
+
+    bigMat_Ex(1,1:2) = (/ 1,4 /)
+    bigMat_Ex(2,1:2) = (/ 2,5 /)
+    bigMat_Ex(3,1:2) = (/ 3,6 /)
+
+    call MPI_Gather(procVec, 3, MPI_INT, bigMat, 3, MPI_INT, root, MPI_COMM_WORLD, ierror)
+
+    if( processRank == root) then
+
+      @assertEqual(bigMat, bigMat_Ex, 'Test gather')
+
+    end if
+
+  end subroutine test_gather
+
+  @test
+  subroutine test_exp_calc()
+    implicit none
+    integer :: nDists=3
+    double precision :: Xdg(N_a,N_a), expSlice_Ex(nArgs,3)
+    double precision :: expSlice(nArgs,3), dists(3)
+
+    allocate(expData(nArgs,3,N_tp))
+
+    ! All inv. distances in test triplet are 0.5
+    dists = (/ 1d0/3d0,1d0/3d0,1d0/3d0 /)
+
+    ! Pre-calculated exponenitals for dists with first TP
+    expSlice_Ex(1,:) = (/ 0.5039746,0.5039746,0.5039746 /)
+    expSlice_Ex(2,:) = (/ 0.2165715,0.2165715,0.2165715 /)
+    expSlice_Ex(3,:) = (/ 0.1450487,0.1450487,0.1450487 /)
+
+    ! Calculate exponentials w/ appropriate subroutine
+    call calculateExponentialsNonAdd(nDists,N_tp,nArgs,trainData,hyperParams(1), &
+                                     dists,N_a, expData)
+    
+    ! Take slice of expData which has exps with first TP
+    expSlice = expData(:,:,1)
+
+    if( processRank == root) then
+
+      @assertEqual(expSlice, expSlice_Ex, low_tol, 'Test exponential calc')
+
+    end if
+
+  end subroutine test_exp_calc
+
+  @test
+  subroutine test_triplet_energies()
+    implicit none
+    double precision :: U_Ex(1), U(1)
+    integer :: trip(3,1), Perm(6,3), N_p=6
+
+    U_Ex(1) = 68.776748653803210
+    trip(:,1) = (/ 1,2,3 /)
+
+    Perm(1,:) = (/1, 2, 3/)
+    Perm(2,:) = (/1, 3, 2/)
+    Perm(3,:) = (/2, 1, 3/)
+    Perm(4,:) = (/2, 3, 1/)
+    Perm(5,:) = (/3, 1, 2/)
+    Perm(6,:) = (/3, 2, 1/)
+
+    call tripletEnergiesNonAdd(trip,disMat,1,N_tp,N_a,N_p,nArgs,Perm, &
+                               udSize,expData,alpha,hyperParams(2), U)
+
+    if( processRank == root) then
+
+      @assertEqual(U, U_Ex, low_tol, 'Test non-add energy calc')
+
+    end if
+
+  end subroutine test_triplet_energies
   !===========================================================================================
   @test
   subroutine test_finalize()
