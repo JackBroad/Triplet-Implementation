@@ -7,7 +7,7 @@ program energyCheck
   integer :: i, j, k, nTraining, nPerms, nDim, perm(3,6), l, m, n
   double precision :: kSqExpAllPerms, kSqExpJthPerm, kKernTotal
 
-  xStar = (/ 1d0/3d0,1d0/3d0,1d0/3d0 /)
+  xStar = (/ 4.9530743964810102E-002, 2.1838616589923775E-002, 3.0229538987517568E-002/)
   perm(:,1) = (/1, 2, 3/)
   perm(:,2) = (/1, 3, 2/)
   perm(:,3) = (/2, 1, 3/)
