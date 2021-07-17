@@ -24,7 +24,7 @@ contains
     integer, allocatable :: indPerTrip(:,:), scatterTripInd(:), scatterTrip(:,:)
     integer, allocatable :: scatterIndPerTrip(:,:), changedTriplets(:,:)
     integer, allocatable :: scatterExpInd(:,:)
-    integer :: N_a, root, newSize, N_tp, N_p, triPerProc, j, indj
+    integer :: N_a, root, newSize, N_tp, N_p, triPerProc, j, indj, nPerProc
     integer :: dataSize, barError, udSize, nArgs, Perm(6,3), kP(3), N_tri, nSum
     integer :: triInt, eCols, i, N_move, move, triPerAt, triInd
 
@@ -168,6 +168,7 @@ contains
     if (processRank .eq. root) then
 
        call totalEnergyNonAdd(uFull,N_tri, U)
+       print *, uFull
        print *, "The total non-additive energy is", U
        print *, "              "
 
@@ -179,14 +180,15 @@ contains
     moveTime = MPI_Wtime()
     call getTriPerAtom(N_a, triPerAt)
     triPerProc = triPerAt / clusterSize
-    allocate(scatterDists((N_a-1)/clusterSize))
+    nPerProc = (N_a-1)/clusterSize
+    allocate(scatterDists(nPerProc))
     allocate(scatterTrip(3,triPerProc))
-    allocate(scatterExpInd(2,(N_a-1)/clusterSize))
+    allocate(scatterExpInd(2,nPerProc))
     allocate(newPosAt(N_a,nArgs))
     allocate(newExpInt(2,N_a-1))
     allocate(newDists(N_a-1))
     allocate(indPerTrip(2,triPerAt))
-    allocate(changeExpData(nArgs,(N_a-1)/clusterSize,N_tp))
+    allocate(changeExpData(nArgs,nPerProc,N_tp))
     allocate(changeExpMat(nArgs,N_a-1,N_tp))
     allocate(newExpMat(nArgs,udSize,N_tp))
     allocate(changedTriplets(3,triPerAt))
@@ -194,9 +196,8 @@ contains
     allocate(newUvec(triPerProc))
     allocate(newUfull(triPerAt))
     allocate(changedTriDists(3,triPerAt))
+    allocate(tripIndex(triPerAt))
     do i = 1, N_move
-
-       newExpMat = expMatrix
 
        ! Set up on root
        if (processRank .eq. root) then
@@ -220,8 +221,7 @@ contains
           print *, 'N_tri =', N_tri
           print *, 'N_dist =', udSize
           print *, 'N_changed =', N_a-1
-          print *, expMatrix(1:3,1,1)
-          print *, newExpMat(1:3,1,1)
+          print *, 'Dists per proc =', nPerProc
           print *, ' '
 
        end if
@@ -229,56 +229,28 @@ contains
        ! Scatter all requisite data from move set-up on root to all procs
        call MPI_Scatter(changedTriplets, triPerProc*3, MPI_INT, scatterTrip, &
                         triPerProc*3, MPI_INT, root, MPI_COMM_WORLD, ierror)
-       if (processRank .eq. root) then
-         print *, 'trips scattered'
-       end if
-       call MPI_Bcast(newExpInt, 2*((N_a-1)/clusterSize), MPI_INT, root, MPI_COMM_WORLD, &
+       call MPI_Bcast(newExpInt, 2*nPerProc, MPI_INT, root, MPI_COMM_WORLD, &
                       ierror)
-       if (processRank .eq. root) then
-         print *, 'expInts broadcasted'
-       end if
-       call MPI_Scatter(newDists, (N_a-1)/clusterSize, MPI_DOUBLE_PRECISION, &
+       call MPI_Scatter(newDists, nPerProc, MPI_DOUBLE_PRECISION, &
                         scatterDists, (N_a-1)/clusterSize, MPI_DOUBLE_PRECISION, &
                         root, MPI_COMM_WORLD, ierror)
-       if (processRank .eq. root) then
-         print *, 'distances scattered'
-       end if
        call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
-       if (processRank .eq. root) then
-         print *, 'broadcast done'
-       end if
-       call MPI_BARRIER(MPI_COMM_WORLD, barError)
-       if (processRank .eq. root) then
-         print *, 'barrier passed'
-       end if
        call MPI_Bcast(tripIndex, triPerAt, MPI_INT, root, MPI_COMM_WORLD, ierror)
        call MPI_Bcast(indPerTrip, 2*triPerAt, MPI_INT, root, MPI_COMM_WORLD, &
                       ierror)
        call MPI_Bcast(changedTriDists, 3*triPerAt, MPI_DOUBLE_PRECISION, root, &
                       MPI_COMM_WORLD, ierror)
-       call MPI_Bcast(oldTriDists, 3*triPerAt, MPI_DOUBLE_PRECISION, root, &
-                      MPI_COMM_WORLD, ierror)
-       
+      
        ! Update exponentials in changed triplets
-       call calculateExponentialsNonAdd(((N_a-1)/clusterSize),N_tp,nArgs,trainData, &
+       call calculateExponentialsNonAdd(nPerProc,N_tp,nArgs,trainData, &
                                         hyperParams(1),scatterDists,N_a, changeExpData)
-       if (processRank .eq. root) then
-         print *, 'exps re-calculated'
-       end if 
 
        ! Gather in all updated exps and broadcast the resultant matrix to all procs
-       call MPI_Gather(changeExpData, N_tp*nArgs*((N_a-1)/clusterSize), &
+       call MPI_Gather(changeExpData, N_tp*nArgs*nPerProc, &
                        MPI_DOUBLE_PRECISION, changeExpMat, N_tp*nArgs*((N_a-1)/clusterSize), &
                        MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-       if (processRank .eq. root) then
-         print *, 'exps re-gathered'
-       end if
-       call MPI_Bcast(changeExpMat, N_tp*nArgs*((N_a-1)/clusterSize), &
+       call MPI_Bcast(changeExpMat, N_tp*nArgs*nPerProc, &
                       MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-       call MPI_BARRIER(MPI_COMM_WORLD, barError)
-       if (processRank .eq. root) then
-         print *, 'exps re-broadcasted'
-       end if
 
        ! Calculate the non-additive energies for the changed triplets and gather
        call tripletEnergiesNonAdd(scatterTrip,disIntMat,triPerProc,N_tp,N_a,N_p,nArgs,Perm, &
@@ -292,7 +264,7 @@ contains
 
          call totalEnergyNonAdd(newUfull,triPerAt, deltaU)
          print *, "The change in non-additive energy after the move is", deltaU
-         print *, '=========================='
+         print *, ' '
 
        end if
 
@@ -300,9 +272,30 @@ contains
        do j = 1, N_a-1
 
          indj = disIntMat(newExpInt(1,j),newExpInt(2,j))
+
+         if (j .eq. 1) then
+!           print *, 'Changed exps between atoms', newExpInt(1,j), 'and', &
+!                    newExpInt(2,j)
+!           print *, 'This means distance', indj, 'is changed'
+!           print *, 'The slice through the old expMatrix for this dist was:'
+!           print *, expMatrix(1:nArgs,indj,1:N_tp)
+!           print *, 'The new slice is:'
+!           print *, changeExpMat(1:nArgs,j,1:N_tp)
+!           print *, ' '
+         end if
+
          expMatrix(1:nArgs,indj,1:N_tp) = changeExpMat(1:nArgs,j,1:N_tp)
 
+         if (j .eq. 1) then
+!           print *, 'The slice through the new expMatrix is:'
+!           print *, expMatrix(1:nArgs,indj,1:N_tp)
+         end if
+
        end do
+
+       if (processRank .eq. root) then
+         print *, '=========================='
+       end if
 
     end do
     moveTime = MPI_Wtime() - moveTime
