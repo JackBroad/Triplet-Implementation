@@ -1,6 +1,7 @@
 VPATH = ./ src/
 # Find all source files, create a list of corresponding object files
-SRCS=  MPI_Variables.F90 triplet_mod.F90 triplet_mpi.F90 main.F90
+# SRCS=  MPI_Variables.F90 triplet_mod.F90 triplet_mpi.F90 main.F90
+SRCS=  MPI_Variables.F90 triplet_mod.F90 noMove_triplet_mpi.F90 main.F90
 OBJS=$(patsubst %.F90,%.o,$(SRCS))
 
 # Ditto for mods (They will be in both lists)
@@ -9,7 +10,7 @@ MOD_OBJS=$(patsubst %.F90,%.o,$(MODS))
 
 # Compiler/Linker settings
 FC = mpif90
-FCFLAGS =  -c -cpp -fallow-argument-mismatch #-Wall -Wextra -Wconversion -Wno-unused-parameter -ffpe-trap=invalid -ffpe-trap=zero,overflow,underflow -fbacktrace -fdump-core -fcheck=bounds -Wno-tabs  #-fmax-errors=5
+FCFLAGS =  -c -cpp -Wno-argument-mismatch #-Wall -Wextra -Wconversion -Wno-unused-parameter -ffpe-trap=invalid -ffpe-trap=zero,overflow,underflow -fbacktrace -fdump-core -fcheck=bounds -Wno-tabs  #-fmax-errors=5
 FLFLAGS = # -g -Wall -DDEBUG -Wextra -Wconversion  -ffpe-trap=invalid -ffpe-trap=zero,overflow,underflow -fbacktrace -fdump-core -fcheck=bounds   #-fmax-errors=5
 PROGRAM = triplet.out
 PRG_OBJ = $(PROGRAM).o
