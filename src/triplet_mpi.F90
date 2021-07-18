@@ -222,6 +222,8 @@ contains
           print *, 'N_dist =', udSize
           print *, 'N_changed =', N_a-1
           print *, 'Dists per proc =', nPerProc
+          print *, 'N_tp =', N_tp
+          print *, 'nArgs =', nArgs
           print *, ' '
 
        end if
@@ -240,61 +242,67 @@ contains
                       ierror)
        call MPI_Bcast(changedTriDists, 3*triPerAt, MPI_DOUBLE_PRECISION, root, &
                       MPI_COMM_WORLD, ierror)
+       if (processRank .eq. root) then
+       print *, 'Completed scatter and broadcast'
+       end if
       
        ! Update exponentials in changed triplets
        call calculateExponentialsNonAdd(nPerProc,N_tp,nArgs,trainData, &
-                                        hyperParams(1),scatterDists,N_a, changeExpData)
+                                        hyperParams(1),scatterDists,N_a, &
+                                        changeExpData)
+       if (processRank .eq. root) then
+       print *, 'Updated exps'
+       end if
 
        ! Gather in all updated exps and broadcast the resultant matrix to all procs
+       if (processRank .eq. root) then
+       print *, shape(changeExpData)
+       end if
        call MPI_Gather(changeExpData, N_tp*nArgs*nPerProc, &
-                       MPI_DOUBLE_PRECISION, changeExpMat, N_tp*nArgs*((N_a-1)/clusterSize), &
+                       MPI_DOUBLE_PRECISION, changeExpMat, N_tp*nArgs*nPerProc, &
                        MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+       if (processRank .eq. root) then
+       print *, 'Gathered all changed exps'
+       end if
        call MPI_Bcast(changeExpMat, N_tp*nArgs*nPerProc, &
                       MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+       if (processRank .eq. root) then
+       print *, 'Broadcast all changed exps'
+       end if
 
        ! Calculate the non-additive energies for the changed triplets and gather
        call tripletEnergiesNonAdd(scatterTrip,disIntMat,triPerProc,N_tp,N_a,N_p,nArgs,Perm, &
                                   N_a-1,changeExpMat,alpha,hyperParams(2), newUvec)
+       print *, newUvec
        call MPI_Gather(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, triPerProc, &
                        MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+       if (processRank .eq. root) then
+       print *, 'Calc and gather triplet energies'
+       end if
 
        ! Find total change in non-add energy from moving atom
        deltaU = 0d0
        if (processRank .eq. root) then
 
          call totalEnergyNonAdd(newUfull,triPerAt, deltaU)
+         print *, newUfull
          print *, "The change in non-additive energy after the move is", deltaU
          print *, ' '
 
        end if
 
-       ! Update expData (accept all moves for now so auto-update in each loop)
+       ! Update data (accept all moves for now so auto-update in each loop)
+       posArray = newPosAt
+       X_dg = newX_dg
        do j = 1, N_a-1
 
          indj = disIntMat(newExpInt(1,j),newExpInt(2,j))
-
-         if (j .eq. 1) then
-!           print *, 'Changed exps between atoms', newExpInt(1,j), 'and', &
-!                    newExpInt(2,j)
-!           print *, 'This means distance', indj, 'is changed'
-!           print *, 'The slice through the old expMatrix for this dist was:'
-!           print *, expMatrix(1:nArgs,indj,1:N_tp)
-!           print *, 'The new slice is:'
-!           print *, changeExpMat(1:nArgs,j,1:N_tp)
-!           print *, ' '
-         end if
-
          expMatrix(1:nArgs,indj,1:N_tp) = changeExpMat(1:nArgs,j,1:N_tp)
-
-         if (j .eq. 1) then
-!           print *, 'The slice through the new expMatrix is:'
-!           print *, expMatrix(1:nArgs,indj,1:N_tp)
-         end if
 
        end do
 
        if (processRank .eq. root) then
-         print *, '=========================='
+         print *, '========================'
        end if
 
     end do
