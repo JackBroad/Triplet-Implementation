@@ -4,45 +4,38 @@ module triplet_mpi_mod
   implicit none
   include 'mpif.h'
 
+
 contains
 
 
-  subroutine triplet_mpi(fileName)
+  subroutine triplet_mpi_fullNonAdd(fileName, N_a,nArgs,N_tp,N_tri,N_p,udSize,posArray,X_dg, &
+                                    disIntMat,hyperParams,trainData,alpha,Perm,expMatrix, &
+                                    U,uFull)
     character (len=40), intent(in) :: fileName
     double precision, allocatable :: X_dg(:,:), scatterData(:), UD_dg(:), alpha(:)
     double precision, allocatable :: trainData(:,:), expData(:,:,:), expMatrix(:,:,:)
-    double precision, allocatable :: posArray(:,:), uVec(:), uFull(:), newPosAt(:,:)
-    double precision, allocatable :: newX_dg(:,:), newDists(:), newExpons(:)
-    double precision, allocatable :: changedTriDists(:,:), newExpMat(:,:,:)
-    double precision, allocatable :: scatterDists(:), changeExpData(:,:,:)
-    double precision, allocatable :: oldTriDists(:,:), changeExpMat(:,:,:)
-    double precision, allocatable :: newUvec(:), newUfull(:)
+    double precision, allocatable :: posArray(:,:), uVec(:), uFull(:)
     double precision :: hyperParams(3), expTime, sumTime, totTime, setUpTime, U
-    double precision :: moveTime, dist, deltaU
     integer, allocatable :: triMat(:,:), triScatter(:,:), disIntMat(:,:)
-    integer, allocatable :: newExpInt(:,:), changeTriMat(:,:), tripIndex(:)
-    integer, allocatable :: indPerTrip(:,:), scatterTripInd(:), scatterTrip(:,:)
-    integer, allocatable :: scatterIndPerTrip(:,:), changedTriplets(:,:)
-    integer, allocatable :: scatterExpInd(:,:)
-    integer :: N_a, root, newSize, N_tp, N_p, triPerProc, j, indj, nPerProc
-    integer :: dataSize, barError, udSize, nArgs, Perm(6,3), kP(3), N_tri, nSum
-    integer :: triInt, eCols, i, N_move, move, triPerAt, triInd
-
-
-    ! Call functions to initialise MPI
-    totTime = MPI_Wtime()
+    integer :: N_a, root, newSize, N_tp, N_p, eCols, i, kP(3), N_tri, nSum
+    integer :: dataSize, barError, udSize, nArgs, Perm(6,3)
 
 
     ! Declare constants and rows of permutation matrix
+    totTime = MPI_Wtime()
     root = 0
     N_p = 6
-    N_move = 10
-    dist = 1.5
     setUpTime = MPI_Wtime()
 
 
     ! Set up on root
     if (processRank .eq. root) then
+
+       print *, ' '
+       print *, ' '
+       print *, '========================'
+       print *, 'Beginning non-additive calculation for whole sim box'
+       print *, ' '
 
        ! Read in all necessary info from files
        call initialise(fileName, posArray,trainData,alpha,hyperParams,N_tp,nArgs, &
@@ -93,6 +86,7 @@ contains
       allocate(trainData(N_tp,nArgs))
       allocate(disIntMat(N_a,N_a))
       allocate(X_dg(N_a,N_a))
+      allocate(posArray(N_a,3))
 
     end if
 
@@ -102,7 +96,8 @@ contains
     call MPI_Bcast(trainData, N_tp*nArgs, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, &
          ierror)
     call MPI_Bcast(disIntMat, N_a*N_a, MPI_INT, root, MPI_COMM_WORLD, ierror)
-    call MPI_Bcast(X_dg, N_a*N_a, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD,ierror)
+    call MPI_Bcast(X_dg, N_a*N_a, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(posArray, N_a*3, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
     call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
@@ -127,14 +122,14 @@ contains
     ! Calculate the exponentials for each distance on each process
     setUpTime = MPI_Wtime() - setUpTime
     expTime = MPI_Wtime()
-    allocate(expData(nArgs,dataSize,N_tp))
+    allocate(expData(nArgs,N_tp,dataSize))
     call calculateExponentialsNonAdd(dataSize,N_tp,nArgs,trainData,hyperParams(1), &
                                      scatterData,N_a, expData)
 
 
     ! Allocate an array to hold all exps
     eCols = nArgs*N_tri !udSize
-    allocate(expMatrix(nArgs,udSize,N_tp))
+    allocate(expMatrix(nArgs,N_tp,udSize))
 
 
     ! Gather expData arrays from the other processes and add them to expMatrix on
@@ -168,36 +163,103 @@ contains
     if (processRank .eq. root) then
 
        call totalEnergyNonAdd(uFull,N_tri, U)
-       print *, uFull
        print *, "The total non-additive energy is", U
        print *, "              "
 
     end if
-    sumTime = MPI_Wtime() - sumTime
 
-  
-    ! Loop over N moves, moving an atom and re-calculating the energy each time
-    moveTime = MPI_Wtime()
+
+    ! De-allocate arrays not passed to atom-move subroutine
+    deallocate(scatterData)
+    deallocate(expData)
+    deallocate(uVec)
+    deallocate(triScatter)
+    if (processRank .eq. root) then
+
+       deallocate(UD_dg)
+       deallocate(triMat)
+       deallocate(uFull)
+
+    end if
+
+
+    ! Print times taken for each part of subroutine to run
+    sumTime = MPI_Wtime() - sumTime
+    totTime = MPI_Wtime() - totTime
+    if (processRank .eq. root) then
+
+       print *, "The time taken for the exponentials was", expTime, "seconds"
+       print *, "The time taken for the sum was", sumTime, "seconds"
+       print *, "The time taken to set up was", setUpTime, "seconds"
+       print *, "The total time for the program to run was", totTime, "seconds"
+       print *, ' '
+       print *, 'Non-additive calculation for full sim box complete'
+       print *, '========================'
+       print *, ' '
+       print *, ' '
+
+    end if
+
+  return
+  end subroutine triplet_mpi_fullNonAdd 
+
+  subroutine triplet_mpi_moveNonAdd(N_move,dist,N_a,nArgs,N_tp,N_tri,N_p,udSize, &
+                                    posArray,X_dg,disIntMat,hyperParams, &
+                                    trainData,alpha,Perm,expMatrix,deltaU, &
+                                    newUfull)
+    integer :: N_a, root=0, newSize, N_tp, N_p, triPerProc, j, indj, nPerProc
+    integer :: dataSize, barError, udSize, nArgs, Perm(6,3), kP(3), N_tri
+    integer :: triInt, i, N_move, move, triPerAt, triInd, disIntMat(N_a,N_a)
+    double precision :: X_dg(N_a,N_a), alpha(N_tp), trainData(N_tp,nArgs)
+    double precision :: expMatrix(nArgs,N_tp,udSize), posArray(N_a,nArgs)
+    double precision :: newPosAt(N_a,nArgs), newX_dg(N_a,N_a), deltaU
+    double precision :: hyperParams(3), totTime, moveTime, dist
+    integer, allocatable :: newExpInt(:,:), changeTriMat(:,:), tripIndex(:)
+    integer, allocatable :: indPerTrip(:,:), scatterTripInd(:), scatterTrip(:,:)
+    integer, allocatable :: scatterIndPerTrip(:,:), changedTriplets(:,:)
+    integer, allocatable :: scatterExpInd(:,:)
+    double precision, allocatable :: newDists(:), newUfull(:), newUvec(:)
+    double precision, allocatable :: changedTriDists(:,:), newExpMat(:,:,:)
+    double precision, allocatable :: scatterDists(:), changeExpData(:,:,:)
+    double precision, allocatable :: changeExpMat(:,:,:)
+
+
+    if (processRank .eq. root) then
+
+      print *, ' '
+      print *, ' '
+      print *, '========================'
+      print *, 'Beginning non-additive calculation for atom move'
+      print *, ' '
+
+    end if
+
+
+    totTime = MPI_Wtime()
     call getTriPerAtom(N_a, triPerAt)
     triPerProc = triPerAt / clusterSize
     nPerProc = (N_a-1)/clusterSize
     allocate(scatterDists(nPerProc))
     allocate(scatterTrip(3,triPerProc))
     allocate(scatterExpInd(2,nPerProc))
-    allocate(newPosAt(N_a,nArgs))
     allocate(newExpInt(2,N_a-1))
     allocate(newDists(N_a-1))
     allocate(indPerTrip(2,triPerAt))
-    allocate(changeExpData(nArgs,nPerProc,N_tp))
-    allocate(changeExpMat(nArgs,N_a-1,N_tp))
-    allocate(newExpMat(nArgs,udSize,N_tp))
+    allocate(changeExpData(nArgs,N_tp,nPerProc))
+    allocate(changeExpMat(nArgs,N_tp,N_a-1))
+    allocate(newExpMat(nArgs,N_tp,udSize))
     allocate(changedTriplets(3,triPerAt))
-    allocate(newX_dg(N_a,N_a))
     allocate(newUvec(triPerProc))
     allocate(newUfull(triPerAt))
     allocate(changedTriDists(3,triPerAt))
     allocate(tripIndex(triPerAt))
+
+
+    ! Loop over N moves, moving an atom and re-calculating the energy each time
+    moveTime = MPI_Wtime()
     do i = 1, N_move
+
+       newExpMat = expMatrix
 
        ! Set up on root
        if (processRank .eq. root) then
@@ -217,24 +279,20 @@ contains
           call findChangedTriIndex(triPerAt,N_a,move, tripIndex)
           call findChangedDistsPerTrip(triPerAt,changedTriplets,move, indPerTrip)
 
-          print *, ' '
-          print *, 'N_tri =', N_tri
-          print *, 'N_dist =', udSize
-          print *, 'N_changed =', N_a-1
-          print *, 'Dists per proc =', nPerProc
-          print *, 'N_tp =', N_tp
-          print *, 'nArgs =', nArgs
-          print *, ' '
-
        end if
 
        ! Scatter all requisite data from move set-up on root to all procs
+       call MPI_BARRIER(MPI_COMM_WORLD, barError)
        call MPI_Scatter(changedTriplets, triPerProc*3, MPI_INT, scatterTrip, &
                         triPerProc*3, MPI_INT, root, MPI_COMM_WORLD, ierror)
-       call MPI_Bcast(newExpInt, 2*nPerProc, MPI_INT, root, MPI_COMM_WORLD, &
+       call MPI_Bcast(newExpInt, 2*(N_a-1), MPI_INT, root, MPI_COMM_WORLD, &
                       ierror)
+       call MPI_Bcast(newX_dg, N_a*N_a, MPI_DOUBLE_PRECISION, root, &
+                      MPI_COMM_WORLD, ierror)
+       call MPI_Bcast(newPosAt, 3*N_a, MPI_DOUBLE_PRECISION, root, &
+                      MPI_COMM_WORLD, ierror)
        call MPI_Scatter(newDists, nPerProc, MPI_DOUBLE_PRECISION, &
-                        scatterDists, (N_a-1)/clusterSize, MPI_DOUBLE_PRECISION, &
+                        scatterDists, nPerProc, MPI_DOUBLE_PRECISION, &
                         root, MPI_COMM_WORLD, ierror)
        call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
        call MPI_Bcast(tripIndex, triPerAt, MPI_INT, root, MPI_COMM_WORLD, ierror)
@@ -242,51 +300,43 @@ contains
                       ierror)
        call MPI_Bcast(changedTriDists, 3*triPerAt, MPI_DOUBLE_PRECISION, root, &
                       MPI_COMM_WORLD, ierror)
-       if (processRank .eq. root) then
-       print *, 'Completed scatter and broadcast'
-       end if
       
        ! Update exponentials in changed triplets
        call calculateExponentialsNonAdd(nPerProc,N_tp,nArgs,trainData, &
                                         hyperParams(1),scatterDists,N_a, &
                                         changeExpData)
-       if (processRank .eq. root) then
-       print *, 'Updated exps'
-       end if
+       call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
        ! Gather in all updated exps and broadcast the resultant matrix to all procs
-       if (processRank .eq. root) then
-       print *, shape(changeExpData)
-       end if
        call MPI_Gather(changeExpData, N_tp*nArgs*nPerProc, &
                        MPI_DOUBLE_PRECISION, changeExpMat, N_tp*nArgs*nPerProc, &
                        MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-       if (processRank .eq. root) then
-       print *, 'Gathered all changed exps'
-       end if
-       call MPI_Bcast(changeExpMat, N_tp*nArgs*nPerProc, &
+       call MPI_Bcast(changeExpMat, N_tp*nArgs*(N_a-1), &
                       MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-       if (processRank .eq. root) then
-       print *, 'Broadcast all changed exps'
-       end if
+       call MPI_BARRIER(MPI_COMM_WORLD, barError)
+
+       ! Update the exp matrix
+       do j = 1, N_a-1
+
+         indj = disIntMat(newExpInt(1,j),newExpInt(2,j))
+         newExpMat(1:nArgs,1:N_tp,indj) = changeExpMat(1:nArgs,1:N_tp,j)
+
+       end do
 
        ! Calculate the non-additive energies for the changed triplets and gather
        call tripletEnergiesNonAdd(scatterTrip,disIntMat,triPerProc,N_tp,N_a,N_p,nArgs,Perm, &
-                                  N_a-1,changeExpMat,alpha,hyperParams(2), newUvec)
-       print *, newUvec
+                                  N_a-1,newExpMat,alpha,hyperParams(2), newUvec)
+       call MPI_BARRIER(MPI_COMM_WORLD, barError)
        call MPI_Gather(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, triPerProc, &
                        MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-       if (processRank .eq. root) then
-       print *, 'Calc and gather triplet energies'
-       end if
 
        ! Find total change in non-add energy from moving atom
        deltaU = 0d0
        if (processRank .eq. root) then
 
          call totalEnergyNonAdd(newUfull,triPerAt, deltaU)
-         print *, newUfull
          print *, "The change in non-additive energy after the move is", deltaU
+         print *, '------------------------'
          print *, ' '
 
        end if
@@ -297,55 +347,42 @@ contains
        do j = 1, N_a-1
 
          indj = disIntMat(newExpInt(1,j),newExpInt(2,j))
-         expMatrix(1:nArgs,indj,1:N_tp) = changeExpMat(1:nArgs,j,1:N_tp)
+         expMatrix(1:nArgs,1:N_tp,indj) = changeExpMat(1:nArgs,1:N_tp,j)
 
        end do
-
-       if (processRank .eq. root) then
-         print *, '========================'
-       end if
 
     end do
     moveTime = MPI_Wtime() - moveTime
 
 
     ! Deallocate all arrays on root process and any shared across processes
-    deallocate(scatterData)
-    deallocate(alpha)
-    deallocate(trainData)
-    deallocate(expData)
-    deallocate(expMatrix)
-    deallocate(uVec)
-    deallocate(triScatter)
-    deallocate(disIntMat)
-    deallocate(newPosAt)
+    deallocate(scatterTrip)
+    deallocate(scatterExpInd)
+    deallocate(indPerTrip)
+    deallocate(changeExpData)
+    deallocate(changeExpMat)
+    deallocate(tripIndex)
     deallocate(newExpInt)
     deallocate(newDists)
     deallocate(newExpMat)
     deallocate(changedTriplets)
     deallocate(changedTriDists)
-    deallocate(indPerTrip)
-    deallocate(X_dg)
-    if (processRank .eq. root) then
-
-       deallocate(UD_dg)
-       deallocate(triMat)
-       deallocate(uFull)
-       deallocate(newX_dg)
-
-    end if
 
 
     ! Finalise MPI and print times taken for each step of calculation
     totTime = MPI_Wtime() - totTime
     if (processRank .eq. root) then
 
-       print *, "The time taken for the exponentials was", expTime, "seconds"
-       print *, "The time taken for the sum was", sumTime, "seconds"
-       print *, "The time taken to set up was", setUpTime, "seconds"
        print *, "The time taken to do", N_move, "moves was", moveTime, "seconds"
        print *, "The total time for the program to run was", totTime, "seconds"
+       print *, ' '
+       print *, 'Non-additive calculation for atom move complete'
+       print *, '========================'
+       print *, ' '
+       print *, ' '
 
     end if
-  end subroutine triplet_mpi
-END module triplet_mpi_mod
+
+  return
+  end subroutine triplet_mpi_moveNonAdd
+end module triplet_mpi_mod

@@ -163,7 +163,7 @@ subroutine calculateExponentialsNonAdd(nJobs,nTP,nArguments,trainingData, &
   integer, intent(in) :: nJobs, nTP, nArguments, nAt
   double precision, intent(in) :: trainingData(nTP,nArguments)
   double precision, intent(in) :: lengthscale, dists(nJobs)
-  double precision, intent(out) :: exponentials(nArguments,nJobs,nTP)
+  double precision, intent(out) :: exponentials(nArguments,nTP,nJobs)
   integer :: i, j, k, atOne, atTwo
   double precision :: expon, dist, num, denom
 
@@ -178,7 +178,7 @@ subroutine calculateExponentialsNonAdd(nJobs,nTP,nArguments,trainingData, &
           denom = 2*denom
 
           expon = num / denom
-          exponentials(k,i,j) = exp(-1*expon)
+          exponentials(k,j,i) = exp(-1*expon)
 
       end do
     end do
@@ -221,7 +221,7 @@ subroutine tripletEnergiesNonAdd(triData,intMat,nJob,nTP,nAt,nPerm,nArg,permMat,
   implicit none
   integer, intent(in) :: nJob, nTP, nAt, nPerm, nArg, expCols
   integer, intent(in) :: triData(3,nJob), intMat(nAt,nAt), permMat(nPerm,nArg)
-  double precision, intent(in) :: expMat(nArg,expCols,nTP), alphaVec(nTP), sigVar
+  double precision, intent(in) :: expMat(nArg,nTP,expCols), alphaVec(nTP), sigVar
   double precision, intent(out) :: uVector(nJob)
   integer :: triInt, alp, bet, gam, alDis, beDis, gaDis, r, s, kP(nArg)
   integer :: alInt, beInt, gaInt
@@ -259,7 +259,7 @@ subroutine tripletEnergiesNonAdd(triData,intMat,nJob,nTP,nAt,nPerm,nArg,permMat,
         kP = permMat(s,1:3)
 
         ! Find the product of the relevant exps under this permutation
-        expProd = expMat(kP(1),alDis,r) * expMat(kP(2),beDis,r) * expMat(kP(3),gaDis,r)
+        expProd = expMat(kP(1),r,alDis) * expMat(kP(2),r,beDis) * expMat(kP(3),r,gaDis)
 
         ! Add the product to the sum for this training point
         expSum = expSum + expProd
@@ -332,7 +332,7 @@ subroutine moveAt(pos,num,dMax,  newPos,mover)
     end do
   end do
 
-  print *, '========================'
+  print *, '------------------------'
   print *, "Moving atom", mover
   print *, "                 "
 
