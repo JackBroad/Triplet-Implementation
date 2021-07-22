@@ -14,21 +14,25 @@ contains
        disIntMat,expMatrix, &
        U,uFull)
     character (len=40), intent(in) :: fileName
-    integer, intent(inout) :: N_a,N_tri, udSize
-    !currently read from inputfile but this needs to moved to outside this function
-    double precision, allocatable :: posArray(:,:),X_dg(:,:), expMatrix(:,:,:)
-    integer, allocatable :: disIntMat(:,:)
-    double precision:: U
-    double precision, allocatable :: uFull(:)
+    integer, intent(inout) :: N_a
+    !currently Na readfrom inputfile and other calculated but this
+    !needs to moved to outside this function
+    integer, intent(inout):: N_tri, udSize
+    ! Can be calculated from Na so should be local variables (ie not returned)
     
+    double precision, allocatable, intent(out) :: posArray(:,:),X_dg(:,:), expMatrix(:,:,:)
+    integer, allocatable, intent(out) :: disIntMat(:,:)
+    double precision,intent(out):: U
+    double precision, allocatable, intent(out) :: uFull(:)
     
+    !====Local variables====
     double precision, allocatable ::  scatterData(:), UD_dg(:)
     double precision, allocatable :: expData(:,:,:)
     double precision, allocatable ::  uVec(:)
     double precision ::  expTime, sumTime, totTime, setUpTime
     integer, allocatable :: triMat(:,:), triScatter(:,:)
     integer ::  newSize, eCols, i, kP(3), nSum
-    integer :: dataSize, barError
+    integer :: dataSize
 
 
     ! Declare constants and rows of permutation matrix
