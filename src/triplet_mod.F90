@@ -1,4 +1,5 @@
 module triplet_mod
+  use GP_variables
   implicit none
 
 
@@ -7,14 +8,10 @@ contains
 
 ! Subroutine to read in matrix of atomic positions and return all requisite
 ! constants
-subroutine initialise(fileName, posAt,trainData,alpha,hyperParams,N_tp,nArgs,N_a,N_tri,udSize)
+subroutine initialise_GP()
+!subroutine initialise_GP(fileName, posAt,trainData,alpha,hyperParams,N_tp,nArgs,N_a,N_tri,udSize)
   implicit none
-  character (len=40), intent(in) :: fileName
-  double precision, allocatable, intent(out) :: posAt(:,:), alpha(:)
-  double precision, allocatable, intent(out) :: trainData(:,:)
-  double precision, intent(out) :: hyperParams(3)
-  integer :: i, j, k, l, m, n
-  integer, intent(out) :: N_tp, nArgs, N_a, N_tri, udSize
+  integer :: i, j, k, l
 
   ! Read in hyperparameters
   open(1, file='hyperParam.txt', status='old')
@@ -39,16 +36,36 @@ subroutine initialise(fileName, posAt,trainData,alpha,hyperParams,N_tp,nArgs,N_a
   end do
   close(3)
 
+return
+end subroutine initialise_GP
+
+
+subroutine initialise_Positions(fileName, posAt,N_a)
+  implicit none
+  character (len=40), intent(in) :: fileName
+  double precision, allocatable, intent(out) :: posAt(:,:)
+  integer, intent(out) :: N_a
+  integer :: m, n
+
   ! Read in the number of atoms
-  open(4, file=fileName, status='old')
-  read(4,*) N_a
+  open(1, file=fileName, status='old')
+  read(1,*) N_a
 
   ! Get the atomic positions
   allocate(posAt(N_a,nArgs))
   do m = 1, N_a
-    read(4,*) (posAt(m,n), n=1,nArgs)
+    read(1,*) (posAt(m,n), n=1,nArgs)
   end do
-  close(4)
+  close(1)
+
+return
+end subroutine initialise_Positions
+
+
+subroutine initialise_Variables(N_a, N_tri,udSize)
+  implicit none
+  integer, intent(in) :: N_a
+  integer, intent(out) :: N_tri, udSize
 
   ! Calculate the number of triplets
   N_tri = N_a**3
@@ -60,7 +77,7 @@ subroutine initialise(fileName, posAt,trainData,alpha,hyperParams,N_tp,nArgs,N_a
   udSize = ((N_a * N_a) - N_a) / 2
 
 return
-end subroutine initialise
+end subroutine initialise_Variables
 
 
 ! Subroutine to make X_dg for the non-additive calculation
