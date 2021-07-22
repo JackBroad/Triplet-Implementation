@@ -5,5 +5,6 @@ module GP_variables
   double precision, allocatable ::  alpha(:)
   integer ::  Perm(6,3)
   double precision, allocatable :: trainData(:,:)
+  integer:: N_tp
   
 end module GP_variables

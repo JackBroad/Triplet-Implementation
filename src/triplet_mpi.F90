@@ -1,7 +1,7 @@
 module triplet_mpi_mod
   use mpi_variables
   use triplet_mod
-  use GP_variables, only: hyperParams, alpha, Perm, trainData
+  use GP_variables, only: hyperParams, alpha, Perm, trainData, N_tp
   implicit none
   include 'mpif.h'
 
@@ -9,17 +9,26 @@ module triplet_mpi_mod
 contains
 
 
-  subroutine triplet_mpi_fullNonAdd(fileName, N_a,nArgs,N_tp,N_tri,N_p,udSize,posArray,X_dg, &
+  subroutine triplet_mpi_fullNonAdd(fileName, &
+       N_a,nArgs,N_tri,N_p,udSize,posArray,X_dg, &
        disIntMat,expMatrix, &
        U,uFull)
     character (len=40), intent(in) :: fileName
-    double precision, allocatable :: X_dg(:,:), scatterData(:), UD_dg(:)
-    double precision, allocatable :: expData(:,:,:), expMatrix(:,:,:)
-    double precision, allocatable :: posArray(:,:), uVec(:), uFull(:)
-    double precision ::  expTime, sumTime, totTime, setUpTime, U
-    integer, allocatable :: triMat(:,:), triScatter(:,:), disIntMat(:,:)
-    integer :: N_a, root, newSize, N_tp, N_p, eCols, i, kP(3), N_tri, nSum
-    integer :: dataSize, barError, udSize, nArgs
+    integer, intent(inout) :: N_a, nArgs,N_tri, N_p , udSize
+    !currently read from inputfile but this needs to moved to outside this function
+    double precision, allocatable :: posArray(:,:),X_dg(:,:), expMatrix(:,:,:)
+    integer, allocatable :: disIntMat(:,:)
+    double precision:: U
+    double precision, allocatable :: uFull(:)
+    
+    
+    double precision, allocatable ::  scatterData(:), UD_dg(:)
+    double precision, allocatable :: expData(:,:,:)
+    double precision, allocatable ::  uVec(:)
+    double precision ::  expTime, sumTime, totTime, setUpTime
+    integer, allocatable :: triMat(:,:), triScatter(:,:)
+    integer ::  newSize, eCols, i, kP(3), nSum
+    integer :: dataSize, barError
 
 
     ! Declare constants and rows of permutation matrix
@@ -206,10 +215,10 @@ contains
 
 
 
-  subroutine triplet_mpi_moveNonAdd(N_move,dist,N_a,nArgs,N_tp,N_tri,N_p,udSize, &
+  subroutine triplet_mpi_moveNonAdd(N_move,dist,N_a,nArgs,N_tri,N_p,udSize, &
        posArray,X_dg,disIntMat,expMatrix,deltaU, &
        newUfull)
-    integer :: N_a, root=0, newSize, N_tp, N_p, triPerProc, j, indj, nPerProc
+    integer :: N_a, root=0, newSize, N_p, triPerProc, j, indj, nPerProc
     integer :: dataSize, barError, udSize, nArgs, kP(3), N_tri
     integer :: triInt, i, N_move, move, triPerAt, triInd, disIntMat(N_a,N_a)
     double precision :: X_dg(N_a,N_a)
