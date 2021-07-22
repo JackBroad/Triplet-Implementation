@@ -35,9 +35,9 @@ contains
 
     if( processRank == root ) then
        print *,'========================Regression tests============================'
-       print *,'!!!!!!!!!!!!!!!!!!Warning: test_exp_calc is disabled and needs fixing!!!'
-       print *,'!!!!!!!!!!!!!!!!!!Warning: test_triplet energy is disabled !!!'
-       print *,'!!!!!!!!!!!!!!!!!!This is because matrices shapes have changed !!!'
+       !print *,'!!!!!!!!!!!!!!!!!!Warning: test_exp_calc is disabled and needs fixing!!!'
+       !print *,'!!!!!!!!!!!!!!!!!!Warning: test_triplet energy is disabled !!!'
+       !print *,'!!!!!!!!!!!!!!!!!!This is because matrices shapes have changed !!!'
 
        call getDistsAndTripletsPerProcNonAdd(nDist,nTrips,nProc,distsPerProc,tripsPerProc)
        @assertEqual(distsPerProc, 3,'Distances per processor #1')
@@ -239,16 +239,16 @@ contains
 
   end subroutine test_gather
 
-  !@test
+  @test
   subroutine test_exp_calc()
     implicit none
     integer :: nDists=3
     double precision :: Xdg(N_a,N_a), expSlice_Ex(nArgs,3)
     double precision :: expSlice(nArgs,3), dists(3)
 
-    allocate(expData(nArgs,3,N_tp))
+    allocate(expData(nArgs,N_tp,3))
 
-    ! All inv. distances in test triplet are 0.5
+    ! All distances in test triplet are 3 A
     dists = (/ 1d0/3d0,1d0/3d0,1d0/3d0 /)
 
     ! Pre-calculated exponenitals for dists with first TP
@@ -271,7 +271,7 @@ contains
 
   end subroutine test_exp_calc
 
-  !@test
+  @test
   subroutine test_triplet_energies()
     implicit none
     double precision :: U_Ex(1), U(1)
@@ -303,7 +303,7 @@ contains
     implicit none
     character(len=40) :: name='AtomicPositions5.txt'
     double precision, allocatable :: pos(:,:), dists(:)
-    double precision :: X(5,5), uVec(10), uVec_Ex(10), exps(nArgs,10,N_tp)
+    double precision :: X(5,5), uVec(10), uVec_Ex(10), exps(nArgs,N_tp,10)
     integer, allocatable :: indX(:,:)
     integer :: nAt, nTri, nDist, triplets(3,10), N_p=6, Perm(6,3)
 
