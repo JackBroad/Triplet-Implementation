@@ -17,20 +17,18 @@ program main
   
 
   call triplet_mpi_fullNonAdd('AtomicPositions5.txt', N_at,nArg,N_t,N_trip, &
-                              N_per,nUD,posiArray,Xdg,disIndMat,hyperParam,trainDat, &
-                              alph,Permu,expMat,uFinal,uVecFinal)
+                              N_per,nUD,posiArray,Xdg,disIndMat,expMat,uFinal,uVecFinal)
 
 
   call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
   call triplet_mpi_moveNonAdd(5,1.5d0,N_at,nArg,N_t,N_trip,N_per,nUD, &
-                              posiArray,Xdg,disIndMat,hyperParam,trainDat,alph, &
-                              Permu,expMat,uChange,uVecChange)
+                              posiArray,Xdg,disIndMat,expMat,uChange,uVecChange)
 
 
-  deallocate(alph)
-  deallocate(trainDat)
+  deallocate(alpha)
+  deallocate(trainData)
   deallocate(Xdg)
   deallocate(expMat)
   deallocate(disIndMat)

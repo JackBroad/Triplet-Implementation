@@ -1,5 +1,5 @@
 FC :=  mpif90
-SRCS := MPI_Variables.F90 triplet_mod.F90 triplet_mpi.F90
+SRCS := MPI_Variables.F90 GP_Variables.F90 triplet_mod.F90 triplet_mpi.F90
 OBJS := $(SRCS:%.F90=%.o)
 
 MODS=$(wildcard mod*.f90)
