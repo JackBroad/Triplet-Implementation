@@ -16,14 +16,14 @@ program main
   call MPI_COMM_RANK(MPI_COMM_WORLD, processRank, ierror)
   
 
-  call triplet_mpi_fullNonAdd('AtomicPositions5.txt', N_at,nArg,N_trip, &
-                              N_per,nUD,posiArray,Xdg,disIndMat,expMat,uFinal,uVecFinal)
+  call triplet_mpi_fullNonAdd('AtomicPositions5.txt', N_at,N_trip, &
+                              nUD,posiArray,Xdg,disIndMat,expMat,uFinal,uVecFinal)
 
 
   call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
-  call triplet_mpi_moveNonAdd(5,1.5d0,N_at,nArg,N_trip,N_per,nUD, &
+  call triplet_mpi_moveNonAdd(5,1.5d0,N_at,N_trip,nUD, &
                               posiArray,Xdg,disIndMat,expMat,uChange,uVecChange)
 
 

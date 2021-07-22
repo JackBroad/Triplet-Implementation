@@ -1,7 +1,7 @@
 module triplet_mpi_mod
   use mpi_variables
   use triplet_mod
-  use GP_variables, only: hyperParams, alpha, Perm, trainData, N_tp
+  use GP_variables, only: hyperParams, alpha, Perm, trainData, N_tp, nArgs,N_p 
   implicit none
   include 'mpif.h'
 
@@ -10,11 +10,11 @@ contains
 
 
   subroutine triplet_mpi_fullNonAdd(fileName, &
-       N_a,nArgs,N_tri,N_p,udSize,posArray,X_dg, &
+       N_a,N_tri,udSize,posArray,X_dg, &
        disIntMat,expMatrix, &
        U,uFull)
     character (len=40), intent(in) :: fileName
-    integer, intent(inout) :: N_a, nArgs,N_tri, N_p , udSize
+    integer, intent(inout) :: N_a,N_tri, udSize
     !currently read from inputfile but this needs to moved to outside this function
     double precision, allocatable :: posArray(:,:),X_dg(:,:), expMatrix(:,:,:)
     integer, allocatable :: disIntMat(:,:)
@@ -215,11 +215,11 @@ contains
 
 
 
-  subroutine triplet_mpi_moveNonAdd(N_move,dist,N_a,nArgs,N_tri,N_p,udSize, &
+  subroutine triplet_mpi_moveNonAdd(N_move,dist,N_a,N_tri,udSize, &
        posArray,X_dg,disIntMat,expMatrix,deltaU, &
        newUfull)
-    integer :: N_a, root=0, newSize, N_p, triPerProc, j, indj, nPerProc
-    integer :: dataSize, barError, udSize, nArgs, kP(3), N_tri
+    integer :: N_a, root=0, newSize,  triPerProc, j, indj, nPerProc
+    integer :: dataSize, barError, udSize, kP(3), N_tri
     integer :: triInt, i, N_move, move, triPerAt, triInd, disIntMat(N_a,N_a)
     double precision :: X_dg(N_a,N_a)
     double precision :: expMatrix(nArgs,N_tp,udSize), posArray(N_a,nArgs)
