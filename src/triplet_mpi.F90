@@ -13,22 +13,19 @@ contains
     ! Input variables
     integer, intent(in) :: N_a, N_tri, udSize
     double precision, intent(in) :: posArray(N_a,3)
-    !currently Na readfrom inputfile and other calculated but this
-    !needs to moved to outside this function
-    ! Can be calculated from Na so should be local variables (ie not returned)
    
-    ! Output variables 
+    ! Output variables
+    double precision, intent(out):: U
+    integer, allocatable, intent(out) :: disIntMat(:,:)
     double precision, allocatable, intent(out) :: X_dg(:,:), uFull(:)
     double precision, allocatable, intent(out) :: expMatrix(:,:,:)
-    integer, allocatable, intent(out) :: disIntMat(:,:)
-    double precision, intent(out):: U
     
     ! Local variables
-    double precision, allocatable ::  scatterData(:), UD_dg(:)
-    double precision, allocatable :: expData(:,:,:), uVec(:)
+    integer ::  eCols, i, nSum, dataSize
     double precision ::  expTime, sumTime, totTime, setUpTime
     integer, allocatable :: triMat(:,:), triScatter(:,:)
-    integer ::  newSize, eCols, i, kP(3), nSum, dataSize
+    double precision, allocatable ::  scatterData(:), UD_dg(:)
+    double precision, allocatable :: expData(:,:,:), uVec(:)
 
 
     ! Declare constants and rows of permutation matrix
@@ -48,8 +45,6 @@ contains
        print *, ' '
 
        ! Read in all necessary info from files
-       !call initialise(fileName, posArray,trainData,alpha,hyperParams,N_tp,nArgs, &
-       !                N_a,N_tri,udSize)
        allocate(uFull(N_tri))
        allocate(X_dg(N_a,N_a))
 
@@ -92,33 +87,21 @@ contains
     ! Use info from last broadcast to allocate arrays on other processes
     if (processRank .ne. root) then
 
-  !     allocate(alpha(N_tp))
-  !     allocate(trainData(N_tp,nArgs))
        allocate(disIntMat(N_a,N_a))
        allocate(X_dg(N_a,N_a))
-       !allocate(posArray(N_a,3))
 
     end if
-    print *, 'end if'
 
     ! Broadcast new arrays from root
-    !call MPI_Bcast(alpha, N_tp, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-    !call MPI_Bcast(trainData, N_tp*nArgs, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, &
-    !               ierror)
     call MPI_Bcast(disIntMat, N_a*N_a, MPI_INT, root, MPI_COMM_WORLD, ierror)
-    print *, 'broadcasted disIntMat'
     call MPI_Bcast(X_dg, N_a*N_a, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-    print *, 'broadcasted Xdg'
-    !call MPI_Bcast(posArray, N_a*3, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
     call MPI_BARRIER(MPI_COMM_WORLD, barError)
-    print *, 'broadcast'
 
 
     ! Determine no. of elements of UD_dg to send to each process for exp
     ! calculations and no. of triplets to send to each for energy calculations
     call getDistsAndTripletsPerProcNonAdd(udSize,N_tri,clusterSize, dataSize,nSum)
     allocate(scatterData(dataSize)) ! Allocate array to send exponentials
-    print *, dataSize
 
 
     ! Scatter the interatomic distances in U_dg to all processes
@@ -220,25 +203,32 @@ contains
 
 
 
-  subroutine triplet_mpi_moveNonAdd(N_move,dist,N_a,N_tri,udSize,posArray,X_dg,disIntMat,&
+  subroutine triplet_mpi_moveNonAdd(N_move,dist,N_a,N_tri,udSize,posArray,X_dg,disIntMat, &
                                     expMatrix,deltaU,newUfull)
-    integer :: N_a, root=0, newSize,  triPerProc, j, indj, nPerProc
-    integer :: dataSize, barError, udSize, kP(3), N_tri
-    integer :: triInt, i, N_move, move, triPerAt, triInd, disIntMat(N_a,N_a)
-    double precision :: X_dg(N_a,N_a)
-    double precision :: expMatrix(nArgs,N_tp,udSize), posArray(N_a,nArgs)
-    double precision :: newPosAt(N_a,nArgs), newX_dg(N_a,N_a), deltaU
-    double precision :: totTime, moveTime, dist
-    integer, allocatable :: newExpInt(:,:), changeTriMat(:,:), tripIndex(:)
-    integer, allocatable :: indPerTrip(:,:), scatterTripInd(:), scatterTrip(:,:)
-    integer, allocatable :: scatterIndPerTrip(:,:), changedTriplets(:,:)
-    integer, allocatable :: scatterExpInd(:,:)
-    double precision, allocatable :: newDists(:), newUfull(:), newUvec(:)
-    double precision, allocatable :: changedTriDists(:,:), newExpMat(:,:,:)
+    ! Input variables
+    integer, intent(in) :: N_a, udSize, N_tri, N_move, disIntMat(N_a,N_a)
+    double precision, intent(in) :: dist
+
+    ! In/out variables
+    double precision, intent(inout) :: X_dg(N_a,N_a), posArray(N_a,nArgs)
+    double precision, intent(inout) :: expMatrix(nArgs,N_tp,udSize)
+
+    ! Output variables
+    double precision, intent(out) :: deltaU
+    double precision, allocatable, intent(out) :: newUfull(:)
+
+    ! Local variables
+    integer :: triPerProc, i, j, indj, nPerProc, move, triPerAt
+    double precision :: newPosAt(N_a,nArgs), newX_dg(N_a,N_a), totTime
+    double precision :: moveTime, newExpMat(nArgs,N_tp,udSize)
+    integer, allocatable :: newExpInt(:,:), tripIndex(:), changedTriplets(:,:)
+    integer, allocatable :: indPerTrip(:,:), scatterTrip(:,:)
+    double precision, allocatable :: newDists(:), newUvec(:), changedTriDists(:,:)
     double precision, allocatable :: scatterDists(:), changeExpData(:,:,:)
     double precision, allocatable :: changeExpMat(:,:,:)
 
 
+    root = 0
     if (processRank .eq. root) then
 
        print *, ' '
@@ -256,13 +246,11 @@ contains
     nPerProc = (N_a-1)/clusterSize
     allocate(scatterDists(nPerProc))
     allocate(scatterTrip(3,triPerProc))
-    allocate(scatterExpInd(2,nPerProc))
     allocate(newExpInt(2,N_a-1))
     allocate(newDists(N_a-1))
     allocate(indPerTrip(2,triPerAt))
     allocate(changeExpData(nArgs,N_tp,nPerProc))
     allocate(changeExpMat(nArgs,N_tp,N_a-1))
-    allocate(newExpMat(nArgs,N_tp,udSize))
     allocate(changedTriplets(3,triPerAt))
     allocate(newUvec(triPerProc))
     allocate(newUfull(triPerAt))
@@ -299,35 +287,35 @@ contains
        ! Scatter all requisite data from move set-up on root to all procs
        call MPI_BARRIER(MPI_COMM_WORLD, barError)
        call MPI_Scatter(changedTriplets, triPerProc*3, MPI_INT, scatterTrip, &
-            triPerProc*3, MPI_INT, root, MPI_COMM_WORLD, ierror)
+                        triPerProc*3, MPI_INT, root, MPI_COMM_WORLD, ierror)
        call MPI_Bcast(newExpInt, 2*(N_a-1), MPI_INT, root, MPI_COMM_WORLD, &
-            ierror)
+                      ierror)
        call MPI_Bcast(newX_dg, N_a*N_a, MPI_DOUBLE_PRECISION, root, &
-            MPI_COMM_WORLD, ierror)
+                      MPI_COMM_WORLD, ierror)
        call MPI_Bcast(newPosAt, 3*N_a, MPI_DOUBLE_PRECISION, root, &
-            MPI_COMM_WORLD, ierror)
+                      MPI_COMM_WORLD, ierror)
        call MPI_Scatter(newDists, nPerProc, MPI_DOUBLE_PRECISION, &
-            scatterDists, nPerProc, MPI_DOUBLE_PRECISION, &
-            root, MPI_COMM_WORLD, ierror)
+                        scatterDists, nPerProc, MPI_DOUBLE_PRECISION, &
+                        root, MPI_COMM_WORLD, ierror)
        call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
        call MPI_Bcast(tripIndex, triPerAt, MPI_INT, root, MPI_COMM_WORLD, ierror)
        call MPI_Bcast(indPerTrip, 2*triPerAt, MPI_INT, root, MPI_COMM_WORLD, &
-            ierror)
+                      ierror)
        call MPI_Bcast(changedTriDists, 3*triPerAt, MPI_DOUBLE_PRECISION, root, &
-            MPI_COMM_WORLD, ierror)
+                      MPI_COMM_WORLD, ierror)
 
        ! Update exponentials in changed triplets
        call calculateExponentialsNonAdd(nPerProc,N_tp,nArgs,trainData, &
-            hyperParams(1),scatterDists,N_a, &
-            changeExpData)
+                                        hyperParams(1),scatterDists,N_a, &
+                                        changeExpData)
        call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
        ! Gather in all updated exps and broadcast the resultant matrix to all procs
        call MPI_Gather(changeExpData, N_tp*nArgs*nPerProc, &
-            MPI_DOUBLE_PRECISION, changeExpMat, N_tp*nArgs*nPerProc, &
-            MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+                       MPI_DOUBLE_PRECISION, changeExpMat, N_tp*nArgs*nPerProc, &
+                       MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
        call MPI_Bcast(changeExpMat, N_tp*nArgs*(N_a-1), &
-            MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+                      MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
        call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
        ! Update the exp matrix
@@ -340,10 +328,10 @@ contains
 
        ! Calculate the non-additive energies for the changed triplets and gather
        call tripletEnergiesNonAdd(scatterTrip,disIntMat,triPerProc,N_tp,N_a,N_p,nArgs,Perm, &
-            N_a-1,newExpMat,alpha,hyperParams(2), newUvec)
+                                  N_a-1,newExpMat,alpha,hyperParams(2), newUvec)
        call MPI_BARRIER(MPI_COMM_WORLD, barError)
        call MPI_Gather(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, triPerProc, &
-            MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+                       MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
 
        ! Find total change in non-add energy from moving atom
        deltaU = 0d0
@@ -371,15 +359,16 @@ contains
 
 
     ! Deallocate all arrays on root process and any shared across processes
+
+    deallocate(scatterDists)
     deallocate(scatterTrip)
-    deallocate(scatterExpInd)
+    deallocate(newUvec)
     deallocate(indPerTrip)
     deallocate(changeExpData)
     deallocate(changeExpMat)
     deallocate(tripIndex)
     deallocate(newExpInt)
     deallocate(newDists)
-    deallocate(newExpMat)
     deallocate(changedTriplets)
     deallocate(changedTriDists)
 

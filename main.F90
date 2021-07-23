@@ -23,7 +23,7 @@ program main
   call initialise_Variables(N_a, N_tri,udSize)
   
 
-  call triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray, X_dg,&
+  call triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray, X_dg, &
                               disIntMat,expMat,uFinal,uVecFinal)
 
 
@@ -40,6 +40,8 @@ program main
   deallocate(expMat)
   deallocate(disIntMat)
   deallocate(posArray)
+  !deallocate(uVecFinal)
+  !deallocate(uVecChange)
 
 
   call MPI_FINALIZE(ierror)
