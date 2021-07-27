@@ -21,14 +21,14 @@ subroutine initialise_GP()
   close(1)
 
   ! Get the no of TPs and alpha values for each
-  open(2, file='smallAlpha.txt', status='old')
+  open(2, file='alpha.txt', status='old')
   read(2,*) N_tp
   allocate(alpha(N_tp))
   read(2,*) (alpha(j), j=1,N_tp)
   close(2)
 
   ! Read in nArgs and the distances for each TP
-  open(3, file='smallTrainingSet.txt', status='old')
+  open(3, file='trainingSet.txt', status='old')
   read(3,*) nArgs
   allocate(trainData(N_tp,nArgs))
   do k = 1, N_tp
@@ -160,17 +160,58 @@ end subroutine makeUDdgNonAdd
 
 ! Gets distances per process that need exponential calculations for and number
 ! of triplets needed per node for non-additve energy calculation
-subroutine getDistsAndTripletsPerProcNonAdd(nDist,nTrips,nProc, &
-                                            distsPerProc,tripsPerProc)
-  implicit none
-  integer, intent(in) :: nDist, nProc, nTrips
-  integer, intent(out) :: distsPerProc, tripsPerProc
+!subroutine getDistsAndTripletsPerProcNonAdd(nDist,nTrips,nProc, &
+!                                            distsPerProc,tripsPerProc)
+!  implicit none
+!  integer, intent(in) :: nDist, nProc, nTrips
+!  integer, intent(out) :: distsPerProc, tripsPerProc
 
-  distsPerProc = nDist / nProc
-  tripsPerProc = nTrips / nProc
+!  distsPerProc = nDist / nProc
+!  tripsPerProc = nTrips / nProc
+
+!return
+!end subroutine getDistsAndTripletsPerProcNonAdd
+
+
+subroutine getNPerProcNonAdd(nDist,nProc,pR, maxDat,reDat)
+  implicit none
+  integer, intent(in) :: nDist, nProc, pR
+  integer, intent(out) :: maxDat, reDat
+  integer :: counter
+
+  counter = 1
+
+  if (pR .eq. 0) then
+    print *, ' '
+    print *, counter
+    print *, nDist
+    print *, nProc
+  end if
+
+  do while (nDist .ge. counter*nProc)
+
+    maxDat = counter
+    counter = counter + 1
+
+  end do
+
+  reDat = nDist - maxDat*(nProc-1)
+
+  if (reDat .le. 0) then
+
+    reDat = maxDat
+
+  end if
+
+  if (pR .eq. 0) then
+
+    print *, maxDat
+    print *, reDat
+
+  end if
 
 return
-end subroutine getDistsAndTripletsPerProcNonAdd
+end subroutine getNPerProcNonAdd
 
 
 ! Calculates the exponentials required to find the non-additive energy

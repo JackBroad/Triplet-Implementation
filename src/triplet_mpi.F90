@@ -1,12 +1,13 @@
 module triplet_mpi_mod
   use mpi_variables
   use triplet_mod
-  use GP_variables, only: hyperParams, alpha, Perm, trainData, N_tp, nArgs,N_p 
+  use GP_variables, only: hyperParams,alpha,Perm,trainData,N_tp,nArgs,N_p
   implicit none
   include 'mpif.h'
 
 
 contains
+
 
   subroutine triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray, X_dg, &
                                     disIntMat,expMatrix,U,uFull)
@@ -21,10 +22,12 @@ contains
     double precision, allocatable, intent(out) :: expMatrix(:,:,:)
     
     ! Local variables
-    integer ::  eCols, i, nSum, dataSize
-    double precision ::  expTime, sumTime, totTime, setUpTime
-    integer, allocatable :: triMat(:,:), triScatter(:,:)
-    double precision, allocatable ::  scatterData(:), UD_dg(:)
+    integer :: eCols, i, nSum, maxnSum, dataSize, maxDataSize
+    integer :: totSize, reNsum, reDataSize, j
+    double precision :: expTime, sumTime, totTime, setUpTime
+    integer, allocatable :: triMat(:,:), triScatter(:,:) 
+    integer, allocatable :: scounts(:), displs(:) !(KIND=MPI_ADDRESS_KIND)
+    double precision, allocatable :: scatterData(:), UD_dg(:)
     double precision, allocatable :: expData(:,:,:), uVec(:)
 
 
@@ -33,6 +36,8 @@ contains
     root = 0
     N_p = 6
     setUpTime = MPI_Wtime()
+    allocate(scounts(clusterSize))
+    allocate(displs(clusterSize))
 
 
     ! Set up on root
@@ -98,42 +103,71 @@ contains
     call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
-    ! Determine no. of elements of UD_dg to send to each process for exp
-    ! calculations and no. of triplets to send to each for energy calculations
-    call getDistsAndTripletsPerProcNonAdd(udSize,N_tri,clusterSize, dataSize,nSum)
+    ! Determine max no. of elements of UD_dg to send to each process for exp
+    ! calculations and max no. of triplets to send to each for energy calculations
+    !call getDistsAndTripletsPerProcNonAdd(udSize,N_tri,clusterSize, maxDataSize, &
+    !                                      maxnSum)
+    call getNPerProcNonAdd(udSize,clusterSize,processRank, maxDataSize,reDataSize)
+    setUpTime = MPI_Wtime() - setUpTime
+    expTime = MPI_Wtime()
+
+
+    ! Determine actual no. of elements to send to each process for exp calc.
+    totSize = udSize
+    do i = 1, clusterSize
+
+    !  totSize = totSize - clusterSize
+
+    !  if (totSize .ge. 0) then
+
+    !    scounts(i) = maxDataSize
+
+    !  else
+
+    !    scounts(i) = reDataSize
+
+    !  end if
+      if (i .lt. clusterSize) then
+
+        scounts(i) = maxDataSize
+
+      else 
+
+        scounts(i) = reDataSize
+
+      end if
+
+      displs(i) = (i-1) * maxDataSize
+
+    end do
+    dataSize = scounts(processRank+1)
+    if (processRank .eq. root) then
+    print *, scounts
+    end if
     allocate(scatterData(dataSize)) ! Allocate array to send exponentials
 
 
     ! Scatter the interatomic distances in U_dg to all processes
-    call MPI_Scatter(UD_dg, dataSize, MPI_DOUBLE_PRECISION, scatterData, dataSize, &
-                     MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-
-
-    ! Scatter the triplet matrix
-    allocate(triScatter(3,nSum))
-    call MPI_Scatter(triMat, nSum*3, MPI_INT, triScatter, nSum*3, MPI_INT, root, &
-                     MPI_COMM_WORLD, ierror)
-    call MPI_BARRIER(MPI_COMM_WORLD, barError)
+    call MPI_scatterv(UD_dg, scounts, displs, MPI_DOUBLE_PRECISION, scatterData, dataSize, &
+                      MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
 
 
     ! Calculate the exponentials for each distance on each process
-    setUpTime = MPI_Wtime() - setUpTime
-    expTime = MPI_Wtime()
     allocate(expData(nArgs,N_tp,dataSize))
     call calculateExponentialsNonAdd(dataSize,N_tp,nArgs,trainData,hyperParams(1), &
                                      scatterData,N_a, expData)
 
 
     ! Allocate an array to hold all exps
-    eCols = nArgs*N_tri !udSize
+    eCols = nArgs*N_tri
     allocate(expMatrix(nArgs,N_tp,udSize))
 
 
     ! Gather expData arrays from the other processes and add them to expMatrix on
     ! the root process
-    call MPI_Gather(expData, N_tp*nArgs*dataSize, MPI_DOUBLE_PRECISION, expMatrix, &
-                    N_tp*nArgs*dataSize, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, &
-                    ierror)
+    call MPI_gatherv(expData, N_tp*nArgs*dataSize, MPI_DOUBLE_PRECISION, expMatrix, &
+                     N_tp*nArgs*scounts, N_tp*nArgs*displs, MPI_DOUBLE_PRECISION, &
+                     root, MPI_COMM_WORLD, ierror)
     expTime = MPI_Wtime() - expTime
 
 
@@ -144,15 +178,90 @@ contains
     call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
+    ! Determine actual no. of elements to send to each process for triplet calc.
+    call getNPerProcNonAdd(N_tri,clusterSize,processRank, maxnSum,reNsum)
+    totSize = N_tri
+    do i = 1, clusterSize
+
+    !  totSize = totSize - clusterSize
+
+    !  if (totSize .ge. 0) then
+
+    !    scounts(i) = maxDataSize
+
+    !  else
+
+    !    scounts(i) = reDataSize
+
+    !  end if
+      if (i .lt. clusterSize) then
+
+        scounts(i) = maxDataSize
+
+      else
+
+        scounts(i) = reDataSize
+
+      end if
+
+      displs(i) = (i-1) * maxDataSize
+
+    end do
+    nSum = scounts(processRank+1)
+    if (processRank .eq. root) then
+    print *, scounts
+    end if
+
+
+    ! Scatter the triplet matrix
+    allocate(triScatter(3,nSum))
+    call MPI_scatterv(triMat, scounts*3, displs*3, MPI_INT, triScatter, nSum*3, MPI_INT, &
+                      root, MPI_COMM_WORLD, ierror)
+    call MPI_BARRIER(MPI_COMM_WORLD, barError)
+
+
+    do i = 0, clusterSize
+
+      if (i .eq. processRank) then
+
+      print *, ' '
+      print *, processRank
+
+        do j = 1, nSum
+
+          print *, triScatter(:,j)
+
+        end do
+
+      end if
+
+      call MPI_BARRIER(MPI_COMM_WORLD, barError)
+
+    end do
+
+
     ! Find the energies of the triplets assigned to each process
     allocate(uVec(nSum))
     call tripletEnergiesNonAdd(triScatter,disIntMat,nSum,N_tp,N_a,N_p,nArgs,Perm, &
                                udSize,expMatrix,alpha,hyperParams(2), uVec)
+    do i = 0, clusterSize
+
+      if (i .eq. processRank) then
+
+      print *, ' '
+      print *, processRank
+      print *, uVec
+
+      end if
+
+      call MPI_BARRIER(MPI_COMM_WORLD, barError)
+
+    end do
 
 
     ! Gather in the triplet energies and sum them to get total non-add energy
-    call MPI_Gather(uVec, nSum, MPI_DOUBLE_PRECISION, uFull, nSum, MPI_DOUBLE_PRECISION, &
-                    root, MPI_COMM_WORLD, ierror)
+    call MPI_gatherv(uVec, nSum, MPI_DOUBLE_PRECISION, uFull, scounts, displs, MPI_DOUBLE_PRECISION, &
+                     root, MPI_COMM_WORLD, ierror)
 
 
     ! Find the total non-additive energy for the system
@@ -165,7 +274,7 @@ contains
        print *, "              "
 
     end if
-
+    sumTime = MPI_Wtime() - sumTime
 
     ! De-allocate arrays not passed to atom-move subroutine
     deallocate(scatterData)
@@ -182,7 +291,6 @@ contains
 
 
     ! Print times taken for each part of subroutine to run
-    sumTime = MPI_Wtime() - sumTime
     totTime = MPI_Wtime() - totTime
     if (processRank .eq. root) then
 
