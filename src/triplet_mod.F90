@@ -173,20 +173,13 @@ end subroutine makeUDdgNonAdd
 !end subroutine getDistsAndTripletsPerProcNonAdd
 
 
-subroutine getNPerProcNonAdd(nDist,nProc,pR, maxDat,reDat)
+subroutine getNPerProcNonAdd(nDist,nProc, maxDat,reDat)
   implicit none
-  integer, intent(in) :: nDist, nProc, pR
+  integer, intent(in) :: nDist, nProc
   integer, intent(out) :: maxDat, reDat
   integer :: counter
 
   counter = 1
-
-  if (pR .eq. 0) then
-    print *, ' '
-    print *, counter
-    print *, nDist
-    print *, nProc
-  end if
 
   do while (nDist .ge. counter*nProc)
 
@@ -203,27 +196,20 @@ subroutine getNPerProcNonAdd(nDist,nProc,pR, maxDat,reDat)
 
   end if
 
-  if (pR .eq. 0) then
-
-    print *, maxDat
-    print *, reDat
-
-  end if
-
 return
 end subroutine getNPerProcNonAdd
 
 
 ! Calculates the exponentials required to find the non-additive energy
 subroutine calculateExponentialsNonAdd(nJobs,nTP,nArguments,trainingData, &
-                                       lengthscale,dists,nAt, exponentials)
+                                       lengthscale,dists, exponentials)
   implicit none
-  integer, intent(in) :: nJobs, nTP, nArguments, nAt
+  integer, intent(in) :: nJobs, nTP, nArguments
   double precision, intent(in) :: trainingData(nTP,nArguments)
   double precision, intent(in) :: lengthscale, dists(nJobs)
   double precision, intent(out) :: exponentials(nArguments,nTP,nJobs)
-  integer :: i, j, k, atOne, atTwo
-  double precision :: expon, dist, num, denom
+  integer :: i, j, k
+  double precision :: expon, num, denom
 
   do i = 1, nJobs
       do j = 1, nTP
@@ -282,7 +268,6 @@ subroutine tripletEnergiesNonAdd(triData,intMat,nJob,nTP,nAt,nPerm,nArg,permMat,
   double precision, intent(in) :: expMat(nArg,nTP,expCols), alphaVec(nTP), sigVar
   double precision, intent(out) :: uVector(nJob)
   integer :: triInt, alp, bet, gam, alDis, beDis, gaDis, r, s, kP(nArg)
-  integer :: alInt, beInt, gaInt
   double precision :: alphaSum, expSum, expProd
 
   do triInt = 1, nJob
@@ -468,7 +453,7 @@ subroutine getChangedTriplets(atom,nAt,Xdg,nPerAt, changedTriplets, &
   double precision, intent(in) :: Xdg(nAt,nAt)
   integer, intent(out) :: changedTriplets(3,nPerAt)
   double precision, intent(out) :: changedTriDists(3,nPerAt)
-  integer :: a, b, al, be, ga, counter, i
+  integer :: al, be, ga, counter, i
 
   ! Fill changed triplet array
   counter = 0
@@ -581,7 +566,7 @@ subroutine findChangedDistsPerTrip(nPerAt,changedTri,atom, indPerTrip)
   implicit none
   integer, intent(in) :: nPerAt, changedTri(3,nPerAt), atom
   integer, intent(out) :: indPerTrip(2,nPerAt)
-  integer :: i, al, be, ga, j
+  integer :: i, al, be, ga
 
   do i = 1, nPerAt
 
@@ -621,7 +606,7 @@ subroutine updateExponentialsNonAdd(nJob,nTP,nArgument,dists,ind,triIndVec, &
   double precision, intent(in) :: trainingData(nTP,nArgument)
   double precision, intent(out) :: updateExp(nTP,nDat*nArgument)
   double precision :: expon
-  integer :: i, j, k, l, triInd, m, n, minInd, maxInd, countDone, countJobs, o
+  integer :: i, j, k, l, triInd, m, n, minInd, maxInd, countDone, countJobs
   integer :: first
 
   minInd = pR*nDat + 1

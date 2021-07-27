@@ -23,7 +23,7 @@ contains
     
     ! Local variables
     integer :: eCols, i, nSum, maxnSum, dataSize, maxDataSize
-    integer :: totSize, reNsum, reDataSize, j
+    integer :: reNsum, reDataSize, j
     double precision :: expTime, sumTime, totTime, setUpTime
     integer, allocatable :: triMat(:,:), triScatter(:,:) 
     integer, allocatable :: scounts(:), displs(:) !(KIND=MPI_ADDRESS_KIND)
@@ -104,29 +104,15 @@ contains
 
 
     ! Determine max no. of elements of UD_dg to send to each process for exp
-    ! calculations and max no. of triplets to send to each for energy calculations
-    !call getDistsAndTripletsPerProcNonAdd(udSize,N_tri,clusterSize, maxDataSize, &
-    !                                      maxnSum)
-    call getNPerProcNonAdd(udSize,clusterSize,processRank, maxDataSize,reDataSize)
+    ! calculations
+    call getNPerProcNonAdd(udSize,clusterSize, maxDataSize,reDataSize)
     setUpTime = MPI_Wtime() - setUpTime
     expTime = MPI_Wtime()
 
 
     ! Determine actual no. of elements to send to each process for exp calc.
-    totSize = udSize
     do i = 1, clusterSize
 
-    !  totSize = totSize - clusterSize
-
-    !  if (totSize .ge. 0) then
-
-    !    scounts(i) = maxDataSize
-
-    !  else
-
-    !    scounts(i) = reDataSize
-
-    !  end if
       if (i .lt. clusterSize) then
 
         scounts(i) = maxDataSize
@@ -141,9 +127,6 @@ contains
 
     end do
     dataSize = scounts(processRank+1)
-    if (processRank .eq. root) then
-    print *, scounts
-    end if
     allocate(scatterData(dataSize)) ! Allocate array to send exponentials
 
 
@@ -155,7 +138,7 @@ contains
     ! Calculate the exponentials for each distance on each process
     allocate(expData(nArgs,N_tp,dataSize))
     call calculateExponentialsNonAdd(dataSize,N_tp,nArgs,trainData,hyperParams(1), &
-                                     scatterData,N_a, expData)
+                                     scatterData, expData)
 
 
     ! Allocate an array to hold all exps
@@ -179,21 +162,9 @@ contains
 
 
     ! Determine actual no. of elements to send to each process for triplet calc.
-    call getNPerProcNonAdd(N_tri,clusterSize,processRank, maxnSum,reNsum)
-    totSize = N_tri
+    call getNPerProcNonAdd(N_tri,clusterSize, maxnSum,reNsum)
     do i = 1, clusterSize
-
-    !  totSize = totSize - clusterSize
-
-    !  if (totSize .ge. 0) then
-
-    !    scounts(i) = maxDataSize
-
-    !  else
-
-    !    scounts(i) = reDataSize
-
-    !  end if
+    
       if (i .lt. clusterSize) then
 
         scounts(i) = maxDataSize
@@ -208,9 +179,6 @@ contains
 
     end do
     nSum = scounts(processRank+1)
-    if (processRank .eq. root) then
-    print *, scounts
-    end if
 
 
     ! Scatter the triplet matrix
@@ -220,43 +188,10 @@ contains
     call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
-    do i = 0, clusterSize
-
-      if (i .eq. processRank) then
-
-      print *, ' '
-      print *, processRank
-
-        do j = 1, nSum
-
-          print *, triScatter(:,j)
-
-        end do
-
-      end if
-
-      call MPI_BARRIER(MPI_COMM_WORLD, barError)
-
-    end do
-
-
     ! Find the energies of the triplets assigned to each process
     allocate(uVec(nSum))
     call tripletEnergiesNonAdd(triScatter,disIntMat,nSum,N_tp,N_a,N_p,nArgs,Perm, &
                                udSize,expMatrix,alpha,hyperParams(2), uVec)
-    do i = 0, clusterSize
-
-      if (i .eq. processRank) then
-
-      print *, ' '
-      print *, processRank
-      print *, uVec
-
-      end if
-
-      call MPI_BARRIER(MPI_COMM_WORLD, barError)
-
-    end do
 
 
     ! Gather in the triplet energies and sum them to get total non-add energy
@@ -281,6 +216,8 @@ contains
     deallocate(expData)
     deallocate(uVec)
     deallocate(triScatter)
+    deallocate(scounts)
+    deallocate(displs)
     if (processRank .eq. root) then
 
        deallocate(UD_dg)
@@ -326,11 +263,13 @@ contains
     double precision, allocatable, intent(out) :: newUfull(:)
 
     ! Local variables
-    integer :: triPerProc, i, j, indj, nPerProc, move, triPerAt
+    integer :: triPerProc, i, j, indj, nPerProc, move, triPerAt, nExpMax, nExpRe
+    integer :: nTriMax, nTriRe, k
     double precision :: newPosAt(N_a,nArgs), newX_dg(N_a,N_a), totTime
     double precision :: moveTime, newExpMat(nArgs,N_tp,udSize)
     integer, allocatable :: newExpInt(:,:), tripIndex(:), changedTriplets(:,:)
-    integer, allocatable :: indPerTrip(:,:), scatterTrip(:,:)
+    integer, allocatable :: indPerTrip(:,:), scatterTrip(:,:), scounts(:)
+    integer, allocatable :: displs(:)
     double precision, allocatable :: newDists(:), newUvec(:), changedTriDists(:,:)
     double precision, allocatable :: scatterDists(:), changeExpData(:,:,:)
     double precision, allocatable :: changeExpMat(:,:,:)
@@ -350,20 +289,18 @@ contains
 
     totTime = MPI_Wtime()
     call getTriPerAtom(N_a, triPerAt)
-    triPerProc = triPerAt / clusterSize
-    nPerProc = (N_a-1)/clusterSize
-    allocate(scatterDists(nPerProc))
-    allocate(scatterTrip(3,triPerProc))
+    !triPerProc = triPerAt / clusterSize
+    !nPerProc = (N_a-1)/clusterSize
     allocate(newExpInt(2,N_a-1))
     allocate(newDists(N_a-1))
     allocate(indPerTrip(2,triPerAt))
-    allocate(changeExpData(nArgs,N_tp,nPerProc))
     allocate(changeExpMat(nArgs,N_tp,N_a-1))
     allocate(changedTriplets(3,triPerAt))
-    allocate(newUvec(triPerProc))
     allocate(newUfull(triPerAt))
     allocate(changedTriDists(3,triPerAt))
     allocate(tripIndex(triPerAt))
+    allocate(scounts(clusterSize))
+    allocate(displs(clusterSize))
 
 
     ! Loop over N moves, moving an atom and re-calculating the energy each time
@@ -394,17 +331,12 @@ contains
 
        ! Scatter all requisite data from move set-up on root to all procs
        call MPI_BARRIER(MPI_COMM_WORLD, barError)
-       call MPI_Scatter(changedTriplets, triPerProc*3, MPI_INT, scatterTrip, &
-                        triPerProc*3, MPI_INT, root, MPI_COMM_WORLD, ierror)
        call MPI_Bcast(newExpInt, 2*(N_a-1), MPI_INT, root, MPI_COMM_WORLD, &
                       ierror)
        call MPI_Bcast(newX_dg, N_a*N_a, MPI_DOUBLE_PRECISION, root, &
                       MPI_COMM_WORLD, ierror)
        call MPI_Bcast(newPosAt, 3*N_a, MPI_DOUBLE_PRECISION, root, &
                       MPI_COMM_WORLD, ierror)
-       call MPI_Scatter(newDists, nPerProc, MPI_DOUBLE_PRECISION, &
-                        scatterDists, nPerProc, MPI_DOUBLE_PRECISION, &
-                        root, MPI_COMM_WORLD, ierror)
        call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
        call MPI_Bcast(tripIndex, triPerAt, MPI_INT, root, MPI_COMM_WORLD, ierror)
        call MPI_Bcast(indPerTrip, 2*triPerAt, MPI_INT, root, MPI_COMM_WORLD, &
@@ -412,16 +344,48 @@ contains
        call MPI_Bcast(changedTriDists, 3*triPerAt, MPI_DOUBLE_PRECISION, root, &
                       MPI_COMM_WORLD, ierror)
 
+       ! Determine no. of distances to scatter to each process for exp re-calc
+       call getNPerProcNonAdd(N_a-1,clusterSize, nExpMax,nExpRe)
+       do k = 1, clusterSize
+
+         if (k .lt. clusterSize) then
+
+           scounts(k) = nExpMax
+
+         else
+
+           scounts(k) = nExpRe
+
+         end if
+
+         displs(k) = (k-1) * nExpMax
+
+       end do
+       nPerProc = scounts(processRank+1)
+
+       ! Allocate arrays on first loop
+       if (i .eq. 1) then
+
+         allocate(scatterDists(nPerProc))
+         allocate(changeExpData(nArgs,N_tp,nPerProc))
+
+       end if
+
+       ! Scatter distances across processes
+       call MPI_scatterv(newDists, scounts, displs, MPI_DOUBLE_PRECISION, &
+                         scatterDists, nPerProc, MPI_DOUBLE_PRECISION, &
+                         root, MPI_COMM_WORLD, ierror)
+
        ! Update exponentials in changed triplets
        call calculateExponentialsNonAdd(nPerProc,N_tp,nArgs,trainData, &
-                                        hyperParams(1),scatterDists,N_a, &
+                                        hyperParams(1),scatterDists, &
                                         changeExpData)
        call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
        ! Gather in all updated exps and broadcast the resultant matrix to all procs
-       call MPI_Gather(changeExpData, N_tp*nArgs*nPerProc, &
-                       MPI_DOUBLE_PRECISION, changeExpMat, N_tp*nArgs*nPerProc, &
-                       MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+       call MPI_gatherv(changeExpData, N_tp*nArgs*nPerProc, MPI_DOUBLE_PRECISION, &
+                        changeExpMat, N_tp*nArgs*scounts, N_tp*nArgs*displs, &
+                        MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
        call MPI_Bcast(changeExpMat, N_tp*nArgs*(N_a-1), &
                       MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
        call MPI_BARRIER(MPI_COMM_WORLD, barError)
@@ -434,12 +398,43 @@ contains
 
        end do
 
+       ! Determine how many triplets to send to each proc
+       call getNPerProcNonAdd(N_a-1,clusterSize, nTriMax,nTriRe)
+       do k = 1, clusterSize
+
+         if (k .lt. clusterSize) then
+
+           scounts(k) = nTriMax
+
+         else
+
+           scounts(k) = nTriRe
+
+         end if
+
+         displs(k) = (k-1) * nTriMax
+
+       end do
+       triPerProc = scounts(processRank+1)
+
+       ! Allocate requisite arrasy in first loop
+       if (i .eq. 1) then
+
+         allocate(scatterTrip(3,triPerProc))
+         allocate(newUvec(triPerProc))
+
+       end if
+
+       ! Scatter triplets across processes
+       call MPI_scatterv(changedTriplets, scounts*3, displs*3, MPI_INT, scatterTrip, &
+                         triPerProc*3, MPI_INT, root, MPI_COMM_WORLD, ierror)
+
        ! Calculate the non-additive energies for the changed triplets and gather
        call tripletEnergiesNonAdd(scatterTrip,disIntMat,triPerProc,N_tp,N_a,N_p,nArgs,Perm, &
                                   N_a-1,newExpMat,alpha,hyperParams(2), newUvec)
        call MPI_BARRIER(MPI_COMM_WORLD, barError)
-       call MPI_Gather(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, triPerProc, &
-                       MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+       call MPI_gatherv(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, scounts, &
+                        displs, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
 
        ! Find total change in non-add energy from moving atom
        deltaU = 0d0
