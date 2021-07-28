@@ -21,7 +21,7 @@ subroutine initialise_GP()
   close(1)
 
   ! Get the no of TPs and alpha values for each
-  open(2, file='smallAlpha.txt', status='old')
+  open(2, file='alpha.txt', status='old')
   read(2,*) N_tp
   if (allocated(alpha)) then
     deallocate(alpha)
@@ -31,7 +31,7 @@ subroutine initialise_GP()
   close(2)
 
   ! Read in nArgs and the distances for each TP
-  open(3, file='smallTrainingSet.txt', status='old')
+  open(3, file='trainingSet.txt', status='old')
   read(3,*) nArgs
   if (allocated(trainData)) then
     deallocate(trainData)
@@ -179,6 +179,8 @@ return
 end subroutine getDistsAndTripletsPerProcNonAdd
 
 
+! Get amount of data to send to each process for a scatterv call (or receive in
+! a gatehrv call)
 subroutine getNPerProcNonAdd(nDist,nProc, maxDat,reDat)
   implicit none
   integer, intent(in) :: nDist, nProc
@@ -204,6 +206,33 @@ subroutine getNPerProcNonAdd(nDist,nProc, maxDat,reDat)
 
 return
 end subroutine getNPerProcNonAdd
+
+
+! Fill arrays needed for scatterv/gatherv calls
+subroutine getVarrays(nProc,maxSize,reSize, counts,stride)
+  implicit none
+  integer, intent(in) :: nProc, maxSize, reSize
+  integer, intent(out) :: counts(nProc), stride(nProc)
+  integer :: i
+
+  do i = 1, nProc
+
+    if (i .lt. nProc) then
+
+      counts(i) = maxSize
+
+    else
+
+      counts(i) = reSize
+
+    end if
+
+    stride(i) = (i-1) * maxSize
+
+  end do
+
+return
+end subroutine getVarrays
 
 
 ! Calculates the exponentials required to find the non-additive energy

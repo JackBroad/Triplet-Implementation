@@ -34,9 +34,7 @@ contains
 
     if( processRank == root ) then
        print *,'========================Regression tests============================'
-       !print *,'!!!!!!!!!!!!!!!!!!Warning: test_exp_calc is disabled and needs fixing!!!'
-       !print *,'!!!!!!!!!!!!!!!!!!Warning: test_triplet energy is disabled !!!'
-       !print *,'!!!!!!!!!!!!!!!!!!This is because matrices shapes have changed !!!'
+       print *,'If many tests fail, check that triplet_mod reads smallAlpha.txt and smallTrainingSet.txt'
 
        call getDistsAndTripletsPerProcNonAdd(nDist,nTrips,nProc,distsPerProc,tripsPerProc)
        @assertEqual(distsPerProc, 3,'Distances per processor #1')
@@ -343,6 +341,72 @@ contains
     end if
 
   end subroutine test_cluster_energies
+
+  @test
+  subroutine test_v_setup()
+    implicit none
+    integer :: nP, nD=11, max, re, max_Ex, re_Ex
+    integer, allocatable :: c(:), s(:), c_Ex(:), s_Ex(:)
+
+    nP = 3
+    allocate(c(nP),s(nP),c_Ex(nP),s_Ex(nP))
+
+    max_Ex = 3
+    re_Ex = 5
+
+    call getNPerProcNonAdd(nD,nP, max,re)
+
+    if( processRank == root) then
+
+      @assertEqual(max, max_Ex, 'Test v setup max elements #1')
+      @assertEqual(re, re_Ex, 'Test v setup re elements #1')
+
+    end if
+
+    c_Ex = (/ 3,3,5 /)
+    s_Ex = (/ 0,3,6 /)
+
+    call getVarrays(nP,max,re, c,s)
+
+    if( processRank == root) then
+
+      @assertEqual(c, c_Ex, 'Test v setup scounts #1')
+      @assertEqual(s, s_Ex, 'Test v setup displs #1')
+
+    end if
+
+    deallocate(c,s,c_Ex,s_Ex)
+
+    nP = 6
+    allocate(c(nP),s(nP),c_Ex(nP),s_Ex(nP))
+
+    max_Ex = 1
+    re_Ex = 6
+
+    call getNPerProcNonAdd(nD,nP, max,re)
+
+    if( processRank == root) then
+
+       @assertEqual(max, max_Ex, 'Test v setup max elements #2')
+       @assertEqual(re, re_Ex, 'Test v setup re elements #2')
+
+    end if
+
+    c_Ex = (/ 1,1,1,1,1,6 /)
+    s_Ex = (/ 0,1,2,3,4,5 /)
+
+    call getVarrays(nP,max,re, c,s)
+
+    if( processRank == root) then
+
+      @assertEqual(c, c_Ex, 'Test v setup scounts #2')
+      @assertEqual(s, s_Ex, 'Test v setup displs #2')
+
+    end if
+
+    deallocate(c,s,c_Ex,s_Ex)
+
+  end subroutine test_v_setup
   !===========================================================================================
   @test
   subroutine test_finalize()

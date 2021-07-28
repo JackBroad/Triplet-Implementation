@@ -22,8 +22,8 @@ contains
     double precision, allocatable, intent(out) :: expMatrix(:,:,:)
     
     ! Local variables
-    integer :: eCols, i, nSum, maxnSum, dataSize, maxDataSize
-    integer :: reNsum, reDataSize, j
+    integer :: eCols, nSum, maxnSum, dataSize, maxDataSize
+    integer :: reNsum, reDataSize
     double precision :: expTime, sumTime, totTime, setUpTime
     integer, allocatable :: triMat(:,:), triScatter(:,:) 
     integer, allocatable :: scounts(:), displs(:) !(KIND=MPI_ADDRESS_KIND)
@@ -111,21 +111,7 @@ contains
 
 
     ! Determine actual no. of elements to send to each process for exp calc.
-    do i = 1, clusterSize
-
-      if (i .lt. clusterSize) then
-
-        scounts(i) = maxDataSize
-
-      else 
-
-        scounts(i) = reDataSize
-
-      end if
-
-      displs(i) = (i-1) * maxDataSize
-
-    end do
+    call getVarrays(clusterSize,maxDataSize,reDataSize, scounts,displs)
     dataSize = scounts(processRank+1)
     allocate(scatterData(dataSize)) ! Allocate array to send exponentials
 
@@ -163,21 +149,7 @@ contains
 
     ! Determine actual no. of elements to send to each process for triplet calc.
     call getNPerProcNonAdd(N_tri,clusterSize, maxnSum,reNsum)
-    do i = 1, clusterSize
-    
-      if (i .lt. clusterSize) then
-
-        scounts(i) = maxDataSize
-
-      else
-
-        scounts(i) = reDataSize
-
-      end if
-
-      displs(i) = (i-1) * maxDataSize
-
-    end do
+    call getVarrays(clusterSize,maxNsum,reNsum, scounts,displs)
     nSum = scounts(processRank+1)
 
 
@@ -264,7 +236,7 @@ contains
 
     ! Local variables
     integer :: triPerProc, i, j, indj, nPerProc, move, triPerAt, nExpMax, nExpRe
-    integer :: nTriMax, nTriRe, k
+    integer :: nTriMax, nTriRe
     double precision :: newPosAt(N_a,nArgs), newX_dg(N_a,N_a), totTime
     double precision :: moveTime, newExpMat(nArgs,N_tp,udSize)
     integer, allocatable :: newExpInt(:,:), tripIndex(:), changedTriplets(:,:)
@@ -289,8 +261,6 @@ contains
 
     totTime = MPI_Wtime()
     call getTriPerAtom(N_a, triPerAt)
-    !triPerProc = triPerAt / clusterSize
-    !nPerProc = (N_a-1)/clusterSize
     allocate(newExpInt(2,N_a-1))
     allocate(newDists(N_a-1))
     allocate(indPerTrip(2,triPerAt))
@@ -346,21 +316,7 @@ contains
 
        ! Determine no. of distances to scatter to each process for exp re-calc
        call getNPerProcNonAdd(N_a-1,clusterSize, nExpMax,nExpRe)
-       do k = 1, clusterSize
-
-         if (k .lt. clusterSize) then
-
-           scounts(k) = nExpMax
-
-         else
-
-           scounts(k) = nExpRe
-
-         end if
-
-         displs(k) = (k-1) * nExpMax
-
-       end do
+       call getVarrays(clusterSize,nExpMax,nExpRe, scounts,displs)
        nPerProc = scounts(processRank+1)
 
        ! Allocate arrays on first loop
@@ -399,22 +355,8 @@ contains
        end do
 
        ! Determine how many triplets to send to each proc
-       call getNPerProcNonAdd(N_a-1,clusterSize, nTriMax,nTriRe)
-       do k = 1, clusterSize
-
-         if (k .lt. clusterSize) then
-
-           scounts(k) = nTriMax
-
-         else
-
-           scounts(k) = nTriRe
-
-         end if
-
-         displs(k) = (k-1) * nTriMax
-
-       end do
+       call getNPerProcNonAdd(triPerAt,clusterSize, nTriMax,nTriRe)
+       call getVarrays(clusterSize,nTriMax,nTriRe, scounts,displs)
        triPerProc = scounts(processRank+1)
 
        ! Allocate requisite arrasy in first loop
@@ -431,7 +373,7 @@ contains
 
        ! Calculate the non-additive energies for the changed triplets and gather
        call tripletEnergiesNonAdd(scatterTrip,disIntMat,triPerProc,N_tp,N_a,N_p,nArgs,Perm, &
-                                  N_a-1,newExpMat,alpha,hyperParams(2), newUvec)
+                                  udSize,newExpMat,alpha,hyperParams(2), newUvec)
        call MPI_BARRIER(MPI_COMM_WORLD, barError)
        call MPI_gatherv(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, scounts, &
                         displs, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
