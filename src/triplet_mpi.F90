@@ -204,7 +204,7 @@ contains
     if (processRank .eq. root) then
 
        call totalEnergyNonAdd(uFull,N_tri, U)
-       print *, uFull
+       !print *, uFull
        print *, "The total non-additive energy is", U
        print *, "              "
 

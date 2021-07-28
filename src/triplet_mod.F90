@@ -21,15 +21,21 @@ subroutine initialise_GP()
   close(1)
 
   ! Get the no of TPs and alpha values for each
-  open(2, file='alpha.txt', status='old')
+  open(2, file='smallAlpha.txt', status='old')
   read(2,*) N_tp
+  if (allocated(alpha)) then
+    deallocate(alpha)
+  end if
   allocate(alpha(N_tp))
   read(2,*) (alpha(j), j=1,N_tp)
   close(2)
 
   ! Read in nArgs and the distances for each TP
-  open(3, file='trainingSet.txt', status='old')
+  open(3, file='smallTrainingSet.txt', status='old')
   read(3,*) nArgs
+  if (allocated(trainData)) then
+    deallocate(trainData)
+  end if
   allocate(trainData(N_tp,nArgs))
   do k = 1, N_tp
     read(3,*) (trainData(k,l), l=1,nArgs)
@@ -160,17 +166,17 @@ end subroutine makeUDdgNonAdd
 
 ! Gets distances per process that need exponential calculations for and number
 ! of triplets needed per node for non-additve energy calculation
-!subroutine getDistsAndTripletsPerProcNonAdd(nDist,nTrips,nProc, &
-!                                            distsPerProc,tripsPerProc)
-!  implicit none
-!  integer, intent(in) :: nDist, nProc, nTrips
-!  integer, intent(out) :: distsPerProc, tripsPerProc
+subroutine getDistsAndTripletsPerProcNonAdd(nDist,nTrips,nProc, &
+                                            distsPerProc,tripsPerProc)
+  implicit none
+  integer, intent(in) :: nDist, nProc, nTrips
+  integer, intent(out) :: distsPerProc, tripsPerProc
 
-!  distsPerProc = nDist / nProc
-!  tripsPerProc = nTrips / nProc
+  distsPerProc = nDist / nProc
+  tripsPerProc = nTrips / nProc
 
-!return
-!end subroutine getDistsAndTripletsPerProcNonAdd
+return
+end subroutine getDistsAndTripletsPerProcNonAdd
 
 
 subroutine getNPerProcNonAdd(nDist,nProc, maxDat,reDat)

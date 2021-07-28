@@ -19,7 +19,7 @@ program main
 
   ! Set-up calls
   call initialise_GP()
-  call initialise_Positions('AtomicPositions5.txt', posArray,N_a)
+  call initialise_Positions('AtomicPositions400.txt', posArray,N_a)
   call initialise_Variables(N_a, N_tri,udSize)
   
 
@@ -30,7 +30,7 @@ program main
   call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
-  call triplet_mpi_moveNonAdd(5,1.5d0,N_a,N_tri,udSize,posArray,X_dg, &
+  call triplet_mpi_moveNonAdd(20,1.5d0,N_a,N_tri,udSize,posArray,X_dg, &
                               disIntMat,expMat,uChange,uVecChange)
 
 
