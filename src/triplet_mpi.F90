@@ -239,12 +239,10 @@ contains
     integer :: nTriMax, nTriRe
     double precision :: newPosAt(N_a,nArgs), newX_dg(N_a,N_a), totTime
     double precision :: moveTime, newExpMat(nArgs,N_tp,udSize)
-    integer, allocatable :: newExpInt(:,:), tripIndex(:), changedTriplets(:,:)
-    integer, allocatable :: indPerTrip(:,:), scatterTrip(:,:), scounts(:)
-    integer, allocatable :: displs(:)
-    double precision, allocatable :: newDists(:), newUvec(:), changedTriDists(:,:)
-    double precision, allocatable :: scatterDists(:), changeExpData(:,:,:)
-    double precision, allocatable :: changeExpMat(:,:,:)
+    integer, allocatable :: newExpInt(:,:), changedTriplets(:,:), scounts(:)
+    integer, allocatable :: scatterTrip(:,:), displs(:)
+    double precision, allocatable :: newDists(:), newUvec(:), scatterDists(:)
+    double precision, allocatable :: changeExpData(:,:,:), changeExpMat(:,:,:)
 
 
     root = 0
@@ -263,12 +261,9 @@ contains
     call getTriPerAtom(N_a, triPerAt)
     allocate(newExpInt(2,N_a-1))
     allocate(newDists(N_a-1))
-    allocate(indPerTrip(2,triPerAt))
     allocate(changeExpMat(nArgs,N_tp,N_a-1))
     allocate(changedTriplets(3,triPerAt))
     allocate(newUfull(triPerAt))
-    allocate(changedTriDists(3,triPerAt))
-    allocate(tripIndex(triPerAt))
     allocate(scounts(clusterSize))
     allocate(displs(clusterSize))
 
@@ -292,10 +287,7 @@ contains
           call extractChangedExps(N_a,move,newX_dg, newExpInt,newDists)
 
           ! Determine which triplets have undergone a change
-          call getChangedTriplets(move,N_a,newX_dg,triPerAt, &
-                                  changedTriplets,changedTriDists)
-          call findChangedTriIndex(triPerAt,N_a,move, tripIndex)
-          call findChangedDistsPerTrip(triPerAt,changedTriplets,move, indPerTrip)
+          call getChangedTriplets(move,N_a,triPerAt, changedTriplets)
 
        end if
 
@@ -308,11 +300,6 @@ contains
        call MPI_Bcast(newPosAt, 3*N_a, MPI_DOUBLE_PRECISION, root, &
                       MPI_COMM_WORLD, ierror)
        call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
-       call MPI_Bcast(tripIndex, triPerAt, MPI_INT, root, MPI_COMM_WORLD, ierror)
-       call MPI_Bcast(indPerTrip, 2*triPerAt, MPI_INT, root, MPI_COMM_WORLD, &
-                      ierror)
-       call MPI_Bcast(changedTriDists, 3*triPerAt, MPI_DOUBLE_PRECISION, root, &
-                      MPI_COMM_WORLD, ierror)
 
        ! Determine no. of distances to scatter to each process for exp re-calc
        call getNPerProcNonAdd(N_a-1,clusterSize, nExpMax,nExpRe)
@@ -403,19 +390,15 @@ contains
     moveTime = MPI_Wtime() - moveTime
 
 
-    ! Deallocate all arrays on root process and any shared across processes
-
+    ! Deallocate all arrays
     deallocate(scatterDists)
     deallocate(scatterTrip)
     deallocate(newUvec)
-    deallocate(indPerTrip)
     deallocate(changeExpData)
     deallocate(changeExpMat)
-    deallocate(tripIndex)
     deallocate(newExpInt)
     deallocate(newDists)
     deallocate(changedTriplets)
-    deallocate(changedTriDists)
 
 
     ! Finalise MPI and print times taken for each step of calculation

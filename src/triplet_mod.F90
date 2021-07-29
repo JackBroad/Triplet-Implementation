@@ -481,14 +481,11 @@ return
 end subroutine getTriPerAtom
 
 
-subroutine getChangedTriplets(atom,nAt,Xdg,nPerAt, changedTriplets, &
-                              changedTriDists)
+subroutine getChangedTriplets(atom,nAt,nPerAt, changedTriplets)
   implicit none
   integer, intent(in) :: atom, nAt, nPerAt
-  double precision, intent(in) :: Xdg(nAt,nAt)
   integer, intent(out) :: changedTriplets(3,nPerAt)
-  double precision, intent(out) :: changedTriDists(3,nPerAt)
-  integer :: al, be, ga, counter, i
+  integer :: al, be, ga, counter
 
   ! Fill changed triplet array
   counter = 0
@@ -547,14 +544,6 @@ subroutine getChangedTriplets(atom,nAt,Xdg,nPerAt, changedTriplets, &
     end do
   end if
 
-  do i = 1, nPerAt
-
-    changedTriDists(1,i) = Xdg(changedTriplets(1,i),changedTriplets(2,i))
-    changedTriDists(2,i) = Xdg(changedTriplets(1,i),changedTriplets(3,i))
-    changedTriDists(3,i) = Xdg(changedTriplets(2,i),changedTriplets(3,i))
-
-  end do
-
 return
 end subroutine getChangedTriplets
 
@@ -597,6 +586,7 @@ return
 end subroutine findChangedTriIndex
 
 
+! Returns the indices of the changed distances in a given triplet after a move
 subroutine findChangedDistsPerTrip(nPerAt,changedTri,atom, indPerTrip)
   implicit none
   integer, intent(in) :: nPerAt, changedTri(3,nPerAt), atom
@@ -629,118 +619,6 @@ subroutine findChangedDistsPerTrip(nPerAt,changedTri,atom, indPerTrip)
 
 return
 end subroutine findChangedDistsPerTrip
-
-
-subroutine updateExponentialsNonAdd(nJob,nTP,nArgument,dists,ind,triIndVec, &
-                                    trainingData,lengthscale,triPerAt,nDat, &
-                                    pR, updateExp)
-  implicit none
-  integer, intent(in) :: nJob, nTP, nArgument, triPerAt, nDat, pR
-  integer, intent(in) :: ind(2,nJob), triIndVec(triPerAt)
-  double precision, intent(in) :: dists(3,nJob), lengthscale
-  double precision, intent(in) :: trainingData(nTP,nArgument)
-  double precision, intent(out) :: updateExp(nTP,nDat*nArgument)
-  double precision :: expon
-  integer :: i, j, k, l, triInd, m, n, minInd, maxInd, countDone, countJobs
-  integer :: first
-
-  minInd = pR*nDat + 1
-  maxInd = (pR+1)*nDat
-
-  countDone = 0
-  do m = 1, triPerAt
-    if (triIndVec(m) .lt. minInd) then
-
-      countDone = countDone + 1
-
-    end if
-  end do
-  first = triIndVec(countDone+1)
-
-  countJobs = 0
-  do n = 1, triPerAt
-    if (triIndVec(n) .ge. minInd) then
-      if (triIndVec(n) .le. maxInd) then
-
-        countJobs = countJobs + 1
-
-      end if
-    end if
-  end do
-
-  if (pR .eq. 0) then
-  print *, ' '
-!  print *, 'The indices of the affected triplets are:'
-!  print *, triIndVec
-!  print *, 'minInd is', minInd
-!  print *, 'maxInd is', maxInd
-!  print *, 'Max no. of triplets per node is', triPerAt
-!  print *, 'No. of preceding triplets already re-calculated on other procs is', &
-!           countDone
-!  print *, 'No. of changed triplets to be calced by this proc is', countJobs
-!  print *, 'No. of changed triplets left to be calced by procs w/ higher rank is', &
-!           triPerAt-(countDone+countJobs) 
-!  print *, ' '
-  end if
-
-  do i = countDone+1, countDone+countJobs
-
-    ! Find col index of last element of first altered triplet in the full expMatrix
-    triInd = triIndVec(i)
-
-    ! Convert to first index of the same triplet in same matrix
-    triInd = 3*triInd - 2
-    
-    ! Convert to index of same triplet in expData for current process
-    triInd = triInd - (pR*nArgument*nDat)
-
-    do j = 1, nTP
-      do k = 1, 2
-
-        l = ind(k,i)
-
-        if (pR .eq. 0) then
-        if (i .eq. first) then
-          if (j .eq. 1) then
-            if (k .eq. 1) then
-            !print *, ' '
-            !print *, 'First triplet was', first
-            !print *, 'On triplet', triIndVec(i)
-            !print *, 'Looking at distances', ind(1,i), 'and', ind(2,i), 'in this triplet'
-            !print *, 'These had new values of', dists(ind(1,i),i), 'and', dists(ind(2,i),i)
-            !print *, 'The old exponentials (from old dists not those above) were:'
-            !print *, updateExp(j,(triInd-1)*nArgument+1), updateExp(j,(triInd-1)*nArgument+2) &
-            !       , updateExp(j,(triInd-1)*nArgument+3)
-            print *, ' '
-            end if
-          end if
-        end if
-        end if
-
-        ! Calculate the new exponenitial and add to updated expMatrix
-        expon = (dists(l,i) - trainingData(j,l))**2 / 2/lengthscale**2
-        updateExp(j,(triInd-1)*nArgument+l) = exp(-1*expon)
-
-        if (pR .eq. 0) then
-        if (i .eq. first) then
-          if (j .eq. 1) then
-            if (k .eq. 2) then
-            print *, ' '
-            !print *, 'The new exponentials are:'
-            !print *, updateExp(j,(triInd-1)*nArgument+1), updateExp(j,(triInd-1)*nArgument+2) &
-            !       , updateExp(j,(triInd-1)*nArgument+3)
-            !print *, ' '
-            end if
-          end if
-        end if
-        end if
-
-      end do
-    end do
-  end do
-
-return
-end subroutine updateExponentialsNonAdd
 
 
 end module triplet_mod
