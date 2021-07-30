@@ -19,6 +19,7 @@ contains
     call MPI_INIT(ierror)
     call MPI_COMM_SIZE(MPI_COMM_WORLD, clusterSize, ierror)
     call MPI_COMM_RANK(MPI_COMM_WORLD, processRank, ierror)
+    call initialise_GP()
 
     @assertEqual(root, 0 ,'Initialisation')
   end subroutine initialise_my_mpi
@@ -71,7 +72,6 @@ contains
     posAt_Ex(2,1:3) = (/ 4.598076211353316d0, 2d0, 0.5d0 /)
     posAt_Ex(3,1:3) = (/ 4.598076211353316d0, 2d0, 3.5d0 /)
 
-    call initialise_GP()
     call initialise_Positions(name, posAt,n_at)
     call initialise_Variables(n_at, n_tri,n_dist)
 
@@ -315,7 +315,6 @@ contains
     Perm(5,:) = (/3, 1, 2/)
     Perm(6,:) = (/3, 2, 1/)
 
-    call initialise_GP()
     call initialise_Positions(name, pos,nAt)
     call initialise_Variables(nAt, nTri,nDist)
     call makeXdgNonAdd(nAt,pos, X)
