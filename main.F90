@@ -4,6 +4,7 @@ program main
   use GP_Variables
   use triplet_mpi_mod
   use energiesData_Module, only: energiesData
+  use assert_module
   implicit none
 
   integer :: N_a, N_tri, udSize
@@ -12,6 +13,8 @@ program main
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
   type( energiesData ) :: currentEnergies
+
+  !call assertEqual_double( 1.d0, 2.d0, 1d-10,'This fails')
   
   call MPI_INIT(ierror)
   call MPI_COMM_SIZE(MPI_COMM_WORLD, clusterSize, ierror)
@@ -27,7 +30,7 @@ program main
 !  call triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray, X_dg, &
 !       disIntMat,expMat,uFinal,uVecFinal)
 
-  call triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray, currentEnergies)!%interatomicDistances, &
+  currentEnergies = triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray)!%interatomicDistances, &
 !       currentEnergies%distancesIntMat,currentEnergies%expMatrix, &
  !      currentEnergies%Utotal, currentEnergies%tripletEnergies)
 

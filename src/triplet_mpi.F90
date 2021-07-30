@@ -11,13 +11,13 @@ module triplet_mpi_mod
 contains
 
 
-  subroutine triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray, currentEnergies)
+  function triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray) result(currentEnergies)
     ! Input variables
     integer, intent(in) :: N_a, N_tri, udSize
     double precision, intent(in) :: posArray(N_a,3)
    
     ! Output variables
-    type( energiesData), intent(out):: currentEnergies
+    type( energiesData):: currentEnergies
     
     ! Local variables
     integer :: eCols, nSum, maxnSum, dataSize, maxDataSize
@@ -218,7 +218,7 @@ contains
     end if
 
     return
-  end subroutine triplet_mpi_fullNonAdd
+  end function triplet_mpi_fullNonAdd
 
 
 

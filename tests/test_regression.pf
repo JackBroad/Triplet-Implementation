@@ -334,7 +334,7 @@ contains
     !call triplet_mpi_fullNonAdd(nAt,nTri,nDist,pos, X, &
     !     indX,expos,Utotal,uVec)
 
-    call triplet_mpi_fullNonAdd(nAt,nTri,nDist,pos, currentEnergies)
+    currentEnergies = triplet_mpi_fullNonAdd(nAt,nTri,nDist,pos )
 
     uVec_Ex = (/ -36.447687049554496,-42.826746144585805,-115.37904762300680, &
                  -39.315816583964079,-35.145291686734041,-40.420576004505804, &
