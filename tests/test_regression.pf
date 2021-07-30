@@ -16,10 +16,12 @@ contains
   @test
   subroutine initialise_my_mpi()
 
+    Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
+    
     call MPI_INIT(ierror)
     call MPI_COMM_SIZE(MPI_COMM_WORLD, clusterSize, ierror)
     call MPI_COMM_RANK(MPI_COMM_WORLD, processRank, ierror)
-    call initialise_GP()
+    call initialise_GP( hyperParametersFile )
 
     @assertEqual(root, 0 ,'Initialisation')
   end subroutine initialise_my_mpi

@@ -8,10 +8,10 @@ contains
 
 ! Subroutine to read in matrix of atomic positions and return all requisite
 ! constants
-subroutine initialise_GP()
+subroutine initialise_GP(hyperParametersFile)
 !subroutine initialise_GP(fileName, posAt,trainData,alpha,hyperParams,N_tp,nArgs,N_a,N_tri,udSize)
   implicit none
-  Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
+  Character(len=300) :: hyperParametersFile != 'hyperParam.txt'
   integer :: i, j, k, l
 
   ! Read in hyperparameters
