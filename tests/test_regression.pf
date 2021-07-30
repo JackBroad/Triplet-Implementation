@@ -5,6 +5,7 @@ module test_regression
   use triplet_mpi_mod, only:  triplet_mpi_fullNonAdd
   use GP_Variables
   use global_Flags, only: textOutput
+  use energiesData_Module, only: energiesData
   use funit
   implicit none
   double precision :: regression_tolerance=1e-9, low_tol=5e-6
@@ -317,6 +318,7 @@ contains
     integer, allocatable :: indX(:,:)
     integer :: nAt, nTri, nDist, triplets(3,10), N_p=6, Perm(6,3)
     double precision Utotal
+    type( energiesData ) :: currentEnergies
 
     Perm(1,:) = (/1, 2, 3/)
     Perm(2,:) = (/1, 3, 2/)
@@ -329,8 +331,12 @@ contains
     call initialise_Variables(nAt, nTri,nDist)
                                
                                
-    call triplet_mpi_fullNonAdd(nAt,nTri,nDist,pos, X, &
-                                    indX,expos,Utotal,uVec)
+    !call triplet_mpi_fullNonAdd(nAt,nTri,nDist,pos, X, &
+    !     indX,expos,Utotal,uVec)
+
+    call triplet_mpi_fullNonAdd(nAt,nTri,nDist,pos, currentEnergies%interatomicDistances, &
+         currentEnergies%distancesIntMat,currentEnergies%expMatrix, &
+         currentEnergies%Utotal, currentEnergies%tripletEnergies)
 
     uVec_Ex = (/ -36.447687049554496,-42.826746144585805,-115.37904762300680, &
                  -39.315816583964079,-35.145291686734041,-40.420576004505804, &
@@ -342,7 +348,7 @@ contains
     if( processRank == root) then
        !print *,uVec
        !print *,Utotal
-        @assertEqual(uVec, uVec_Ex, low_tol, 'Test non-add energy cluster')
+        @assertEqual( currentEnergies%tripletEnergies, uVec_Ex, low_tol, 'Test non-add energy cluster')
 
     end if
 

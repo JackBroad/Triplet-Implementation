@@ -203,7 +203,6 @@ contains
 
        deallocate(UD_dg)
        deallocate(triMat)
-       !deallocate(tripletEnergies)
 
     end if
 
