@@ -11,10 +11,12 @@ contains
 subroutine initialise_GP()
 !subroutine initialise_GP(fileName, posAt,trainData,alpha,hyperParams,N_tp,nArgs,N_a,N_tri,udSize)
   implicit none
+  Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   integer :: i, j, k, l
 
   ! Read in hyperparameters
-  open(1, file='hyperParam.txt', status='old')
+  hyperParametersFile = trim( hyperParametersFile )
+  open(1, file= hyperParametersFile , status='old')
   do i = 1, 3
     read(1,*) hyperParams(i)
   end do
