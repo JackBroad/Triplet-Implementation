@@ -10,14 +10,14 @@ contains
 
 
   subroutine triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray, X_dg, &
-                                    disIntMat,expMatrix,Utotal,uFull)
+                                    distancesIntMat,expMatrix,Utotal,uFull)
     ! Input variables
     integer, intent(in) :: N_a, N_tri, udSize
     double precision, intent(in) :: posArray(N_a,3)
    
     ! Output variables
     double precision, intent(out):: Utotal
-    integer, allocatable, intent(out) :: disIntMat(:,:)
+    integer, allocatable, intent(out) :: distancesIntMat(:,:)
     double precision, allocatable, intent(out) :: X_dg(:,:), uFull(:)
     double precision, allocatable, intent(out) :: expMatrix(:,:,:)
     
@@ -55,7 +55,7 @@ contains
 
        ! Set up the arrays required for the non-additive calculation
        call makeXdgNonAdd(N_a,posArray, X_dg)
-       call makeDisIntMatNonAdd(N_a, disIntMat)
+       call makeDisIntMatNonAdd(N_a, distancesIntMat)
        call makeUDdgNonAdd(N_a,udSize,X_dg, UD_dg)
 
        ! Set up array of a all possible triplets
@@ -92,13 +92,13 @@ contains
     ! Use info from last broadcast to allocate arrays on other processes
     if (processRank .ne. root) then
 
-       allocate(disIntMat(N_a,N_a))
+       allocate(distancesIntMat(N_a,N_a))
        allocate(X_dg(N_a,N_a))
 
     end if
 
     ! Broadcast new arrays from root
-    call MPI_Bcast(disIntMat, N_a*N_a, MPI_INT, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(distancesIntMat, N_a*N_a, MPI_INT, root, MPI_COMM_WORLD, ierror)
     call MPI_Bcast(X_dg, N_a*N_a, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
     call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
@@ -162,7 +162,7 @@ contains
 
     ! Find the energies of the triplets assigned to each process
     allocate(uVec(nSum))
-    call tripletEnergiesNonAdd(triScatter,disIntMat,nSum,N_tp,N_a,N_p,nArgs,Perm, &
+    call tripletEnergiesNonAdd(triScatter,distancesIntMat,nSum,N_tp,N_a,N_p,nArgs,Perm, &
                                udSize,expMatrix,alpha,hyperParams(2), uVec)
 
 
@@ -220,10 +220,10 @@ contains
 
 
 
-  subroutine triplet_mpi_moveNonAdd(N_move,dist,N_a,N_tri,udSize,posArray,X_dg,disIntMat, &
+  subroutine triplet_mpi_moveNonAdd(N_move,dist,N_a,N_tri,udSize,posArray,X_dg,distancesIntMat, &
                                     expMatrix,deltaU,newUfull)
     ! Input variables
-    integer, intent(in) :: N_a, udSize, N_tri, N_move, disIntMat(N_a,N_a)
+    integer, intent(in) :: N_a, udSize, N_tri, N_move, distancesIntMat(N_a,N_a)
     double precision, intent(in) :: dist
 
     ! In/out variables
@@ -336,7 +336,7 @@ contains
        ! Update the exp matrix
        do j = 1, N_a-1
 
-          indj = disIntMat(newExpInt(1,j),newExpInt(2,j))
+          indj = distancesIntMat(newExpInt(1,j),newExpInt(2,j))
           newExpMat(1:nArgs,1:N_tp,indj) = changeExpMat(1:nArgs,1:N_tp,j)
 
        end do
@@ -359,7 +359,7 @@ contains
                          triPerProc*3, MPI_INT, root, MPI_COMM_WORLD, ierror)
 
        ! Calculate the non-additive energies for the changed triplets and gather
-       call tripletEnergiesNonAdd(scatterTrip,disIntMat,triPerProc,N_tp,N_a,N_p,nArgs,Perm, &
+       call tripletEnergiesNonAdd(scatterTrip,distancesIntMat,triPerProc,N_tp,N_a,N_p,nArgs,Perm, &
                                   udSize,newExpMat,alpha,hyperParams(2), newUvec)
        call MPI_BARRIER(MPI_COMM_WORLD, barError)
        call MPI_gatherv(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, scounts, &
@@ -381,7 +381,7 @@ contains
        X_dg = newX_dg
        do j = 1, N_a-1
 
-          indj = disIntMat(newExpInt(1,j),newExpInt(2,j))
+          indj = distancesIntMat(newExpInt(1,j),newExpInt(2,j))
           expMatrix(1:nArgs,1:N_tp,indj) = changeExpMat(1:nArgs,1:N_tp,j)
 
        end do
