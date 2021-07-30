@@ -337,9 +337,12 @@ contains
                  -57.148919337879079,-87.423280140314134,-110.11337614380483, &
                  -50.353330971893016  /)
 
-    if( processRank == root) then
 
-        !@assertEqual(uVec, uVec_Ex, low_tol, 'Test non-add energy cluster')
+
+    if( processRank == root) then
+       !print *,uVec
+       !print *,Utotal
+        @assertEqual(uVec, uVec_Ex, low_tol, 'Test non-add energy cluster')
 
     end if
 
