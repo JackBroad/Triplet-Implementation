@@ -3,6 +3,7 @@ module triplet_mpi_mod
   use triplet_mod
   use GP_variables, only: hyperParams,alpha,Perm,trainData,N_tp,nArgs,N_p
   use energiesData_Module, only: energiesData
+  use global_Flags, only: textOutput
   implicit none
   include 'mpif.h'
 
@@ -47,12 +48,13 @@ contains
 
     ! Set up on root
     if (processRank .eq. root) then
-
-       print *, ' '
-       print *, ' '
-       print *, '========================'
-       print *, 'Beginning non-additive calculation for whole sim box'
-       print *, ' '
+       if( textOutput) then
+          print *, ' '
+          print *, ' '
+          print *, '========================'
+          print *, 'Beginning non-additive calculation for whole sim box'
+          print *, ' '
+       end if
 
        ! Read in all necessary info from files
        allocate(tripletEnergies(N_tri))
@@ -182,8 +184,10 @@ contains
 
        call totalEnergyNonAdd(tripletEnergies,N_tri, Utotal)
        !print *, tripletEnergies
-       print *, "The total non-additive energy is", Utotal
-       print *, "              "
+       if( textOutput ) then
+          print *, "The total non-additive energy is", Utotal
+          print *, "              "
+       endif
 
     end if
     sumTime = MPI_Wtime() - sumTime
@@ -207,16 +211,17 @@ contains
     ! Print times taken for each part of subroutine to run
     totTime = MPI_Wtime() - totTime
     if (processRank .eq. root) then
-
-       print *, "The time taken for the exponentials was", expTime, "seconds"
-       print *, "The time taken for the sum was", sumTime, "seconds"
-       print *, "The time taken to set up was", setUpTime, "seconds"
-       print *, "The total time for the program to run was", totTime, "seconds"
-       print *, ' '
-       print *, 'Non-additive calculation for full sim box complete'
-       print *, '========================'
-       print *, ' '
-       print *, ' '
+       if( textOutput ) then
+          print *, "The time taken for the exponentials was", expTime, "seconds"
+          print *, "The time taken for the sum was", sumTime, "seconds"
+          print *, "The time taken to set up was", setUpTime, "seconds"
+          print *, "The total time for the program to run was", totTime, "seconds"
+          print *, ' '
+          print *, 'Non-additive calculation for full sim box complete'
+          print *, '========================'
+          print *, ' '
+          print *, ' '
+       endif
 
     end if
 

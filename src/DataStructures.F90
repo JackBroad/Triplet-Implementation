@@ -1,3 +1,9 @@
+module global_Flags
+  logical :: textOutput = .true.
+
+end module global_Flags
+  
+
 module energiesData_Module
 
   type energiesData
