@@ -10,13 +10,13 @@ contains
 
 
   subroutine triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray, X_dg, &
-                                    disIntMat,expMatrix,U,uFull)
+                                    disIntMat,expMatrix,Utotal,uFull)
     ! Input variables
     integer, intent(in) :: N_a, N_tri, udSize
     double precision, intent(in) :: posArray(N_a,3)
    
     ! Output variables
-    double precision, intent(out):: U
+    double precision, intent(out):: Utotal
     integer, allocatable, intent(out) :: disIntMat(:,:)
     double precision, allocatable, intent(out) :: X_dg(:,:), uFull(:)
     double precision, allocatable, intent(out) :: expMatrix(:,:,:)
@@ -172,12 +172,12 @@ contains
 
 
     ! Find the total non-additive energy for the system
-    U = 0d0
+    Utotal = 0d0
     if (processRank .eq. root) then
 
-       call totalEnergyNonAdd(uFull,N_tri, U)
+       call totalEnergyNonAdd(uFull,N_tri, Utotal)
        !print *, uFull
-       print *, "The total non-additive energy is", U
+       print *, "The total non-additive energy is", Utotal
        print *, "              "
 
     end if
