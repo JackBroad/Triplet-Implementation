@@ -9,8 +9,8 @@ module triplet_mpi_mod
 contains
 
 
-  subroutine triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray, X_dg, &
-                                    distancesIntMat,expMatrix,Utotal,uFull)
+  subroutine triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray, interatomicDistances, &
+                                    distancesIntMat,expMatrix,Utotal,tripletEnergies)
     ! Input variables
     integer, intent(in) :: N_a, N_tri, udSize
     double precision, intent(in) :: posArray(N_a,3)
@@ -18,7 +18,7 @@ contains
     ! Output variables
     double precision, intent(out):: Utotal
     integer, allocatable, intent(out) :: distancesIntMat(:,:)
-    double precision, allocatable, intent(out) :: X_dg(:,:), uFull(:)
+    double precision, allocatable, intent(out) :: interatomicDistances(:,:), tripletEnergies(:)
     double precision, allocatable, intent(out) :: expMatrix(:,:,:)
     
     ! Local variables
@@ -50,13 +50,13 @@ contains
        print *, ' '
 
        ! Read in all necessary info from files
-       allocate(uFull(N_tri))
-       allocate(X_dg(N_a,N_a))
+       allocate(tripletEnergies(N_tri))
+       allocate(interatomicDistances(N_a,N_a))
 
        ! Set up the arrays required for the non-additive calculation
-       call makeXdgNonAdd(N_a,posArray, X_dg)
+       call makeXdgNonAdd(N_a,posArray, interatomicDistances)
        call makeDisIntMatNonAdd(N_a, distancesIntMat)
-       call makeUDdgNonAdd(N_a,udSize,X_dg, UD_dg)
+       call makeUDdgNonAdd(N_a,udSize,interatomicDistances, UD_dg)
 
        ! Set up array of a all possible triplets
        allocate(triMat(3,N_tri))
@@ -93,13 +93,13 @@ contains
     if (processRank .ne. root) then
 
        allocate(distancesIntMat(N_a,N_a))
-       allocate(X_dg(N_a,N_a))
+       allocate(interatomicDistances(N_a,N_a))
 
     end if
 
     ! Broadcast new arrays from root
     call MPI_Bcast(distancesIntMat, N_a*N_a, MPI_INT, root, MPI_COMM_WORLD, ierror)
-    call MPI_Bcast(X_dg, N_a*N_a, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(interatomicDistances, N_a*N_a, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
     call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
@@ -167,7 +167,7 @@ contains
 
 
     ! Gather in the triplet energies and sum them to get total non-add energy
-    call MPI_gatherv(uVec, nSum, MPI_DOUBLE_PRECISION, uFull, scounts, displs, MPI_DOUBLE_PRECISION, &
+    call MPI_gatherv(uVec, nSum, MPI_DOUBLE_PRECISION, tripletEnergies, scounts, displs, MPI_DOUBLE_PRECISION, &
                      root, MPI_COMM_WORLD, ierror)
 
 
@@ -175,8 +175,8 @@ contains
     Utotal = 0d0
     if (processRank .eq. root) then
 
-       call totalEnergyNonAdd(uFull,N_tri, Utotal)
-       !print *, uFull
+       call totalEnergyNonAdd(tripletEnergies,N_tri, Utotal)
+       !print *, tripletEnergies
        print *, "The total non-additive energy is", Utotal
        print *, "              "
 
@@ -194,7 +194,7 @@ contains
 
        deallocate(UD_dg)
        deallocate(triMat)
-       deallocate(uFull)
+       deallocate(tripletEnergies)
 
     end if
 
@@ -220,14 +220,14 @@ contains
 
 
 
-  subroutine triplet_mpi_moveNonAdd(N_move,dist,N_a,N_tri,udSize,posArray,X_dg,distancesIntMat, &
+  subroutine triplet_mpi_moveNonAdd(N_move,dist,N_a,N_tri,udSize,posArray,interatomicDistances,distancesIntMat, &
                                     expMatrix,deltaU,newUfull)
     ! Input variables
     integer, intent(in) :: N_a, udSize, N_tri, N_move, distancesIntMat(N_a,N_a)
     double precision, intent(in) :: dist
 
     ! In/out variables
-    double precision, intent(inout) :: X_dg(N_a,N_a), posArray(N_a,nArgs)
+    double precision, intent(inout) :: interatomicDistances(N_a,N_a), posArray(N_a,nArgs)
     double precision, intent(inout) :: expMatrix(nArgs,N_tp,udSize)
 
     ! Output variables
@@ -237,7 +237,7 @@ contains
     ! Local variables
     integer :: triPerProc, i, j, indj, nPerProc, move, triPerAt, nExpMax, nExpRe
     integer :: nTriMax, nTriRe
-    double precision :: newPosAt(N_a,nArgs), newX_dg(N_a,N_a), totTime
+    double precision :: newPosAt(N_a,nArgs), newinteratomicDistances(N_a,N_a), totTime
     double precision :: moveTime, newExpMat(nArgs,N_tp,udSize)
     integer, allocatable :: newExpInt(:,:), changedTriplets(:,:), scounts(:)
     integer, allocatable :: scatterTrip(:,:), displs(:)
@@ -280,11 +280,11 @@ contains
           ! Move an atom
           call moveAt(posArray,N_a,dist, newPosAt,move)
 
-          ! Re-calculate X_dg for the new atomic positions
-          call makeXdgNonAdd(N_a,newPosAt, newX_dg)
+          ! Re-calculate interatomicDistances for the new atomic positions
+          call makeXdgNonAdd(N_a,newPosAt, newinteratomicDistances)
 
           ! Find the indices of the affected exponentials
-          call extractChangedExps(N_a,move,newX_dg, newExpInt,newDists)
+          call extractChangedExps(N_a,move,newinteratomicDistances, newExpInt,newDists)
 
           ! Determine which triplets have undergone a change
           call getChangedTriplets(move,N_a,triPerAt, changedTriplets)
@@ -295,7 +295,7 @@ contains
        call MPI_BARRIER(MPI_COMM_WORLD, barError)
        call MPI_Bcast(newExpInt, 2*(N_a-1), MPI_INT, root, MPI_COMM_WORLD, &
                       ierror)
-       call MPI_Bcast(newX_dg, N_a*N_a, MPI_DOUBLE_PRECISION, root, &
+       call MPI_Bcast(newinteratomicDistances, N_a*N_a, MPI_DOUBLE_PRECISION, root, &
                       MPI_COMM_WORLD, ierror)
        call MPI_Bcast(newPosAt, 3*N_a, MPI_DOUBLE_PRECISION, root, &
                       MPI_COMM_WORLD, ierror)
@@ -378,7 +378,7 @@ contains
 
        ! Update data (accept all moves for now so auto-update in each loop)
        posArray = newPosAt
-       X_dg = newX_dg
+       interatomicDistances = newinteratomicDistances
        do j = 1, N_a-1
 
           indj = distancesIntMat(newExpInt(1,j),newExpInt(2,j))
