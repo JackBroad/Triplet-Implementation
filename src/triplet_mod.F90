@@ -8,10 +8,10 @@ contains
 
 ! Subroutine to read in matrix of atomic positions and return all requisite
 ! constants
-subroutine initialise_GP(hyperParametersFile)
+subroutine initialise_GP(hyperParametersFile, alphaFile, trainingSetFile)
 !subroutine initialise_GP(fileName, posAt,trainData,alpha,hyperParams,N_tp,nArgs,N_a,N_tri,udSize)
   implicit none
-  Character(len=300) :: hyperParametersFile != 'hyperParam.txt'
+  Character(len=300) :: hyperParametersFile , alphaFile, trainingSetFile
   integer :: i, j, k, l
 
   ! Read in hyperparameters
@@ -23,7 +23,8 @@ subroutine initialise_GP(hyperParametersFile)
   close(1)
 
   ! Get the no of TPs and alpha values for each
-  open(2, file='smallAlpha.txt', status='old')
+  alphaFile = trim( alphaFile)
+  open(2, file=alphaFile, status='old')
   read(2,*) N_tp
   if (allocated(alpha)) then
     deallocate(alpha)
@@ -33,7 +34,8 @@ subroutine initialise_GP(hyperParametersFile)
   close(2)
 
   ! Read in nArgs and the distances for each TP
-  open(3, file='smallTrainingSet.txt', status='old')
+  trainingSetFile = trim( trainingSetFile )
+  open(3, file=trainingSetFile, status='old')
   read(3,*) nArgs
   if (allocated(trainData)) then
     deallocate(trainData)

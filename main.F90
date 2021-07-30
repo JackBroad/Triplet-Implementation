@@ -11,6 +11,9 @@ program main
   double precision, allocatable :: posArray(:,:), X_dg(:,:)
   double precision, allocatable :: expMat(:,:,:), uVecFinal(:)
   double precision, allocatable :: uVecChange(:)
+  Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
+  Character(len=300) :: alphaFile = 'alpha.txt'
+  Character(len=300) :: trainingSetFile = 'trainingSet.txt'
   
   call MPI_INIT(ierror)
   call MPI_COMM_SIZE(MPI_COMM_WORLD, clusterSize, ierror)
@@ -18,7 +21,7 @@ program main
 
 
   ! Set-up calls
-  call initialise_GP()
+  call initialise_GP(hyperParametersFile, alphaFile, trainingSetFile)
   call initialise_Positions('AtomicPositions5.txt', posArray,N_a)
   call initialise_Variables(N_a, N_tri,udSize)
   

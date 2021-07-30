@@ -17,11 +17,13 @@ contains
   subroutine initialise_my_mpi()
 
     Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
+    Character(len=300) :: alphaFile = 'smallAlpha.txt'
+    Character(len=300) :: trainingSetFile = 'smallTrainingSet.txt'
     
     call MPI_INIT(ierror)
     call MPI_COMM_SIZE(MPI_COMM_WORLD, clusterSize, ierror)
     call MPI_COMM_RANK(MPI_COMM_WORLD, processRank, ierror)
-    call initialise_GP( hyperParametersFile )
+    call initialise_GP( hyperParametersFile, alphaFile, trainingSetFile )
 
     @assertEqual(root, 0 ,'Initialisation')
   end subroutine initialise_my_mpi
