@@ -7,7 +7,7 @@ module energiesData_Module
      double precision, allocatable :: interatomicDistances(:,:), tripletEnergies(:)
      double precision, allocatable :: expMatrix(:,:,:)
 
-  end type EnergiesData
+  end type energiesData
 
 end module EnergiesData_Module
 

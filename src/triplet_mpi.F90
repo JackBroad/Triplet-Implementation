@@ -2,6 +2,7 @@ module triplet_mpi_mod
   use mpi_variables
   use triplet_mod
   use GP_variables, only: hyperParams,alpha,Perm,trainData,N_tp,nArgs,N_p
+  use energiesData_Module, only: energiesData
   implicit none
   include 'mpif.h'
 
@@ -29,6 +30,10 @@ contains
     integer, allocatable :: scounts(:), displs(:) !(KIND=MPI_ADDRESS_KIND)
     double precision, allocatable :: scatterData(:), UD_dg(:)
     double precision, allocatable :: expData(:,:,:), uVec(:)
+
+    type( energiesData) :: currentEnergies
+
+    allocate(currentEnergies%distancesIntMat(N_a,N_a))
 
 
     ! Declare constants and rows of permutation matrix
