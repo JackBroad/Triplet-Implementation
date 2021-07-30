@@ -27,9 +27,9 @@ program main
 !  call triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray, X_dg, &
 !       disIntMat,expMat,uFinal,uVecFinal)
 
-  call triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray, currentEnergies%interatomicDistances, &
-       currentEnergies%distancesIntMat,currentEnergies%expMatrix, &
-       currentEnergies%Utotal, currentEnergies%tripletEnergies)
+  call triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray, currentEnergies)!%interatomicDistances, &
+!       currentEnergies%distancesIntMat,currentEnergies%expMatrix, &
+ !      currentEnergies%Utotal, currentEnergies%tripletEnergies)
 
 
   call MPI_BARRIER(MPI_COMM_WORLD, barError)

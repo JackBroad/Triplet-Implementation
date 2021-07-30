@@ -11,17 +11,13 @@ module triplet_mpi_mod
 contains
 
 
-  subroutine triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray, interatomicDistances, &
-                                    distancesIntMat,expMatrix,Utotal,tripletEnergies)
+  subroutine triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray, currentEnergies)
     ! Input variables
     integer, intent(in) :: N_a, N_tri, udSize
     double precision, intent(in) :: posArray(N_a,3)
    
     ! Output variables
-    double precision, intent(out):: Utotal
-    integer, allocatable, intent(out) :: distancesIntMat(:,:)
-    double precision, allocatable, intent(out) :: interatomicDistances(:,:), tripletEnergies(:)
-    double precision, allocatable, intent(out) :: expMatrix(:,:,:)
+    type( energiesData), intent(out):: currentEnergies
     
     ! Local variables
     integer :: eCols, nSum, maxnSum, dataSize, maxDataSize
@@ -32,9 +28,6 @@ contains
     double precision, allocatable :: scatterData(:), UD_dg(:)
     double precision, allocatable :: expData(:,:,:), uVec(:)
 
-    type( energiesData) :: currentEnergies
-
-    allocate(currentEnergies%distancesIntMat(N_a,N_a))
 
 
     ! Declare constants and rows of permutation matrix
@@ -57,13 +50,13 @@ contains
        end if
 
        ! Read in all necessary info from files
-       allocate(tripletEnergies(N_tri))
-       allocate(interatomicDistances(N_a,N_a))
+       allocate(currentEnergies%tripletEnergies(N_tri))
+       allocate(currentEnergies%interatomicDistances(N_a,N_a))
 
        ! Set up the arrays required for the non-additive calculation
-       call makeXdgNonAdd(N_a,posArray, interatomicDistances)
-       call makeDisIntMatNonAdd(N_a, distancesIntMat)
-       call makeUDdgNonAdd(N_a,udSize,interatomicDistances, UD_dg)
+       call makeXdgNonAdd(N_a,posArray, currentEnergies%interatomicDistances)
+       call makeDisIntMatNonAdd(N_a, currentEnergies%distancesIntMat)
+       call makeUDdgNonAdd(N_a,udSize,currentEnergies%interatomicDistances, UD_dg)
 
        ! Set up array of a all possible triplets
        allocate(triMat(3,N_tri))
@@ -99,14 +92,14 @@ contains
     ! Use info from last broadcast to allocate arrays on other processes
     if (processRank .ne. root) then
 
-       allocate(distancesIntMat(N_a,N_a))
-       allocate(interatomicDistances(N_a,N_a))
+       allocate(currentEnergies%distancesIntMat(N_a,N_a))
+       allocate(currentEnergies%interatomicDistances(N_a,N_a))
 
     end if
 
     ! Broadcast new arrays from root
-    call MPI_Bcast(distancesIntMat, N_a*N_a, MPI_INT, root, MPI_COMM_WORLD, ierror)
-    call MPI_Bcast(interatomicDistances, N_a*N_a, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(currentEnergies%distancesIntMat, N_a*N_a, MPI_INT, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(currentEnergies%interatomicDistances, N_a*N_a, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
     call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
@@ -136,12 +129,12 @@ contains
 
     ! Allocate an array to hold all exps
     eCols = nArgs*N_tri
-    allocate(expMatrix(nArgs,N_tp,udSize))
+    allocate(currentEnergies%expMatrix(nArgs,N_tp,udSize))
 
 
     ! Gather expData arrays from the other processes and add them to expMatrix on
     ! the root process
-    call MPI_gatherv(expData, N_tp*nArgs*dataSize, MPI_DOUBLE_PRECISION, expMatrix, &
+    call MPI_gatherv(expData, N_tp*nArgs*dataSize, MPI_DOUBLE_PRECISION, currentEnergies%expMatrix, &
                      N_tp*nArgs*scounts, N_tp*nArgs*displs, MPI_DOUBLE_PRECISION, &
                      root, MPI_COMM_WORLD, ierror)
     expTime = MPI_Wtime() - expTime
@@ -149,7 +142,7 @@ contains
 
     ! Broadcast expMatrix to all processes so that sum can be parallelised
     sumTime = MPI_Wtime()
-    call MPI_Bcast(expMatrix, N_tp*nArgs*udSize, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, &
+    call MPI_Bcast(currentEnergies%expMatrix, N_tp*nArgs*udSize, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, &
                    ierror)
     call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
@@ -169,23 +162,23 @@ contains
 
     ! Find the energies of the triplets assigned to each process
     allocate(uVec(nSum))
-    call tripletEnergiesNonAdd(triScatter,distancesIntMat,nSum,N_tp,N_a,N_p,nArgs,Perm, &
-                               udSize,expMatrix,alpha,hyperParams(2), uVec)
+    call tripletEnergiesNonAdd(triScatter,currentEnergies%distancesIntMat,nSum,N_tp,N_a,N_p,nArgs,Perm, &
+                               udSize,currentEnergies%expMatrix,alpha,hyperParams(2), uVec)
 
 
     ! Gather in the triplet energies and sum them to get total non-add energy
-    call MPI_gatherv(uVec, nSum, MPI_DOUBLE_PRECISION, tripletEnergies, scounts, displs, MPI_DOUBLE_PRECISION, &
+    call MPI_gatherv(uVec, nSum, MPI_DOUBLE_PRECISION, currentEnergies%tripletEnergies, scounts, displs, MPI_DOUBLE_PRECISION, &
                      root, MPI_COMM_WORLD, ierror)
 
 
     ! Find the total non-additive energy for the system
-    Utotal = 0d0
+    currentEnergies%Utotal = 0d0
     if (processRank .eq. root) then
 
-       call totalEnergyNonAdd(tripletEnergies,N_tri, Utotal)
-       !print *, tripletEnergies
+       call totalEnergyNonAdd(currentEnergies%tripletEnergies,N_tri, currentEnergies%Utotal)
+       !print *, currentEnergies%tripletEnergies
        if( textOutput ) then
-          print *, "The total non-additive energy is", Utotal
+          print *, "The total non-additive energy is", currentEnergies%Utotal
           print *, "              "
        endif
 
