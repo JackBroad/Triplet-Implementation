@@ -21,7 +21,7 @@ subroutine initialise_GP()
   close(1)
 
   ! Get the no of TPs and alpha values for each
-  open(2, file='alpha.txt', status='old')
+  open(2, file='smallAlpha.txt', status='old')
   read(2,*) N_tp
   if (allocated(alpha)) then
     deallocate(alpha)
@@ -31,7 +31,7 @@ subroutine initialise_GP()
   close(2)
 
   ! Read in nArgs and the distances for each TP
-  open(3, file='trainingSet.txt', status='old')
+  open(3, file='smallTrainingSet.txt', status='old')
   read(3,*) nArgs
   if (allocated(trainData)) then
     deallocate(trainData)
