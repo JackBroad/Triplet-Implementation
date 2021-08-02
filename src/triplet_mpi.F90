@@ -11,7 +11,7 @@ module triplet_mpi_mod
 contains
 
 
-  function triplet_mpi_fullNonAdd(N_a,N_tri,udSize,posArray) result(currentEnergies)
+  function tmpi_calcFullSimBoxEnergy(N_a,N_tri,udSize,posArray) result(currentEnergies)
     ! Input variables
     integer, intent(in) :: N_a, N_tri, udSize
     double precision, intent(in) :: posArray(N_a,3)
@@ -218,14 +218,13 @@ contains
     end if
 
     return
-  end function triplet_mpi_fullNonAdd
+  end function tmpi_calcFullSimBoxEnergy
 
 
-
-  subroutine triplet_mpi_moveNonAdd(N_move,dist,N_a,N_tri,udSize,currentEnergies,posArray, &
+  subroutine tmpi_calcAtomMoveEnergy(N_move,dist,N_a,N_tri,udSize,currentEnergies,posArray, &
                                     proposedEnergies)
     ! Input variables
-    integer, intent(in) :: N_a, udSize, N_tri, N_move!, distancesIntMat(N_a,N_a)
+    integer, intent(in) :: N_a, udSize, N_tri, N_move
     double precision, intent(in) :: dist
     type( energiesData ), intent(in) :: currentEnergies
 
@@ -417,5 +416,5 @@ contains
     end if
 
     return
-  end subroutine triplet_mpi_moveNonAdd
+  end subroutine tmpi_calcAtomMoveEnergy
 end module triplet_mpi_mod

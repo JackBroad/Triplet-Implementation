@@ -9,7 +9,7 @@ include $(LATEST_PFUNIT_DIR)/include/PFUNIT.mk
 
 all: test_regression
 
-FFLAGS =  -c -cpp #-Wall -DDEBUG -Wextra -Wconversion  -ffpe-trap=invalid -ffpe-trap=zero,overflow,underflow -fbacktrace -fdump-core -fcheck=bounds  -Wno-tabs #-fmax-errors=5
+FFLAGS =  -c -cpp -fallow-argument-mismatch #-Wall -DDEBUG -Wextra -Wconversion  -ffpe-trap=invalid -ffpe-trap=zero,overflow,underflow -fbacktrace -fdump-core -fcheck=bounds  -Wno-tabs #-fmax-errors=5
 
 %.o : %.F90
 	$(FC) -c $(FFLAGS) $<

@@ -1,8 +1,8 @@
 module test_regression
-  use mpi
+  !use mpi
   use mpi_variables
   use triplet_mod
-  use triplet_mpi_mod, only:  triplet_mpi_fullNonAdd
+  use triplet_mpi_mod
   use GP_Variables
   use global_Flags, only: textOutput
   use energiesData_Module, only: energiesData
@@ -330,11 +330,7 @@ contains
     call initialise_Positions(name, pos,nAt)
     call initialise_Variables(nAt, nTri,nDist)
                                
-                               
-    !call triplet_mpi_fullNonAdd(nAt,nTri,nDist,pos, X, &
-    !     indX,expos,Utotal,uVec)
-
-    currentEnergies = triplet_mpi_fullNonAdd(nAt,nTri,nDist,pos )
+    currentEnergies = tmpi_calcFullSimBoxEnergy(nAt,nTri,nDist,pos)
 
     uVec_Ex = (/ -36.447687049554496,-42.826746144585805,-115.37904762300680, &
                  -39.315816583964079,-35.145291686734041,-40.420576004505804, &
