@@ -7,7 +7,7 @@ program main
   implicit none
 
 
-  integer :: N_a, N_tri, udSize, i
+  integer :: N_a, N_tri, udSize
   double precision, allocatable :: posArray(:,:)!, X_dg(:,:)
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
@@ -32,7 +32,7 @@ program main
   call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
-  call tmpi_calcAtomMoveEnergy(1,1.5d0,N_a,N_tri,udSize,currentEnergies,posArray, &
+  call tmpi_calcAtomMoveEnergy(20,1.5d0,N_a,udSize,currentEnergies,posArray, &
                               proposedEnergies)
 
 

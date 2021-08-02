@@ -413,9 +413,9 @@ subroutine moveAt(pos,num,dMax,  newPos,mover)
     end do
   end do
 
-  print *, '------------------------'
-  print *, "Moving atom", mover
-  print *, "                 "
+  !print *, '------------------------'
+  !print *, "Moving atom", mover
+  !print *, "                 "
 
   !print *, "Its old position was:"
   !print *, pos(mover,:)
@@ -589,8 +589,8 @@ return
 end subroutine findChangedTriIndex
 
 
-! Returns the indices of the changed distances in a given triplet after a move
-subroutine findChangedDistsPerTrip(nPerAt,changedTri,atom, indPerTrip)
+! Returns indices of changed sistances in each triplet
+subroutine findChangedIndPerTrip(nPerAt,changedTri,atom, indPerTrip)
   implicit none
   integer, intent(in) :: nPerAt, changedTri(3,nPerAt), atom
   integer, intent(out) :: indPerTrip(2,nPerAt)
@@ -621,7 +621,94 @@ subroutine findChangedDistsPerTrip(nPerAt,changedTri,atom, indPerTrip)
   end do
 
 return
+end subroutine findChangedIndPerTrip
+
+
+! Returns the distances in all triplets after a move
+subroutine findChangedDistsPerTrip(nAt,nPerAt,changedTri,X, indPerTrip)
+  implicit none
+  integer, intent(in) :: nAt, nPerAt, changedTri(3,nPerAt)
+  double precision, intent(in) :: X(nAt,nAt)
+  double precision, intent(out) :: indPerTrip(3,nPerAt)
+  integer :: i, al, be, ga
+
+  do i = 1, nPerAt
+
+    al = changedTri(1,i)
+    be = changedTri(2,i)
+    ga = changedTri(3,i)
+
+    indPerTrip(1,i) = X(changedTri(1,i),changedTri(2,i))
+    indPerTrip(2,i) = X(changedTri(1,i),changedTri(3,i))
+    indPerTrip(3,i) = X(changedTri(2,i),changedTri(3,i))
+
+  end do
+
+return
 end subroutine findChangedDistsPerTrip
+
+
+function energyCheckCalc(xStar) result(PES_GP)
+  implicit none
+  double precision :: xStar(3), alpha(3)
+  double precision :: PES_GP, xTraining(3,3), xTrainingPerm(3,6,3)
+  double precision :: lScale=1.010933217823705432e-01
+  double precision :: expVar=5.065189615948498530e-05
+  integer :: i, j, k, nTraining, nPerms, nDim, perm(3,6), l, m, n
+  double precision :: kSqExpAllPerms, kSqExpJthPerm, kKernTotal
+
+  !xStar = (/ 4.9530743964810102E-002, 2.1838616589923775E-002,
+  !3.0229538987517568E-002/)
+  perm(:,1) = (/1, 2, 3/)
+  perm(:,2) = (/1, 3, 2/)
+  perm(:,3) = (/2, 1, 3/)
+  perm(:,4) = (/2, 3, 1/)
+  perm(:,5) = (/3, 1, 2/)
+  perm(:,6) = (/3, 2, 1/)
+
+  ! Get the no of TPs and alpha values for each
+  open(2, file='smallAlpha.txt', status='old')
+  read(2,*) nTraining
+  read(2,*) (alpha(l), l=1,nTraining)
+  close(2)
+
+  ! Read in nArgs and the distances for each TP
+  open(3, file='smallTrainingSet.txt', status='old')
+  read(3,*) nDim
+  do m = 1, nTraining
+    read(3,*) (xTraining(n,m), n=1,nDim)
+  end do
+  close(3)
+
+  nPerms = 6
+  do i=1,nDim
+     do j=1,nPerms
+        do k=1,nTraining
+           xTrainingPerm(i,j,k)=xTraining(perm(i,j),k)
+        end do
+     end do
+  end do
+  do m = 1, nPerms
+    !print *, xTrainingPerm(:,m,3)
+  end do
+
+  kKernTotal=0
+  do i=1,nTraining
+     kSqExpAllPerms=0
+     do j=1,nPerms
+        kSqExpJthPerm=1
+        do k=1,nDim
+           kSqExpJthPerm  =  kSqExpJthPerm * &
+           (exp( - (xStar(k)-xTrainingPerm(k,j,i))**2 /2.0/lScale**2))
+        end do !Dimensions (k)
+        kSqExpAllPerms = kSqExpAllPerms + kSqExpJthPerm
+     end do !Permuations (j)
+     kKernTotal = kKernTotal + alpha(i) * kSqExpAllPerms
+  end do !Training points (i)
+
+  PES_GP=kKernTotal * expVar
+!  print *, 'Non-additive E:', PES_GP
+end function energyCheckCalc
 
 
 end module triplet_mod

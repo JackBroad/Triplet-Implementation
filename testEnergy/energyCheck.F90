@@ -1,4 +1,8 @@
-program energyCheck
+module energyCheck
+
+contains
+
+subroutine energyCheckCalc(xStar, PES_GP)
   implicit none
   double precision :: xStar(3), alpha(3)
   double precision :: PES_GP, xTraining(3,3), xTrainingPerm(3,6,3)
@@ -7,7 +11,7 @@ program energyCheck
   integer :: i, j, k, nTraining, nPerms, nDim, perm(3,6), l, m, n
   double precision :: kSqExpAllPerms, kSqExpJthPerm, kKernTotal
 
-  xStar = (/ 4.9530743964810102E-002, 2.1838616589923775E-002, 3.0229538987517568E-002/)
+  !xStar = (/ 4.9530743964810102E-002, 2.1838616589923775E-002, 3.0229538987517568E-002/)
   perm(:,1) = (/1, 2, 3/)
   perm(:,2) = (/1, 3, 2/)
   perm(:,3) = (/2, 1, 3/)
@@ -57,4 +61,6 @@ program energyCheck
   
   PES_GP=kKernTotal * expVar
   print *, 'Non-additive E:', PES_GP
-end program energyCheck
+end subroutine energyCheckCalc
+
+end module

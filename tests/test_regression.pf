@@ -308,17 +308,16 @@ contains
   end subroutine test_triplet_energies
 
   @test
-  subroutine test_cluster_energies()
+  subroutine test_cluster_energies_and_move()
     implicit none
     character(len=40) :: name='AtomicPositions5.txt'
-    double precision, allocatable :: pos(:,:), dists(:)
-    double precision :: uVec_Ex(10)
-    double precision, allocatable  :: X(:,:), uVec(:)
-    double precision, allocatable  :: expos(:,:,:)
-    integer, allocatable :: indX(:,:)
+    double precision, allocatable :: pos(:,:), dists(:), expos(:,:,:)
+    double precision, allocatable  :: X(:,:), uVec(:), tripDist(:,:)
+    double precision :: uVec_Ex(10), Utotal
+    integer, allocatable :: indX(:,:), changedTri(:,:)
     integer :: nAt, nTri, nDist, triplets(3,10), N_p=6, Perm(6,3)
-    double precision Utotal
-    type( energiesData ) :: currentEnergies
+    integer :: nPerMove, move, i
+    type( energiesData ) :: currentEnergies, proposedEnergies
 
     Perm(1,:) = (/1, 2, 3/)
     Perm(2,:) = (/1, 3, 2/)
@@ -326,6 +325,17 @@ contains
     Perm(4,:) = (/2, 3, 1/)
     Perm(5,:) = (/3, 1, 2/)
     Perm(6,:) = (/3, 2, 1/)
+
+    triplets(:,1) = (/ 1,2,3 /)
+    triplets(:,2) = (/ 1,2,4 /)
+    triplets(:,3) = (/ 1,2,5 /)
+    triplets(:,4) = (/ 1,3,4 /)
+    triplets(:,5) = (/ 1,3,5 /)
+    triplets(:,6) = (/ 1,4,5 /)
+    triplets(:,7) = (/ 2,3,4 /)
+    triplets(:,8) = (/ 2,3,5 /)
+    triplets(:,9) = (/ 2,4,5 /)
+    triplets(:,10) = (/ 3,4,5 /)
 
     call initialise_Positions(name, pos,nAt)
     call initialise_Variables(nAt, nTri,nDist)
@@ -337,16 +347,33 @@ contains
                  -57.148919337879079,-87.423280140314134,-110.11337614380483, &
                  -50.353330971893016  /)
 
-
-
     if( processRank == root) then
-       !print *,uVec
-       !print *,Utotal
-        @assertEqual( currentEnergies%tripletEnergies, uVec_Ex, low_tol, 'Test non-add energy cluster')
+
+        @assertEqual( currentEnergies%tripletEnergies, uVec_Ex, low_tol, 'Test full non-add energy')
 
     end if
 
-  end subroutine test_cluster_energies
+    ! Find E when atom moved
+    call tmpi_calcAtomMoveEnergy(1,1d0,nAt,nDist,currentEnergies,pos, &
+                                 proposedEnergies)
+
+    ! Set up new vector of trip energies for comparison
+    allocate(tripDist(3,nTri))
+    call findChangedDistsPerTrip(nAt,nTri,triplets,proposedEnergies%interatomicDistances,&
+                                 tripDist) ! Distances in each triplet after move
+    do i = 1, nTri
+      
+      uVec_Ex(i) = energyCheckCalc(tripDist(:,i)) ! Energies of each triplet after move
+
+    end do
+
+    if( processRank == root) then
+
+      @assertEqual( proposedEnergies%tripletEnergies, uVec_Ex, low_tol, 'Test atom move energy')
+
+    end if
+
+  end subroutine test_cluster_energies_and_move
 
   @test
   subroutine test_v_setup()
@@ -507,7 +534,7 @@ contains
 
     end if
 
-    call findChangedDistsPerTrip(nPerAt,triInd,move, changeInd)
+    call findChangedIndPerTrip(nPerAt,triInd,move, changeInd)
 
     do i = 1, nPerAt
 
@@ -537,7 +564,7 @@ contains
 
     end if
 
-    call findChangedDistsPerTrip(nPerAt,triInd,move, changeInd)
+    call findChangedIndPerTrip(nPerAt,triInd,move, changeInd)
 
     cInd_Ex(:,1) = (/ 2,3 /)
     cInd_Ex(:,2) = (/ 1,3 /)
@@ -568,7 +595,7 @@ contains
 
     end if
 
-    call findChangedDistsPerTrip(nPerAt,triInd,move, changeInd)
+    call findChangedIndPerTrip(nPerAt,triInd,move, changeInd)
 
     do i = 1, nPerAt
 
@@ -583,6 +610,11 @@ contains
     end if
 
   end subroutine test_getChangedTripletsAndDists
+
+  @test
+  subroutine test_atom_move()
+    implicit none
+  end subroutine test_atom_move
   !===========================================================================================
   @test
   subroutine test_finalize()

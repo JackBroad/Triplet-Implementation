@@ -24,7 +24,7 @@ contains
     integer :: reNsum, reDataSize
     double precision :: expTime, sumTime, totTime, setUpTime
     integer, allocatable :: triMat(:,:), triScatter(:,:) 
-    integer, allocatable :: scounts(:), displs(:) !(KIND=MPI_ADDRESS_KIND)
+    integer, allocatable :: scounts(:), displs(:)
     double precision, allocatable :: scatterData(:), UD_dg(:)
     double precision, allocatable :: expData(:,:,:), uVec(:)
 
@@ -42,7 +42,7 @@ contains
     ! Set up on root
     if (processRank .eq. root) then
 
-       if( textOutput) then
+       if (textOutput) then
           print *, ' '
           print *, ' '
           print *, '========================'
@@ -177,11 +177,11 @@ contains
     if (processRank .eq. root) then
 
        call totalEnergyNonAdd(currentEnergies%tripletEnergies,N_tri, currentEnergies%Utotal)
-       !print *, currentEnergies%tripletEnergies
-       if( textOutput ) then
+
+       if (textOutput ) then
           print *, "The total non-additive energy is", currentEnergies%Utotal
           print *, "              "
-       endif
+       end if
 
     end if
     sumTime = MPI_Wtime() - sumTime
@@ -205,7 +205,7 @@ contains
     totTime = MPI_Wtime() - totTime
     if (processRank .eq. root) then
 
-       if( textOutput ) then
+       if (textOutput) then
           print *, "The time taken for the exponentials was", expTime, "seconds"
           print *, "The time taken for the sum was", sumTime, "seconds"
           print *, "The time taken to set up was", setUpTime, "seconds"
@@ -215,7 +215,7 @@ contains
           print *, '========================'
           print *, ' '
           print *, ' '
-       endif
+       end if
 
     end if
 
@@ -223,10 +223,10 @@ contains
   end function tmpi_calcFullSimBoxEnergy
 
 
-  subroutine tmpi_calcAtomMoveEnergy(N_move,dist,N_a,N_tri,udSize,currentEnergies,posArray, &
-                                    proposedEnergies)
+  subroutine tmpi_calcAtomMoveEnergy(N_move,dist,N_a,udSize,currentEnergies,posArray, &
+                                     proposedEnergies)
     ! Input variables
-    integer, intent(in) :: N_a, udSize, N_tri, N_move
+    integer, intent(in) :: N_a, udSize, N_move
     double precision, intent(in) :: dist
     type( energiesData ), intent(in) :: currentEnergies
 
@@ -237,7 +237,7 @@ contains
     type( energiesData ), intent(out) :: proposedEnergies
 
     ! Local variables
-    integer :: triPerProc, i, j, indj, nPerProc, move, triPerAt, nExpMax, nExpRe
+    integer :: triPerProc, i, j, indj, nPerProc, triPerAt, move, nExpMax, nExpRe
     integer :: nTriMax, nTriRe
     double precision :: newPosAt(N_a,nArgs), totTime
     double precision :: moveTime, deltaU
@@ -251,11 +251,13 @@ contains
     root = 0
     if (processRank .eq. root) then
 
-       print *, ' '
-       print *, ' '
-       print *, '========================'
-       print *, 'Beginning non-additive calculation for atom move'
-       print *, ' '
+       if (textOutput) then
+         print *, ' '
+         print *, ' '
+         print *, '========================'
+         print *, 'Beginning non-additive calculation for atom move'
+         print *, ' '
+      end if
 
     end if
 
@@ -284,6 +286,11 @@ contains
 
           ! Move an atom
           call moveAt(posArray,N_a,dist, newPosAt,move)
+          if (textOutput) then
+            print *, '------------------------'
+            print *, "Moving atom", move
+            print *, "                 "
+          end if
 
           ! Re-calculate interatomicDistances for the new atomic positions
           call makeXdgNonAdd(N_a,newPosAt, proposedEnergies%interatomicDistances)
@@ -381,9 +388,12 @@ contains
 
           call totalEnergyNonAdd(newUfull,triPerAt, deltaU)
           proposedEnergies%Utotal = currentEnergies%Utotal + deltaU
-          print *, "The non-additive energy after the move is", proposedEnergies%Utotal
-          print *, '------------------------'
-          print *, ' '
+
+          if (textOutput) then          
+            print *, "The non-additive energy after the move is", proposedEnergies%Utotal
+            print *, '------------------------'
+            print *, ' '
+          end if
 
           proposedEnergies%tripletEnergies = currentEnergies%tripletEnergies
           do j = 1, triPerAt
@@ -418,13 +428,15 @@ contains
     totTime = MPI_Wtime() - totTime
     if (processRank .eq. root) then
 
-       print *, "The time taken to do", N_move, "moves was", moveTime, "seconds"
-       print *, "The total time for the program to run was", totTime, "seconds"
-       print *, ' '
-       print *, 'Non-additive calculation for atom move complete'
-       print *, '========================'
-       print *, ' '
-       print *, ' '
+       if (textOutput) then
+         print *, "The time taken to do", N_move, "moves was", moveTime, "seconds"
+         print *, "The total time for the program to run was", totTime, "seconds"
+         print *, ' '
+         print *, 'Non-additive calculation for atom move complete'
+         print *, '========================'
+         print *, ' '
+         print *, ' '
+       end if
 
     end if
 
