@@ -41,6 +41,7 @@ contains
 
     ! Set up on root
     if (processRank .eq. root) then
+
        if( textOutput) then
           print *, ' '
           print *, ' '
@@ -203,6 +204,7 @@ contains
     ! Print times taken for each part of subroutine to run
     totTime = MPI_Wtime() - totTime
     if (processRank .eq. root) then
+
        if( textOutput ) then
           print *, "The time taken for the exponentials was", expTime, "seconds"
           print *, "The time taken for the sum was", sumTime, "seconds"
@@ -240,7 +242,7 @@ contains
     double precision :: newPosAt(N_a,nArgs), totTime
     double precision :: moveTime, deltaU
     integer, allocatable :: newExpInt(:,:), changedTriplets(:,:), scounts(:)
-    integer, allocatable :: scatterTrip(:,:), displs(:)
+    integer, allocatable :: scatterTrip(:,:), displs(:), tripIndex(:)
     double precision, allocatable :: newDists(:), newUvec(:), scatterDists(:)
     double precision, allocatable :: changeExpData(:,:,:), changeExpMat(:,:,:)
     double precision, allocatable :: newUfull(:)
@@ -268,6 +270,7 @@ contains
     allocate(scounts(clusterSize))
     allocate(displs(clusterSize))
     allocate(proposedEnergies%interatomicDistances(N_a,N_a))
+    allocate(tripIndex(triPerAt))
 
 
     ! Loop over N moves, moving an atom and re-calculating the energy each time
@@ -291,6 +294,7 @@ contains
 
           ! Determine which triplets have undergone a change
           call getChangedTriplets(move,N_a,triPerAt, changedTriplets)
+          call findChangedTriIndex(triPerAt,N_a,move, tripIndex)
 
        end if
 
@@ -303,6 +307,8 @@ contains
        call MPI_Bcast(newPosAt, 3*N_a, MPI_DOUBLE_PRECISION, root, &
                       MPI_COMM_WORLD, ierror)
        call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
+       !call MPI_Bcast(tripIndex, triPerAt, MPI_INT, root, MPI_COMM_WORLD, &
+       !               ierror)
 
        ! Determine no. of distances to scatter to each process for exp re-calc
        call getNPerProcNonAdd(N_a-1,clusterSize, nExpMax,nExpRe)
@@ -378,6 +384,13 @@ contains
           print *, "The non-additive energy after the move is", proposedEnergies%Utotal
           print *, '------------------------'
           print *, ' '
+
+          proposedEnergies%tripletEnergies = currentEnergies%tripletEnergies
+          do j = 1, triPerAt
+
+            proposedEnergies%tripletEnergies(tripIndex(j)) = newUfull(j)
+
+          end do
 
        end if
 
