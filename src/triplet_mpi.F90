@@ -222,29 +222,29 @@ contains
 
 
 
-  subroutine triplet_mpi_moveNonAdd(N_move,dist,N_a,N_tri,udSize,posArray,interatomicDistances,distancesIntMat, &
-                                    expMatrix,deltaU,newUfull)
+  subroutine triplet_mpi_moveNonAdd(N_move,dist,N_a,N_tri,udSize,currentEnergies,posArray, &
+                                    proposedEnergies)
     ! Input variables
-    integer, intent(in) :: N_a, udSize, N_tri, N_move, distancesIntMat(N_a,N_a)
+    integer, intent(in) :: N_a, udSize, N_tri, N_move!, distancesIntMat(N_a,N_a)
     double precision, intent(in) :: dist
+    type( energiesData ), intent(in) :: currentEnergies
 
     ! In/out variables
-    double precision, intent(inout) :: interatomicDistances(N_a,N_a), posArray(N_a,nArgs)
-    double precision, intent(inout) :: expMatrix(nArgs,N_tp,udSize)
+    double precision, intent(inout) :: posArray(N_a,nArgs)
 
     ! Output variables
-    double precision, intent(out) :: deltaU
-    double precision, allocatable, intent(out) :: newUfull(:)
+    type( energiesData ), intent(out) :: proposedEnergies
 
     ! Local variables
     integer :: triPerProc, i, j, indj, nPerProc, move, triPerAt, nExpMax, nExpRe
     integer :: nTriMax, nTriRe
-    double precision :: newPosAt(N_a,nArgs), newinteratomicDistances(N_a,N_a), totTime
-    double precision :: moveTime, newExpMat(nArgs,N_tp,udSize)
+    double precision :: newPosAt(N_a,nArgs), totTime
+    double precision :: moveTime, deltaU
     integer, allocatable :: newExpInt(:,:), changedTriplets(:,:), scounts(:)
     integer, allocatable :: scatterTrip(:,:), displs(:)
     double precision, allocatable :: newDists(:), newUvec(:), scatterDists(:)
     double precision, allocatable :: changeExpData(:,:,:), changeExpMat(:,:,:)
+    double precision, allocatable :: newUfull(:)
 
 
     root = 0
@@ -268,13 +268,14 @@ contains
     allocate(newUfull(triPerAt))
     allocate(scounts(clusterSize))
     allocate(displs(clusterSize))
+    allocate(proposedEnergies%interatomicDistances(N_a,N_a))
 
 
     ! Loop over N moves, moving an atom and re-calculating the energy each time
     moveTime = MPI_Wtime()
     do i = 1, N_move
 
-       newExpMat = expMatrix
+       proposedEnergies%expMatrix = currentEnergies%expMatrix
 
        ! Set up on root
        if (processRank .eq. root) then
@@ -283,10 +284,11 @@ contains
           call moveAt(posArray,N_a,dist, newPosAt,move)
 
           ! Re-calculate interatomicDistances for the new atomic positions
-          call makeXdgNonAdd(N_a,newPosAt, newinteratomicDistances)
+          call makeXdgNonAdd(N_a,newPosAt, proposedEnergies%interatomicDistances)
 
           ! Find the indices of the affected exponentials
-          call extractChangedExps(N_a,move,newinteratomicDistances, newExpInt,newDists)
+          call extractChangedExps(N_a,move,proposedEnergies%interatomicDistances, &
+                                  newExpInt,newDists)
 
           ! Determine which triplets have undergone a change
           call getChangedTriplets(move,N_a,triPerAt, changedTriplets)
@@ -297,8 +299,8 @@ contains
        call MPI_BARRIER(MPI_COMM_WORLD, barError)
        call MPI_Bcast(newExpInt, 2*(N_a-1), MPI_INT, root, MPI_COMM_WORLD, &
                       ierror)
-       call MPI_Bcast(newinteratomicDistances, N_a*N_a, MPI_DOUBLE_PRECISION, root, &
-                      MPI_COMM_WORLD, ierror)
+       call MPI_Bcast(proposedEnergies%interatomicDistances, N_a*N_a, &
+                      MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
        call MPI_Bcast(newPosAt, 3*N_a, MPI_DOUBLE_PRECISION, root, &
                       MPI_COMM_WORLD, ierror)
        call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
@@ -338,8 +340,8 @@ contains
        ! Update the exp matrix
        do j = 1, N_a-1
 
-          indj = distancesIntMat(newExpInt(1,j),newExpInt(2,j))
-          newExpMat(1:nArgs,1:N_tp,indj) = changeExpMat(1:nArgs,1:N_tp,j)
+          indj = currentEnergies%distancesIntMat(newExpInt(1,j),newExpInt(2,j))
+          proposedEnergies%expMatrix(1:nArgs,1:N_tp,indj) = changeExpMat(1:nArgs,1:N_tp,j)
 
        end do
 
@@ -361,8 +363,9 @@ contains
                          triPerProc*3, MPI_INT, root, MPI_COMM_WORLD, ierror)
 
        ! Calculate the non-additive energies for the changed triplets and gather
-       call tripletEnergiesNonAdd(scatterTrip,distancesIntMat,triPerProc,N_tp,N_a,N_p,nArgs,Perm, &
-                                  udSize,newExpMat,alpha,hyperParams(2), newUvec)
+       call tripletEnergiesNonAdd(scatterTrip,currentEnergies%distancesIntMat,triPerProc, &
+                                  N_tp,N_a,N_p,nArgs,Perm,udSize,proposedEnergies%expMatrix, &
+                                  alpha,hyperParams(2), newUvec)
        call MPI_BARRIER(MPI_COMM_WORLD, barError)
        call MPI_gatherv(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, scounts, &
                         displs, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
@@ -372,21 +375,17 @@ contains
        if (processRank .eq. root) then
 
           call totalEnergyNonAdd(newUfull,triPerAt, deltaU)
-          print *, "The change in non-additive energy after the move is", deltaU
+          proposedEnergies%Utotal = currentEnergies%Utotal + deltaU
+          print *, "The non-additive energy after the move is", proposedEnergies%Utotal
           print *, '------------------------'
           print *, ' '
 
        end if
 
-       ! Update data (accept all moves for now so auto-update in each loop)
+       ! Update data that hasn't yet been
        posArray = newPosAt
-       interatomicDistances = newinteratomicDistances
-       do j = 1, N_a-1
-
-          indj = distancesIntMat(newExpInt(1,j),newExpInt(2,j))
-          expMatrix(1:nArgs,1:N_tp,indj) = changeExpMat(1:nArgs,1:N_tp,j)
-
-       end do
+       !proposedEnergies%interatomicDistances = newinteratomicDistances
+       proposedEnergies%distancesIntMat = currentEnergies%distancesIntMat
 
     end do
     moveTime = MPI_Wtime() - moveTime
