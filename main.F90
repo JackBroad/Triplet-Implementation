@@ -22,7 +22,7 @@ program main
 
   ! Set-up calls
   call initialise_GP(hyperParametersFile, alphaFile, trainingSetFile)
-  call initialise_Positions('AtomicPositions5.txt', posArray,N_a)
+  call initialise_Positions('AtomicPositions400.txt', posArray,N_a)
   call initialise_Variables(N_a, N_tri,udSize)
   
 
@@ -32,8 +32,8 @@ program main
   call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
-  call tmpi_calcAtomMoveEnergy(20,1.5d0,N_a,udSize,currentEnergies,posArray, &
-                              proposedEnergies)
+  call tmpi_calcAtomMoveEnergy(20,1.5d0,N_a,udSize,N_tri,currentEnergies, &
+                               posArray,proposedEnergies)
 
 
   deallocate(alpha)

@@ -223,10 +223,10 @@ contains
   end function tmpi_calcFullSimBoxEnergy
 
 
-  subroutine tmpi_calcAtomMoveEnergy(N_move,dist,N_a,udSize,currentEnergies,posArray, &
+  subroutine tmpi_calcAtomMoveEnergy(N_move,dist,N_a,udSize,N_tri,currentEnergies,posArray, &
                                      proposedEnergies)
     ! Input variables
-    integer, intent(in) :: N_a, udSize, N_move
+    integer, intent(in) :: N_a, udSize, N_move, N_tri
     double precision, intent(in) :: dist
     type( energiesData ), intent(in) :: currentEnergies
 
@@ -239,8 +239,7 @@ contains
     ! Local variables
     integer :: triPerProc, i, j, indj, nPerProc, triPerAt, move, nExpMax, nExpRe
     integer :: nTriMax, nTriRe
-    double precision :: newPosAt(N_a,nArgs), totTime
-    double precision :: moveTime, deltaU
+    double precision :: newPosAt(N_a,nArgs), totTime, moveTime
     integer, allocatable :: newExpInt(:,:), changedTriplets(:,:), scounts(:)
     integer, allocatable :: scatterTrip(:,:), displs(:), tripIndex(:)
     double precision, allocatable :: newDists(:), newUvec(:), scatterDists(:)
@@ -286,11 +285,11 @@ contains
 
           ! Move an atom
           call moveAt(posArray,N_a,dist, newPosAt,move)
-          if (textOutput) then
-            print *, '------------------------'
-            print *, "Moving atom", move
-            print *, "                 "
-          end if
+          !if (textOutput) then
+          !  print *, '------------------------'
+          !  print *, "Moving atom", move
+          !  print *, "                 "
+          !end if
 
           ! Re-calculate interatomicDistances for the new atomic positions
           call makeXdgNonAdd(N_a,newPosAt, proposedEnergies%interatomicDistances)
@@ -314,8 +313,6 @@ contains
        call MPI_Bcast(newPosAt, 3*N_a, MPI_DOUBLE_PRECISION, root, &
                       MPI_COMM_WORLD, ierror)
        call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
-       !call MPI_Bcast(tripIndex, triPerAt, MPI_INT, root, MPI_COMM_WORLD, &
-       !               ierror)
 
        ! Determine no. of distances to scatter to each process for exp re-calc
        call getNPerProcNonAdd(N_a-1,clusterSize, nExpMax,nExpRe)
@@ -383,17 +380,7 @@ contains
                         displs, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
 
        ! Find total change in non-add energy from moving atom
-       deltaU = 0d0
        if (processRank .eq. root) then
-
-          call totalEnergyNonAdd(newUfull,triPerAt, deltaU)
-          proposedEnergies%Utotal = currentEnergies%Utotal + deltaU
-
-          if (textOutput) then          
-            print *, "The non-additive energy after the move is", proposedEnergies%Utotal
-            print *, '------------------------'
-            print *, ' '
-          end if
 
           proposedEnergies%tripletEnergies = currentEnergies%tripletEnergies
           do j = 1, triPerAt
@@ -402,11 +389,19 @@ contains
 
           end do
 
+          call totalEnergyNonAdd(proposedEnergies%tripletEnergies,N_tri, &
+                                 proposedEnergies%Utotal)
+
+          !if (textOutput) then          
+          !  print *, "The non-additive energy after the move is", proposedEnergies%Utotal
+          !  print *, '------------------------'
+          !  print *, ' '
+          !end if
+
        end if
 
        ! Update data that hasn't yet been
        posArray = newPosAt
-       !proposedEnergies%interatomicDistances = newinteratomicDistances
        proposedEnergies%distancesIntMat = currentEnergies%distancesIntMat
 
     end do

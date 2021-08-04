@@ -354,7 +354,7 @@ contains
     end if
 
     ! Find E when atom moved
-    call tmpi_calcAtomMoveEnergy(1,1d0,nAt,nDist,currentEnergies,pos, &
+    call tmpi_calcAtomMoveEnergy(1,1d0,nAt,nDist,nTri,currentEnergies,pos, &
                                  proposedEnergies)
 
     ! Set up new vector of trip energies for comparison
