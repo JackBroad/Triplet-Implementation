@@ -25,7 +25,7 @@ contains
     double precision, intent(in) :: posArray(N_a,3)
    
     ! Output variables
-    type( energiesData):: currentEnergyData
+    type (energiesData) :: currentEnergyData
     
     ! Local variables
     integer :: eCols, nSum, maxnSum, dataSize, maxDataSize
@@ -53,27 +53,12 @@ contains
     call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
-    ! Broadcast all other requisite data that is already allocated everywhere from root to 
-    ! all processes
+    ! Broadcasts
     call MPI_Bcast(N_a, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
     call MPI_Bcast(N_tri, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
     call MPI_Bcast(N_distances, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
     call broadcastRootData()
-    !call MPI_BARRIER(MPI_COMM_WORLD, barError)
-
-
-    ! Use info from last broadcast to allocate arrays on other processes
-    if (processRank .ne. root) then
-
-       allocate(currentEnergyData%distancesIntMat(N_a,N_a))
-       allocate(currentEnergyData%interatomicDistances(N_a,N_a))
-
-    end if
-
-    ! Broadcast new arrays from root
-    call MPI_Bcast(currentEnergyData%distancesIntMat, N_a*N_a, MPI_INT, root, MPI_COMM_WORLD, ierror)
-    call MPI_Bcast(currentEnergyData%interatomicDistances, N_a*N_a, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-    call MPI_BARRIER(MPI_COMM_WORLD, barError)
+    call broadcastCurrentEnergyData(currentEnergyData,N_a)
 
 
     ! Determine max no. of elements of UD_dg to send to each process for exp
@@ -287,6 +272,25 @@ contains
     call MPI_Bcast(Perm, 18, MPI_INT, root, MPI_COMM_WORLD, ierror)
 
   end subroutine broadcastRootData
+
+  subroutine broadcastCurrentEnergyData(currentEnergyData,N_a)
+    integer, intent(in) :: N_a
+    type (energiesData) :: currentEnergyData
+
+    if (processRank .ne. root) then
+
+       allocate(currentEnergyData%distancesIntMat(N_a,N_a))
+       allocate(currentEnergyData%interatomicDistances(N_a,N_a))
+
+    end if
+
+    ! Broadcast new arrays from root
+    call MPI_Bcast(currentEnergyData%distancesIntMat, N_a*N_a, MPI_INT, root, &
+                   MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(currentEnergyData%interatomicDistances, N_a*N_a, &
+                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+
+  end subroutine broadcastCurrentEnergyData
     
   
 end module tmpi_calcFullSimBoxEnergy_mod
