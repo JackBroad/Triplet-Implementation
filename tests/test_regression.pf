@@ -2,7 +2,7 @@ module test_regression
   !use mpi
   use mpi_variables
   use triplet_mod
-  use triplet_mpi_mod
+  use tmpi_calcFullSimBoxEnergy_mod
   use GP_Variables
   use global_Flags, only: textOutput
   use energiesData_Module, only: energiesData

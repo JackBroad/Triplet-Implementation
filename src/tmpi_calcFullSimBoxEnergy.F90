@@ -1,4 +1,4 @@
-module triplet_mpi_mod
+module tmpi_calcFullSimBoxEnergy_mod
   use mpi_variables
   use triplet_mod
   use GP_variables, only: hyperParams,alpha,Perm,trainData,N_tp,nArgs,N_p
@@ -464,4 +464,4 @@ contains
   end subroutine finalAsserts
     
   
-end module triplet_mpi_mod
+end module tmpi_calcFullSimBoxEnergy_mod

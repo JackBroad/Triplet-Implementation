@@ -1,7 +1,7 @@
 program main
   use mpi_variables
   use GP_Variables
-  use triplet_mpi_mod
+  use tmpi_calcFullSimBoxEnergy_mod
   use energiesData_Module, only: energiesData
   use assert_module
   implicit none
