@@ -11,10 +11,11 @@ module tmpi_calcFullSimBoxEnergy_mod
   private
   public  tmpi_calcFullSimBoxEnergy
 
+  integer :: dataSize
   double precision :: totTime, setUpTime
   integer, allocatable :: scounts(:), displs(:)
   integer, allocatable :: triMat(:,:)
-  double precision, allocatable ::  UD_dg(:)
+  double precision, allocatable ::  UD_dg(:), scatterData(:), expData(:,:,:)
 
 contains
 
@@ -28,12 +29,11 @@ contains
     type (energiesData) :: currentEnergyData
     
     ! Local variables
-    integer :: eCols, nSum, maxnSum, dataSize, maxDataSize
+    integer :: nSum, maxnSum, maxDataSize
     integer :: reNsum, reDataSize
     double precision :: expTime, sumTime
     integer, allocatable :: triScatter(:,:) 
-    double precision, allocatable :: scatterData(:)
-    double precision, allocatable :: expData(:,:,:), uVec(:)
+    double precision, allocatable :: uVec(:)
 
     call initialAsserts(N_a)
     call declareConstantsAndRowsOfPermutationMatrix()
@@ -65,13 +65,12 @@ contains
     ! calculations
     call getNPerProcNonAdd(N_distances,clusterSize, maxDataSize,reDataSize)
     setUpTime = MPI_Wtime() - setUpTime
-    expTime = MPI_Wtime()
 
 
     ! Determine actual no. of elements to send to each process for exp calc.
+    expTime = MPI_Wtime()
     call getVarrays(clusterSize,maxDataSize,reDataSize, scounts,displs)
-    dataSize = scounts(processRank+1)
-    allocate(scatterData(dataSize)) ! Allocate array to send exponentials
+    call getDataSizeAndExpArrays()
 
 
     ! Scatter the interatomic distances in U_dg to all processes
@@ -80,13 +79,11 @@ contains
 
 
     ! Calculate the exponentials for each distance on each process
-    allocate(expData(nArgs,N_tp,dataSize))
     call calculateExponentialsNonAdd(dataSize,N_tp,nArgs,trainData,hyperParams(1), &
                                      scatterData, expData)
 
 
     ! Allocate an array to hold all exps
-    eCols = nArgs*N_tri
     allocate(currentEnergyData%expMatrix(nArgs,N_tp,N_distances))
 
 
@@ -273,6 +270,7 @@ contains
 
   end subroutine broadcastRootData
 
+
   subroutine broadcastCurrentEnergyData(currentEnergyData,N_a)
     integer, intent(in) :: N_a
     type (energiesData) :: currentEnergyData
@@ -291,6 +289,15 @@ contains
                    MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
 
   end subroutine broadcastCurrentEnergyData
+
+
+  subroutine getDataSizeAndExpArrays()
+
+    dataSize = scounts(processRank+1)
+    allocate(scatterData(dataSize))
+    allocate(expData(nArgs,N_tp,dataSize))
+
+  end subroutine getDataSizeAndExpArrays
     
   
 end module tmpi_calcFullSimBoxEnergy_mod
