@@ -1,7 +1,8 @@
 program main
   use mpi_variables
   use GP_Variables
-  use tmpi_calcFullSimBoxEnergy_mod
+  use tmpi_calcFullSimBoxEnergy_mod!, only: tmpi_calcFullSimBoxEnergy
+  use tmpi_calcAtomMoveEnergy_mod, only: tmpi_calcAtomMoveEnergy
   use energiesData_Module, only: energiesData
   use assert_module
   implicit none
@@ -34,7 +35,7 @@ program main
 
 
   call tmpi_calcAtomMoveEnergy(20,1.5d0,N_a,udSize,N_tri,currentEnergies, &
-                               posArray,proposedEnergies)
+                              posArray,proposedEnergies)
 
 
   deallocate(alpha)

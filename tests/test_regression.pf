@@ -2,7 +2,8 @@ module test_regression
   !use mpi
   use mpi_variables
   use triplet_mod
-  use tmpi_calcFullSimBoxEnergy_mod
+  use tmpi_calcFullSimBoxEnergy_mod!, only: tmpi_calcFullSimBoxEnergy
+  use tmpi_calcAtomMoveEnergy_mod, only: tmpi_calcAtomMoveEnergy
   use GP_Variables
   use global_Flags, only: textOutput
   use energiesData_Module, only: energiesData
