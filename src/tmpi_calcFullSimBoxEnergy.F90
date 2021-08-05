@@ -40,13 +40,7 @@ contains
     ! Set up on root
     if (processRank .eq. root) then
 
-       if (textOutput) then
-          print *, ' '
-          print *, ' '
-          print *, '========================'
-          print *, 'Beginning non-additive calculation for whole sim box'
-          print *, ' '
-       end if
+       call initialTextOutput()
 
        ! Read in all necessary info from files
        allocate(currentEnergyData%tripletEnergies(N_tri))
@@ -255,6 +249,17 @@ contains
     endif
 
   end subroutine finalAsserts
+
+
+  subroutine initialTextOutput()
+    if (textOutput) then
+          print *, ' '
+          print *, ' '
+          print *, '========================'
+          print *, 'Beginning non-additive calculation for whole sim box'
+          print *, ' '
+       end if
+     end subroutine initialTextOutput
 
   
     
