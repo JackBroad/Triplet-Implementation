@@ -11,11 +11,12 @@ module tmpi_calcFullSimBoxEnergy_mod
   private
   public  tmpi_calcFullSimBoxEnergy
 
-  integer :: dataSize
+  integer :: dataSize, nSum
   double precision :: totTime, setUpTime
   integer, allocatable :: scounts(:), displs(:)
-  integer, allocatable :: triMat(:,:)
-  double precision, allocatable ::  UD_dg(:), scatterData(:), expData(:,:,:)
+  integer, allocatable :: triMat(:,:), triScatter(:,:)
+  double precision, allocatable :: UD_dg(:), scatterData(:)
+  double precision, allocatable :: expData(:,:,:), uVec(:)
 
 contains
 
@@ -29,11 +30,8 @@ contains
     type (energiesData) :: currentEnergyData
     
     ! Local variables
-    integer :: nSum, maxnSum, maxDataSize
-    integer :: reNsum, reDataSize
+    integer :: maxDataSize, maxnSum, reDataSize, reNsum
     double precision :: expTime, sumTime
-    integer, allocatable :: triScatter(:,:) 
-    double precision, allocatable :: uVec(:)
 
     call initialAsserts(N_a)
     call declareConstantsAndRowsOfPermutationMatrix()
@@ -99,24 +97,20 @@ contains
     sumTime = MPI_Wtime()
     call MPI_Bcast(currentEnergyData%expMatrix, N_tp*nArgs*N_distances, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, &
                    ierror)
-    call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
     ! Determine actual no. of elements to send to each process for triplet calc.
     call getNPerProcNonAdd(N_tri,clusterSize, maxnSum,reNsum)
     call getVarrays(clusterSize,maxNsum,reNsum, scounts,displs)
-    nSum = scounts(processRank+1)
+    call getnSumAndTripletArrays()
 
 
     ! Scatter the triplet matrix
-    allocate(triScatter(3,nSum))
     call MPI_scatterv(triMat, scounts*3, displs*3, MPI_INT, triScatter, nSum*3, MPI_INT, &
                       root, MPI_COMM_WORLD, ierror)
-    call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
     ! Find the energies of the triplets assigned to each process
-    allocate(uVec(nSum))
     call tripletEnergiesNonAdd(triScatter,currentEnergyData%distancesIntMat,nSum,N_tp,N_a,N_p,nArgs,Perm, &
                                N_distances,currentEnergyData%expMatrix,alpha,hyperParams(2), uVec)
 
@@ -132,7 +126,7 @@ contains
 
        call totalEnergyNonAdd(currentEnergyData%tripletEnergies,N_tri, currentEnergyData%Utotal)
 
-       if (textOutput ) then
+       if (textOutput) then
           print *, "The total non-additive energy is", currentEnergyData%Utotal
           print *, "              "
        end if
@@ -298,6 +292,15 @@ contains
     allocate(expData(nArgs,N_tp,dataSize))
 
   end subroutine getDataSizeAndExpArrays
+
+
+  subroutine getnSumAndTripletArrays()
+
+    nSum = scounts(processRank+1)
+    allocate(triScatter(3,nSum))
+    allocate(uVec(nSum))
+
+  end subroutine getnSumAndTripletArrays
     
   
 end module tmpi_calcFullSimBoxEnergy_mod
