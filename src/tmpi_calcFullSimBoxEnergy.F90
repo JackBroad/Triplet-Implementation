@@ -13,6 +13,8 @@ module tmpi_calcFullSimBoxEnergy_mod
 
   double precision :: totTime, setUpTime
   integer, allocatable :: scounts(:), displs(:)
+  integer, allocatable :: triMat(:,:)
+  double precision, allocatable ::  UD_dg(:)
 
 contains
 
@@ -29,8 +31,8 @@ contains
     integer :: eCols, nSum, maxnSum, dataSize, maxDataSize
     integer :: reNsum, reDataSize
     double precision :: expTime, sumTime
-    integer, allocatable :: triMat(:,:), triScatter(:,:) 
-    double precision, allocatable :: scatterData(:), UD_dg(:)
+    integer, allocatable :: triScatter(:,:) 
+    double precision, allocatable :: scatterData(:)
     double precision, allocatable :: expData(:,:,:), uVec(:)
 
     call initialAsserts(N_a)
@@ -41,19 +43,8 @@ contains
     if (processRank .eq. root) then
 
        call initialTextOutput()
-
-       ! Read in all necessary info from files
-       allocate(currentEnergyData%tripletEnergies(N_tri))
-       allocate(currentEnergyData%interatomicDistances(N_a,N_a))
-
-       ! Set up the arrays required for the non-additive calculation
-       call makeXdgNonAdd(N_a,posArray, currentEnergyData%interatomicDistances)
-       call makeDisIntMatNonAdd(N_a, currentEnergyData%distancesIntMat)
-       call makeUDdgNonAdd(N_a,N_distances,currentEnergyData%interatomicDistances, UD_dg)
-
-       ! Set up array of a all possible triplets
-       allocate(triMat(3,N_tri))
-       call makeTripletMatrix(N_a,N_tri, triMat)
+       currentEnergyData = setupCurrentEnergyDataAndArrays(N_a,N_tri,N_distances,posArray) 
+      
 
        ! Declare permutation matrix
        Perm(1,:) = (/1, 2, 3/)
@@ -261,7 +252,29 @@ contains
        end if
      end subroutine initialTextOutput
 
-  
+
+     function setupCurrentEnergyDataAndArrays(N_a,N_tri,N_distances,posArray) result(currentEnergyData)
+       ! Input variables
+       integer, intent(in) :: N_a, N_tri, N_distances
+       double precision, intent(in) :: posArray(N_a,3)
+       
+       ! Output variables
+       type( energiesData):: currentEnergyData
+
+        ! Read in all necessary info from files
+       allocate(currentEnergyData%tripletEnergies(N_tri))
+       allocate(currentEnergyData%interatomicDistances(N_a,N_a))
+
+       ! Set up the arrays required for the non-additive calculation
+       call makeXdgNonAdd(N_a,posArray, currentEnergyData%interatomicDistances)
+       call makeDisIntMatNonAdd(N_a, currentEnergyData%distancesIntMat)
+       call makeUDdgNonAdd(N_a,N_distances,currentEnergyData%interatomicDistances, UD_dg)
+
+       ! Set up array of a all possible triplets
+       allocate(triMat(3,N_tri))
+       call makeTripletMatrix(N_a,N_tri, triMat)
+
+     end function setupCurrentEnergyDataAndArrays
     
   
 end module tmpi_calcFullSimBoxEnergy_mod
