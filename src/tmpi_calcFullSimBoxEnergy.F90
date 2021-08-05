@@ -12,7 +12,7 @@ module tmpi_calcFullSimBoxEnergy_mod
   public  tmpi_calcFullSimBoxEnergy
 
   integer :: dataSize, nSum
-  double precision :: totTime, setUpTime
+  double precision :: totTime, setUpTime, expTime, sumTime
   integer, allocatable :: scounts(:), displs(:)
   integer, allocatable :: triMat(:,:), triScatter(:,:)
   double precision, allocatable :: UD_dg(:), scatterData(:)
@@ -31,7 +31,6 @@ contains
     
     ! Local variables
     integer :: maxDataSize, maxnSum, reDataSize, reNsum
-    double precision :: expTime, sumTime
 
     call initialAsserts(N_a)
     call declareConstantsAndRowsOfPermutationMatrix()
@@ -51,7 +50,7 @@ contains
     call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
-    ! Broadcasts
+    ! Broadcasts of data on root
     call MPI_Bcast(N_a, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
     call MPI_Bcast(N_tri, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
     call MPI_Bcast(N_distances, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
@@ -125,48 +124,20 @@ contains
     if (processRank .eq. root) then
 
        call totalEnergyNonAdd(currentEnergyData%tripletEnergies,N_tri, currentEnergyData%Utotal)
-
-       if (textOutput) then
-          print *, "The total non-additive energy is", currentEnergyData%Utotal
-          print *, "              "
-       end if
+       call energyTextOutput(currentEnergyData)
 
     end if
     sumTime = MPI_Wtime() - sumTime
-
-    ! De-allocate arrays not passed to atom-move subroutine
-    deallocate(scatterData)
-    deallocate(expData)
-    deallocate(uVec)
-    deallocate(triScatter)
-    deallocate(scounts)
-    deallocate(displs)
-    if (processRank .eq. root) then
-
-       deallocate(UD_dg)
-       deallocate(triMat)
-
-    end if
+    call deallocateLocalArrays()
 
 
     ! Print times taken for each part of subroutine to run
     totTime = MPI_Wtime() - totTime
     if (processRank .eq. root) then
 
-       if (textOutput) then
-          print *, "The time taken for the exponentials was", expTime, "seconds"
-          print *, "The time taken for the sum was", sumTime, "seconds"
-          print *, "The time taken to set up was", setUpTime, "seconds"
-          print *, "The total time for the program to run was", totTime, "seconds"
-          print *, ' '
-          print *, 'Non-additive calculation for full sim box complete'
-          print *, '========================'
-          print *, ' '
-          print *, ' '
-       end if
+       call finalTextOutput()
 
     end if
-
     call finalAsserts(N_a)
     
     return
@@ -178,21 +149,24 @@ contains
     ! Input variables
     integer, intent(in) :: N_a
 
-
     if ( processRank == root ) then
+
        call assertTrue( N_a>0 , 'tmpi_calcFullSimBoxEnergy argument N_a should be >0')
-    endif
+
+    end if
 
   end subroutine initialAsserts
 
 
   subroutine declareConstantsAndRowsOfPermutationMatrix()
+
     totTime = MPI_Wtime()
     root = 0
     N_p = 6
     setUpTime = MPI_Wtime()
     allocate(scounts(clusterSize))
     allocate(displs(clusterSize))
+
   end subroutine declareConstantsAndRowsOfPermutationMatrix
   
 
@@ -201,20 +175,26 @@ contains
     integer, intent(in) :: N_a
 
     if ( processRank == root ) then
+
        call assertTrue( N_a>0 , 'tmpi_calcFullSimBoxEnergy argument N_a should be >0')
+
     end if
 
   end subroutine finalAsserts
 
 
   subroutine initialTextOutput()
+
     if (textOutput) then
+
        print *, ' '
        print *, ' '
        print *, '========================'
        print *, 'Beginning non-additive calculation for whole sim box'
        print *, ' '
+
     end if
+
   end subroutine initialTextOutput
 
 
@@ -301,6 +281,57 @@ contains
     allocate(uVec(nSum))
 
   end subroutine getnSumAndTripletArrays
+
+
+  subroutine energyTextOutput(currentEnergyData)
+    type (energiesData), intent(in) :: currentEnergyData
+
+    if (textOutput) then
+
+       print *, "The total non-additive energy is", currentEnergyData%Utotal
+       print *, "              "
+
+    end if
+
+  end subroutine energyTextOutput
+
+
+  subroutine deallocateLocalArrays()
+
+    deallocate(scatterData)
+    deallocate(expData)
+    deallocate(uVec)
+    deallocate(triScatter)
+    deallocate(scounts)
+    deallocate(displs)
+
+    if (processRank .eq. root) then
+
+       deallocate(UD_dg)
+       deallocate(triMat)
+
+    end if
+
+  end subroutine deallocateLocalArrays
+
+
+  subroutine finalTextOutput()
+
+    if (textOutput) then
+
+       print *, "The time taken for the exponentials was", expTime, "seconds"
+       print *, "The time taken for the sum was", sumTime, "seconds"
+       print *, "The time taken to set up was", setUpTime, "seconds"
+       print *, "The total time for the program to run was", totTime, "seconds"
+       print *, ' '
+       print *, 'Non-additive calculation for full sim box complete'
+       print *, '========================'
+       print *, ' '
+       print *, ' '
+
+    end if
+
+  end subroutine finalTextOutput
     
   
 end module tmpi_calcFullSimBoxEnergy_mod
