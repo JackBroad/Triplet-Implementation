@@ -55,14 +55,11 @@ contains
 
     ! Broadcast all other requisite data that is already allocated everywhere from root to 
     ! all processes
-    call MPI_Bcast(hyperParams, 3, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
     call MPI_Bcast(N_a, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
     call MPI_Bcast(N_tri, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
     call MPI_Bcast(N_distances, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
-    call MPI_Bcast(N_tp, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
-    call MPI_Bcast(nArgs, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
-    call MPI_Bcast(Perm, 18, MPI_INT, root, MPI_COMM_WORLD, ierror)
-    call MPI_BARRIER(MPI_COMM_WORLD, barError)
+    call broadcastRootData()
+    !call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
     ! Use info from last broadcast to allocate arrays on other processes
@@ -279,7 +276,17 @@ contains
     Perm(5,:) = (/3, 1, 2/)
     Perm(6,:) = (/3, 2, 1/)
 
-  end function
+  end function setupPermutationMatrix
+
+  subroutine broadcastRootData()
+
+    call MPI_Bcast(hyperParams, 3, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, &
+                   ierror)
+    call MPI_Bcast(N_tp, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(nArgs, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(Perm, 18, MPI_INT, root, MPI_COMM_WORLD, ierror)
+
+  end subroutine broadcastRootData
     
   
 end module tmpi_calcFullSimBoxEnergy_mod
