@@ -1,11 +1,11 @@
 FC :=  mpif90
-SRCS := DataStructures.F90 MPI_Variables.F90 GP_Variables.F90 triplet_mod.F90 triplet_mpi.F90
+SRCS := assert.F90 DataStructures.F90 MPI_Variables.F90 GP_Variables.F90 triplet_mod.F90 triplet_mpi.F90
 OBJS := $(SRCS:%.F90=%.o)
 
 MODS=$(wildcard mod*.f90)
 MOD_OBJS=$(patsubst %.f90,%.o,$(MODS))
 
-FCFLAGS =  -c -cpp -fallow-argument-mismatch #-c -cpp -DDEBUG -DASSERTS -Wall -DDEBUG -Wextra -Wconversion  -ffpe-trap=invalid -ffpe-trap=zero,overflow,underflow -fbacktrace -fdump-core -fcheck=bounds  -Wno-tabs  #-fmax-errors=5
+FCFLAGS =  -c -cpp -Wall -Wextra -DASSERTS -Wno-argument-mismatch #-fallow-argument-mismatch #-c -cpp -DDEBUG -DASSERTS -Wall -DDEBUG -Wextra -Wconversion  -ffpe-trap=invalid -ffpe-trap=zero,overflow,underflow -fbacktrace -fdump-core -fcheck=bounds  -Wno-tabs  #-fmax-errors=5
 
 FLFLAGS = # -ffpe-trap=invalid -ffpe-trap=zero,overflow,underflow -fbacktrace -fdump-core -fcheck=bounds #-fmax-errors=5
 

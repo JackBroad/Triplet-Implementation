@@ -22,7 +22,8 @@ program main
 
   ! Set-up calls
   call initialise_GP(hyperParametersFile, alphaFile, trainingSetFile)
-  call initialise_Positions('AtomicPositions400.txt', posArray,N_a)
+  !  call initialise_Positions('AtomicPositions400.txt', posArray,N_a)
+  call initialise_Positions('AtomicPositions5.txt', posArray,N_a)
   call initialise_Variables(N_a, N_tri,udSize)
   
 
