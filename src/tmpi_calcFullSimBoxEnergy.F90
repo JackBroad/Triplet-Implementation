@@ -36,7 +36,7 @@ contains
     double precision, allocatable :: expData(:,:,:), uVec(:)
 
     call initialAsserts(N_a)
-    call declaureConstantsAndRowsOfPermutationMatrix()
+    call declareConstantsAndRowsOfPermutationMatrix()
 
 
     ! Set up on root
@@ -44,15 +44,7 @@ contains
 
        call initialTextOutput()
        currentEnergyData = setupCurrentEnergyDataAndArrays(N_a,N_tri,N_distances,posArray) 
-      
-
-       ! Declare permutation matrix
-       Perm(1,:) = (/1, 2, 3/)
-       Perm(2,:) = (/1, 3, 2/)
-       Perm(3,:) = (/2, 1, 3/)
-       Perm(4,:) = (/2, 3, 1/)
-       Perm(5,:) = (/3, 1, 2/)
-       Perm(6,:) = (/3, 2, 1/)
+       Perm = setupPermutationMatrix()
 
     end if
 
@@ -221,60 +213,73 @@ contains
   end subroutine initialAsserts
 
 
-  subroutine declaureConstantsAndRowsOfPermutationMatrix()
+  subroutine declareConstantsAndRowsOfPermutationMatrix()
     totTime = MPI_Wtime()
     root = 0
     N_p = 6
     setUpTime = MPI_Wtime()
     allocate(scounts(clusterSize))
     allocate(displs(clusterSize))
-  end subroutine declaureConstantsAndRowsOfPermutationMatrix
+  end subroutine declareConstantsAndRowsOfPermutationMatrix
   
 
   subroutine finalAsserts(N_a)
     ! Input variables
     integer, intent(in) :: N_a
 
-     if ( processRank == root ) then
+    if ( processRank == root ) then
        call assertTrue( N_a>0 , 'tmpi_calcFullSimBoxEnergy argument N_a should be >0')
-    endif
+    end if
 
   end subroutine finalAsserts
 
 
   subroutine initialTextOutput()
     if (textOutput) then
-          print *, ' '
-          print *, ' '
-          print *, '========================'
-          print *, 'Beginning non-additive calculation for whole sim box'
-          print *, ' '
-       end if
-     end subroutine initialTextOutput
+       print *, ' '
+       print *, ' '
+       print *, '========================'
+       print *, 'Beginning non-additive calculation for whole sim box'
+       print *, ' '
+    end if
+  end subroutine initialTextOutput
 
 
-     function setupCurrentEnergyDataAndArrays(N_a,N_tri,N_distances,posArray) result(currentEnergyData)
-       ! Input variables
-       integer, intent(in) :: N_a, N_tri, N_distances
-       double precision, intent(in) :: posArray(N_a,3)
+  function setupCurrentEnergyDataAndArrays(N_a,N_tri,N_distances,posArray) result(currentEnergyData)
+    ! Input variables
+    integer, intent(in) :: N_a, N_tri, N_distances
+    double precision, intent(in) :: posArray(N_a,3)
        
-       ! Output variables
-       type( energiesData):: currentEnergyData
+    ! Output variables
+    type( energiesData):: currentEnergyData
 
-        ! Read in all necessary info from files
-       allocate(currentEnergyData%tripletEnergies(N_tri))
-       allocate(currentEnergyData%interatomicDistances(N_a,N_a))
+    ! Read in all necessary info from files
+    allocate(currentEnergyData%tripletEnergies(N_tri))
+    allocate(currentEnergyData%interatomicDistances(N_a,N_a))
 
-       ! Set up the arrays required for the non-additive calculation
-       call makeXdgNonAdd(N_a,posArray, currentEnergyData%interatomicDistances)
-       call makeDisIntMatNonAdd(N_a, currentEnergyData%distancesIntMat)
-       call makeUDdgNonAdd(N_a,N_distances,currentEnergyData%interatomicDistances, UD_dg)
+    ! Set up the arrays required for the non-additive calculation
+    call makeXdgNonAdd(N_a,posArray, currentEnergyData%interatomicDistances)
+    call makeDisIntMatNonAdd(N_a, currentEnergyData%distancesIntMat)
+    call makeUDdgNonAdd(N_a,N_distances,currentEnergyData%interatomicDistances, UD_dg)
 
-       ! Set up array of a all possible triplets
-       allocate(triMat(3,N_tri))
-       call makeTripletMatrix(N_a,N_tri, triMat)
+    ! Set up array of a all possible triplets
+    allocate(triMat(3,N_tri))
+    call makeTripletMatrix(N_a,N_tri, triMat)
 
-     end function setupCurrentEnergyDataAndArrays
+  end function setupCurrentEnergyDataAndArrays
+
+
+  function setupPermutationMatrix() result(Perm)
+    integer :: Perm(6,3)
+
+    Perm(1,:) = (/1, 2, 3/)
+    Perm(2,:) = (/1, 3, 2/)
+    Perm(3,:) = (/2, 1, 3/)
+    Perm(4,:) = (/2, 3, 1/)
+    Perm(5,:) = (/3, 1, 2/)
+    Perm(6,:) = (/3, 2, 1/)
+
+  end function
     
   
 end module tmpi_calcFullSimBoxEnergy_mod

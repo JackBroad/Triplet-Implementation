@@ -9,6 +9,7 @@ module test_regression
   use energiesData_Module, only: energiesData
   use funit
   implicit none
+  include 'mpif.h'
   double precision :: regression_tolerance=1e-9, low_tol=5e-6
   double precision, allocatable :: posAt(:,:), Xd(:,:)
   double precision, allocatable :: expoData(:,:,:)

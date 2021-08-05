@@ -1,11 +1,13 @@
 program main
   use mpi_variables
   use GP_Variables
+  use triplet_mod
   use tmpi_calcFullSimBoxEnergy_mod!, only: tmpi_calcFullSimBoxEnergy
   use tmpi_calcAtomMoveEnergy_mod, only: tmpi_calcAtomMoveEnergy
   use energiesData_Module, only: energiesData
   use assert_module
   implicit none
+  include 'mpif.h'
 
 
   integer :: N_a, N_tri, udSize
