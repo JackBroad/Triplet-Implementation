@@ -118,55 +118,6 @@ return
 end subroutine makeXdgNonAdd
 
 
-! Makes index equivalent to X_dg
-subroutine makeDisIntMatNonAdd(nAt, disIntMat)
-  implicit none
-  integer, intent(in) :: nAt
-  integer, allocatable, intent(out) :: disIntMat(:,:)
-  integer :: ind, indi, indj
-
-  ! Do the same for the integer equivalent of X_dg
-  allocate(disIntMat(nAt,nAt))
-  ind = 0
-  do indi = 1, nAt
-    do indj = 1, nAt
-      if (indi .eq. indj) then
-                disIntMat(indi,indj) = 0
-      else if (indi .lt. indj) then
-        ind = ind + 1
-        disIntMat(indi,indj) = ind
-      else
-        disIntMat(indi,indj) = disIntMat(indj,indi)
-      end if
-    end do
-  end do
-
-return
-end subroutine makeDisIntMatNonAdd
-
-
-! Extracts UD of X_dg
-subroutine makeUDdgNonAdd(nAt,udSize,X_dg, UD_dg)
-  implicit none
-  integer, intent(in) :: nAt, udSize
-  double precision, intent(in) :: X_dg(nAt,nAt)
-  double precision, allocatable, intent(out) :: UD_dg(:)
-  integer :: nMinus, ele, m, n
-
-  allocate(UD_dg(udSize))
-  nMinus = nAt - 1
-  ele = 0
-  do m = 1, nMinus
-    do n = m+1, nAt
-      ele = ele + 1
-      UD_dg(ele) = X_dg(m,n)
-    end do
-  end do
-
-return
-end subroutine makeUDdgNonAdd
-
-
 ! Gets distances per process that need exponential calculations for and number
 ! of triplets needed per node for non-additve energy calculation
 subroutine getDistsAndTripletsPerProcNonAdd(nDist,nTrips,nProc, &
@@ -268,33 +219,6 @@ subroutine calculateExponentialsNonAdd(nJobs,nTP,nArguments,trainingData, &
 
 return
 end subroutine calculateExponentialsNonAdd
-
-
-! Uses the number of atoms (nAt) and number of triplets (nTri) to build a matrix
-! of all possible triplets
-subroutine makeTripletMatrix(nAt,nTri, tripletMatrix)
-  implicit none
-  integer, intent(in) :: nAt, nTri
-  integer, intent(out) :: tripletMatrix(3,nTri)
-  integer :: al, be, ga, counter
-
-  counter = 0
-
-  do al = 1, nAt-2
-    do be = al+1, nAt-1
-      do ga = be+1, nAt
-
-        counter = counter+1
-        tripletMatrix(1,counter) = al
-        tripletMatrix(2,counter) = be
-        tripletMatrix(3,counter) = ga
-
-      end do
-    end do
-  end do
-
-return
-end subroutine makeTripletMatrix
 
 
 ! Calculates the non-additive energy for each triplet in the cluster

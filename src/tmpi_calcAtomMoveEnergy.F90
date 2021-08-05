@@ -15,8 +15,6 @@ module tmpi_calcAtomMoveEnergy_mod
 contains
 
 
- 
-
   subroutine tmpi_calcAtomMoveEnergy(N_move,dist,N_a,N_distances,N_tri,currentEnergyData,posArray, &
                                      proposedEnergies)
     ! Input variables
