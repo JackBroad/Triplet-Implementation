@@ -8,6 +8,9 @@ module tmpi_calcAtomMoveEnergy_mod
   implicit none
   include 'mpif.h'
 
+  private
+  public tmpi_calcAtomMoveEnergy
+
 
 contains
 

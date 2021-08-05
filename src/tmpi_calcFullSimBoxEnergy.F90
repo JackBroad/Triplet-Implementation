@@ -8,6 +8,11 @@ module tmpi_calcFullSimBoxEnergy_mod
   implicit none
   include 'mpif.h'
 
+  private
+  public  tmpi_calcFullSimBoxEnergy
+
+  double precision :: totTime, setUpTime
+  integer, allocatable :: scounts(:), displs(:)
 
 contains
 
@@ -23,21 +28,13 @@ contains
     ! Local variables
     integer :: eCols, nSum, maxnSum, dataSize, maxDataSize
     integer :: reNsum, reDataSize
-    double precision :: expTime, sumTime, totTime, setUpTime
+    double precision :: expTime, sumTime
     integer, allocatable :: triMat(:,:), triScatter(:,:) 
-    integer, allocatable :: scounts(:), displs(:)
     double precision, allocatable :: scatterData(:), UD_dg(:)
     double precision, allocatable :: expData(:,:,:), uVec(:)
 
     call initialAsserts(N_a)
-
-    ! Declare constants and rows of permutation matrix
-    totTime = MPI_Wtime()
-    root = 0
-    N_p = 6
-    setUpTime = MPI_Wtime()
-    allocate(scounts(clusterSize))
-    allocate(displs(clusterSize))
+    call declaureConstantsAndRowsOfPermutationMatrix()
 
 
     ! Set up on root
@@ -238,6 +235,17 @@ contains
 
   end subroutine initialAsserts
 
+
+  subroutine declaureConstantsAndRowsOfPermutationMatrix()
+    totTime = MPI_Wtime()
+    root = 0
+    N_p = 6
+    setUpTime = MPI_Wtime()
+    allocate(scounts(clusterSize))
+    allocate(displs(clusterSize))
+  end subroutine declaureConstantsAndRowsOfPermutationMatrix
+  
+
   subroutine finalAsserts(N_a)
     ! Input variables
     integer, intent(in) :: N_a
@@ -247,6 +255,8 @@ contains
     endif
 
   end subroutine finalAsserts
+
+  
     
   
 end module tmpi_calcFullSimBoxEnergy_mod
