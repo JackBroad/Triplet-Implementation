@@ -3,6 +3,7 @@ module tmpi_calcFullSimBoxEnergy_mod
   use triplet_mod
   use GP_variables, only: hyperParams,alpha,Perm,trainData,N_tp,nArgs,N_p
   use energiesData_Module, only: energiesData
+  use positionData_Module, only: positionData
   use global_Flags, only: textOutput
   use assert_module
   implicit none
@@ -25,10 +26,11 @@ module tmpi_calcFullSimBoxEnergy_mod
 contains
 
 
-  function tmpi_calcFullSimBoxEnergy(N_a,N_tri,N_distances,posArray) result(currentEnergyData)
+  function tmpi_calcFullSimBoxEnergy(currentPosition) result(currentEnergyData)
     ! Input variables
-    integer, intent(in) :: N_a, N_tri, N_distances
-    double precision, intent(in) :: posArray(N_a,3)
+    type (positionData), intent(in) :: currentPosition
+    !integer, intent(in) :: N_a, N_tri, N_distances
+    !double precision, intent(in) :: posArray(N_a,3)
    
     ! Output variables
     type (energiesData) :: currentEnergyData
@@ -36,7 +38,7 @@ contains
     ! Local variables
     integer :: maxDataSize, maxnSum, reDataSize, reNsum
 
-    call initialAsserts(N_a)
+    call initialAsserts(currentPosition%N_a)
     call declareConstantsAndRowsOfPermutationMatrix()
 
 
@@ -44,7 +46,7 @@ contains
     if (processRank .eq. root) then
 
        call initialTextOutput()
-       currentEnergyData = setupCurrentEnergyDataAndArrays(N_a,N_tri,N_distances,posArray) 
+       currentEnergyData = setupCurrentEnergyDataAndArrays(currentPosition)
        Perm = setupPermutationMatrix()
 
     end if
@@ -55,16 +57,16 @@ contains
 
 
     ! Broadcasts of data on root
-    call MPI_Bcast(N_a, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
-    call MPI_Bcast(N_tri, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
-    call MPI_Bcast(N_distances, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(currentPosition%N_a, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(currentPosition%N_tri, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(currentPosition%N_distances, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
     call broadcastRootData()
-    call broadcastCurrentEnergyData(currentEnergyData,N_a)
+    call broadcastCurrentEnergyData(currentEnergyData,currentPosition%N_a)
 
 
     ! Determine max no. of elements of UD_dg to send to each process for exp
     ! calculations
-    call getNPerProcNonAdd(N_distances,clusterSize, maxDataSize,reDataSize)
+    call getNPerProcNonAdd(currentPosition%N_distances,clusterSize, maxDataSize,reDataSize)
     setUpTime = MPI_Wtime() - setUpTime
 
 
@@ -85,25 +87,25 @@ contains
 
 
     ! Allocate an array to hold all exps
-    allocate(currentEnergyData%expMatrix(nArgs,N_tp,N_distances))
+    allocate(currentEnergyData%expMatrix(nArgs,N_tp,currentPosition%N_distances))
 
 
     ! Gather expData arrays from the other processes and add them to expMatrix on
     ! the root process
     call MPI_gatherv(expData, N_tp*nArgs*dataSize, MPI_DOUBLE_PRECISION, currentEnergyData%expMatrix, &
-                     N_tp*nArgs*scounts, N_tp*nArgs*displs, MPI_DOUBLE_PRECISION, &
-                     root, MPI_COMM_WORLD, ierror)
+                     N_tp*nArgs*scounts, N_tp*nArgs*displs, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, &
+                     ierror)
     expTime = MPI_Wtime() - expTime
 
 
     ! Broadcast expMatrix to all processes so that sum can be parallelised
     sumTime = MPI_Wtime()
-    call MPI_Bcast(currentEnergyData%expMatrix, N_tp*nArgs*N_distances, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, &
-                   ierror)
+    call MPI_Bcast(currentEnergyData%expMatrix, N_tp*nArgs*currentPosition%N_distances, MPI_DOUBLE_PRECISION, &
+                   root, MPI_COMM_WORLD, ierror)
 
 
     ! Determine actual no. of elements to send to each process for triplet calc.
-    call getNPerProcNonAdd(N_tri,clusterSize, maxnSum,reNsum)
+    call getNPerProcNonAdd(currentPosition%N_tri,clusterSize, maxnSum,reNsum)
     call getVarrays(clusterSize,maxNsum,reNsum, scounts,displs)
     call getnSumAndTripletArrays()
 
@@ -114,20 +116,22 @@ contains
 
 
     ! Find the energies of the triplets assigned to each process
-    call tripletEnergiesNonAdd(triScatter,currentEnergyData%distancesIntMat,nSum,N_tp,N_a,N_p,nArgs,Perm, &
-                               N_distances,currentEnergyData%expMatrix,alpha,hyperParams(2), uVec)
+    call tripletEnergiesNonAdd(triScatter,currentEnergyData%distancesIntMat,nSum,N_tp,currentPosition%N_a, &
+                               N_p,nArgs,Perm,currentPosition%N_distances,currentEnergyData%expMatrix,alpha, &
+                               hyperParams(2), uVec)
 
 
     ! Gather in the triplet energies and sum them to get total non-add energy
-    call MPI_gatherv(uVec, nSum, MPI_DOUBLE_PRECISION, currentEnergyData%tripletEnergies, scounts, displs, MPI_DOUBLE_PRECISION, &
-                     root, MPI_COMM_WORLD, ierror)
+    call MPI_gatherv(uVec, nSum, MPI_DOUBLE_PRECISION, currentEnergyData%tripletEnergies, scounts, displs, &
+                     MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
 
 
     ! Find the total non-additive energy for the system
     currentEnergyData%Utotal = 0d0
     if (processRank .eq. root) then
 
-       call totalEnergyNonAdd(currentEnergyData%tripletEnergies,N_tri, currentEnergyData%Utotal)
+       call totalEnergyNonAdd(currentEnergyData%tripletEnergies,currentPosition%N_tri, &
+                              currentEnergyData%Utotal)
        call energyTextOutput(currentEnergyData)
 
     end if
@@ -142,7 +146,7 @@ contains
        call finalTextOutput()
 
     end if
-    call finalAsserts(N_a)
+    call finalAsserts(currentPosition%N_a)
     
     return
   end function tmpi_calcFullSimBoxEnergy
@@ -201,26 +205,30 @@ contains
   end subroutine initialTextOutput
 
 
-  function setupCurrentEnergyDataAndArrays(N_a,N_tri,N_distances,posArray) result(currentEnergyData)
+  function setupCurrentEnergyDataAndArrays(currentPosition) result(currentEnergyData)
     ! Input variables
-    integer, intent(in) :: N_a, N_tri, N_distances
-    double precision, intent(in) :: posArray(N_a,3)
+    type (positionData), intent(in) :: currentPosition
+    !integer, intent(in) :: N_a, N_tri, N_distances
+    !double precision, intent(in) :: posArray(N_a,3)
        
     ! Output variables
-    type( energiesData):: currentEnergyData
+    type (energiesData) :: currentEnergyData
 
     ! Read in all necessary info from files
-    allocate(currentEnergyData%tripletEnergies(N_tri))
-    allocate(currentEnergyData%interatomicDistances(N_a,N_a))
+    allocate(currentEnergyData%tripletEnergies(currentPosition%N_tri))
+    allocate(currentEnergyData%interatomicDistances(currentPosition%N_a, &
+             currentPosition%N_a))
 
     ! Set up the arrays required for the non-additive calculation
-    call makeXdgNonAdd(N_a,posArray, currentEnergyData%interatomicDistances)
-    call makeDisIntMatNonAdd(N_a, currentEnergyData%distancesIntMat)
-    call makeUDdgNonAdd(N_a,N_distances,currentEnergyData%interatomicDistances, UD_dg)
+    call makeXdgNonAdd(currentPosition%N_a,currentPosition%posArray, &
+                       currentEnergyData%interatomicDistances)
+    call makeDisIntMatNonAdd(currentPosition%N_a, currentEnergyData%distancesIntMat)
+    call makeUDdgNonAdd(currentPosition%N_a,currentPosition%N_distances, &
+                        currentEnergyData%interatomicDistances, UD_dg)
 
     ! Set up array of a all possible triplets
-    allocate(triMat(3,N_tri))
-    call makeTripletMatrix(N_a,N_tri, triMat)
+    allocate(triMat(3,currentPosition%N_tri))
+    call makeTripletMatrix(currentPosition%N_a,currentPosition%N_tri, triMat)
 
   end function setupCurrentEnergyDataAndArrays
 

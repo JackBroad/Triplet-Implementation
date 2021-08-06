@@ -33,10 +33,7 @@ program main
                             currentPosition%N_distances)
   
 
-  currentEnergies = tmpi_calcFullSimBoxEnergy(currentPosition%N_a, &
-                                              currentPosition%N_tri, &
-                                              currentPosition%N_distances, &
-                                              currentPosition%posArray)
+  currentEnergies = tmpi_calcFullSimBoxEnergy(currentPosition)
 
 
   call MPI_BARRIER(MPI_COMM_WORLD, barError)

@@ -7,6 +7,7 @@ module test_regression
   use GP_Variables
   use global_Flags, only: textOutput
   use energiesData_Module, only: energiesData
+  use positionData_Module, only: positionData
   use funit
   implicit none
   include 'mpif.h'
@@ -103,7 +104,6 @@ contains
   @test
   subroutine test_Xdg()
     implicit none
-    integer :: N_a
     double precision :: Xdg(n_at,n_at), Xdg_Ex(n_at,n_at), ud_Ex(3)
     double precision, allocatable :: upperDiag(:)
 
@@ -254,7 +254,7 @@ contains
   subroutine test_exp_calc()
     implicit none
     integer :: nDists=3
-    double precision :: Xdg(n_at,n_at), expSlice_Ex(nArgs,3)
+    double precision :: expSlice_Ex(nArgs,3)
     double precision :: expSlice(nArgs,3), dists(3)
 
     allocate(expoData(nArgs,N_tp,3))
@@ -313,13 +313,12 @@ contains
   subroutine test_cluster_energies_and_move()
     implicit none
     character(len=40) :: name='AtomicPositions5.txt'
-    double precision, allocatable :: pos(:,:), dists(:), expos(:,:,:)
-    double precision, allocatable  :: X(:,:), uVec(:), tripDist(:,:)
-    double precision :: uVec_Ex(10), Utotal
-    integer, allocatable :: indX(:,:), changedTri(:,:)
-    integer :: nAt, nTri, nDist, triplets(3,10), N_p=6, Perm(6,3)
-    integer :: nPerMove, move, i
-    type( energiesData ) :: currentEnergies, proposedEnergies
+    double precision, allocatable  :: tripDist(:,:)
+    double precision :: uVec_Ex(10)
+    integer :: triplets(3,10), Perm(6,3)
+    integer :: i
+    type (energiesData) :: currentEnergies, proposedEnergies
+    type (positionData) :: currentPosition
 
     Perm(1,:) = (/1, 2, 3/)
     Perm(2,:) = (/1, 3, 2/)
@@ -339,10 +338,10 @@ contains
     triplets(:,9) = (/ 2,4,5 /)
     triplets(:,10) = (/ 3,4,5 /)
 
-    call initialise_Positions(name, pos,nAt)
-    call initialise_Variables(nAt, nTri,nDist)
+    call initialise_Positions(name, currentPosition%posArray,currentPosition%N_a)
+    call initialise_Variables(currentPosition%N_a, currentPosition%N_tri, currentPosition%N_distances)
                                
-    currentEnergies = tmpi_calcFullSimBoxEnergy(nAt,nTri,nDist,pos)
+    currentEnergies = tmpi_calcFullSimBoxEnergy(currentPosition)
 
     uVec_Ex = (/ -36.447687049554496,-42.826746144585805,-115.37904762300680, &
                  -39.315816583964079,-35.145291686734041,-40.420576004505804, &
@@ -356,14 +355,14 @@ contains
     end if
 
     ! Find E when atom moved
-    call tmpi_calcAtomMoveEnergy(1,1d0,nAt,nDist,nTri,currentEnergies,pos, &
-                                 proposedEnergies)
+    call tmpi_calcAtomMoveEnergy(1,1d0,currentPosition%N_a,currentPosition%N_distances,currentPosition%N_tri, &
+                                 currentEnergies,currentPosition%posArray, proposedEnergies)
 
     ! Set up new vector of trip energies for comparison
-    allocate(tripDist(3,nTri))
-    call findChangedDistsPerTrip(nAt,nTri,triplets,proposedEnergies%interatomicDistances,&
-                                 tripDist) ! Distances in each triplet after move
-    do i = 1, nTri
+    allocate(tripDist(3,currentPosition%N_tri))
+    call findChangedDistsPerTrip(currentPosition%N_a,currentPosition%N_tri,triplets, &
+                                 proposedEnergies%interatomicDistances, tripDist) ! Distances in each triplet after move
+    do i = 1, currentPosition%N_tri
       
       uVec_Ex(i) = energyCheckCalc(tripDist(:,i)) ! Energies of each triplet after move
 
