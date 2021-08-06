@@ -1,4 +1,5 @@
 module global_Flags
+
   logical :: textOutput = .true.
 
 end module global_Flags
@@ -17,3 +18,13 @@ module energiesData_Module
 
 end module EnergiesData_Module
 
+module positionData_Module
+
+  type positionData
+
+    integer :: N_a, N_tri, N_distances
+    double precision, allocatable :: posArray(:,:)
+
+  end type positionData
+
+end module positionData_Module
