@@ -315,10 +315,9 @@ contains
     character(len=40) :: name='AtomicPositions5.txt'
     double precision, allocatable  :: tripDist(:,:)
     double precision :: uVec_Ex(10)
-    integer :: triplets(3,10), Perm(6,3)
-    integer :: i
+    integer :: triplets(3,10), Perm(6,3), move, i
     type (energiesData) :: currentEnergies, proposedEnergies
-    type (positionData) :: currentPosition
+    type (positionData) :: currentPosition, proposedPosition
 
     Perm(1,:) = (/1, 2, 3/)
     Perm(2,:) = (/1, 3, 2/)
@@ -355,8 +354,11 @@ contains
     end if
 
     ! Find E when atom moved
-    call tmpi_calcAtomMoveEnergy(1,1d0,currentPosition%N_a,currentPosition%N_distances,currentPosition%N_tri, &
-                                 currentEnergies,currentPosition%posArray, proposedEnergies)
+    proposedPosition = currentPosition
+    call moveAt(currentPosition%posArray,currentPosition%N_a,1d0, &
+                proposedPosition%posArray,move)
+    call tmpi_calcAtomMoveEnergy(1,move,proposedPosition,currentEnergies, &
+                                 proposedEnergies)
 
     ! Set up new vector of trip energies for comparison
     allocate(tripDist(3,currentPosition%N_tri))

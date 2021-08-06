@@ -11,11 +11,12 @@ program main
   include 'mpif.h'
 
 
-  !integer :: N_a, N_tri, udSize
-  !double precision, allocatable :: posArray(:,:)
+  integer :: move
+  double precision :: dist
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
+  Character(len=300) :: positionFile = 'AtomicPositions5.txt'
   type (energiesData) :: currentEnergies, proposedEnergies
   type (positionData) :: currentPosition, proposedPosition
 
@@ -25,10 +26,10 @@ program main
   call MPI_COMM_RANK(MPI_COMM_WORLD, processRank, ierror)
 
 
-  ! Set-up calls
+  ! Set-up calls for full calc
   call initialise_GP(hyperParametersFile, alphaFile, trainingSetFile)
-  call initialise_Positions('AtomicPositions5.txt', currentPosition%posArray, &
-                             currentPosition%N_a)
+  call initialise_Positions(positionFile, currentPosition%posArray, &
+                            currentPosition%N_a)
   call initialise_Variables(currentPosition%N_a, currentPosition%N_tri, &
                             currentPosition%N_distances)
   
@@ -39,9 +40,15 @@ program main
   call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
-  call tmpi_calcAtomMoveEnergy(20,1.5d0,currentPosition%N_a,currentPosition%N_distances, &
-                               currentPosition%N_tri,currentEnergies, &
-                               currentPosition%posArray,proposedEnergies)
+  ! Set-up calls for atom move
+  proposedPosition = currentPosition
+  dist = 1.5d0
+  call moveAt(currentPosition%posArray,currentPosition%N_a,dist, &
+              proposedPosition%posArray,move)
+
+
+  call tmpi_calcAtomMoveEnergy(20,move,proposedPosition,currentEnergies, &
+                               proposedEnergies)
 
 
   deallocate(alpha)
