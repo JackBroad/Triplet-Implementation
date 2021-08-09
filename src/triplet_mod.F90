@@ -10,7 +10,7 @@ contains
 subroutine makeXdgNonAdd(nAt,posArray, X_dg)
   implicit none
   integer, intent(in) :: nAt
-  double precision, intent(in) :: posArray(nAt,nAt)
+  double precision, intent(in) :: posArray(nAt,3)
   double precision, intent(out) :: X_dg(nAt,nAt)
   integer :: i, j
 
