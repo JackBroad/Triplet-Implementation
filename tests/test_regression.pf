@@ -8,6 +8,7 @@ module test_regression
   use global_Flags, only: textOutput
   use energiesData_Module, only: energiesData
   use positionData_Module, only: positionData
+  use initialise_Module
   use funit
   implicit none
   include 'mpif.h'
@@ -31,7 +32,7 @@ contains
     call MPI_INIT(ierror)
     call MPI_COMM_SIZE(MPI_COMM_WORLD, clusterSize, ierror)
     call MPI_COMM_RANK(MPI_COMM_WORLD, processRank, ierror)
-    call initialise_GP( hyperParametersFile, alphaFile, trainingSetFile )
+    call initialise_GP_NonAdd( hyperParametersFile, alphaFile, trainingSetFile )
 
     @assertEqual(root, 0 ,'Initialisation')
   end subroutine initialise_my_mpi
@@ -355,7 +356,7 @@ contains
 
     ! Find E when atom moved
     proposedPosition = currentPosition
-    call moveAt(currentPosition%posArray,currentPosition%N_a,1d0, &
+    call initialise_Move(currentPosition%posArray,currentPosition%N_a,1d0, &
                 proposedPosition%posArray,move)
     call tmpi_calcAtomMoveEnergy(1,move,proposedPosition,currentEnergies, &
                                  proposedEnergies)

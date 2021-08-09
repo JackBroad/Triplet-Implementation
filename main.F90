@@ -7,6 +7,7 @@ program main
   use energiesData_Module, only: energiesData
   use positionData_Module, only: positionData
   use assert_module
+  use initialise_Module
   implicit none
   include 'mpif.h'
 
@@ -27,7 +28,7 @@ program main
 
 
   ! Set-up calls for full calc
-  call initialise_GP(hyperParametersFile, alphaFile, trainingSetFile)
+  call initialise_GP_NonAdd(hyperParametersFile, alphaFile, trainingSetFile)
   call initialise_Positions(positionFile, currentPosition%posArray, &
                             currentPosition%N_a)
   call initialise_Variables(currentPosition%N_a, currentPosition%N_tri, &
@@ -43,8 +44,8 @@ program main
   ! Set-up calls for atom move
   proposedPosition = currentPosition
   dist = 1.5d0
-  call moveAt(currentPosition%posArray,currentPosition%N_a,dist, &
-              proposedPosition%posArray,move)
+  call initialise_Move(currentPosition%posArray,currentPosition%N_a,dist, &
+                       proposedPosition%posArray,move)
 
 
   call tmpi_calcAtomMoveEnergy(20,move,proposedPosition,currentEnergies, &
