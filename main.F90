@@ -48,8 +48,9 @@ program main
                        proposedPosition%posArray,move)
 
 
-  call tmpi_calcAtomMoveEnergy(20,move,proposedPosition,currentEnergies, &
-                               proposedEnergies)
+  !call tmpi_calcAtomMoveEnergy(20,move,proposedPosition,currentEnergies, &
+  !                             proposedEnergies)
+  proposedEnergies = tmpi_calcAtomMoveEnergy(20,move,proposedPosition,currentEnergies)
 
 
   deallocate(alpha)

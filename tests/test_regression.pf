@@ -357,9 +357,8 @@ contains
     ! Find E when atom moved
     proposedPosition = currentPosition
     call initialise_Move(currentPosition%posArray,currentPosition%N_a,1d0, &
-                proposedPosition%posArray,move)
-    call tmpi_calcAtomMoveEnergy(1,move,proposedPosition,currentEnergies, &
-                                 proposedEnergies)
+                         proposedPosition%posArray,move)
+    proposedEnergies = tmpi_calcAtomMoveEnergy(1,move,proposedPosition,currentEnergies)
 
     ! Set up new vector of trip energies for comparison
     allocate(tripDist(3,currentPosition%N_tri))

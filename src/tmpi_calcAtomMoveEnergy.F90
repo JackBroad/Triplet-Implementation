@@ -16,15 +16,14 @@ module tmpi_calcAtomMoveEnergy_mod
 contains
 
 
-  subroutine tmpi_calcAtomMoveEnergy(N_move,move,proposedPosition,currentEnergyData, &
-                                     proposedEnergies)
-    ! Input variables
+  function tmpi_calcAtomMoveEnergy(N_move,move,proposedPosition,currentEnergyData) result(proposedEnergies)
+    ! Inputs
     integer, intent(in) :: N_move, move
     type (energiesData), intent(in) :: currentEnergyData
     type (positionData), intent(in) :: proposedPosition
 
-    ! Output variables
-    type( energiesData ), intent(out) :: proposedEnergies
+    ! Output
+    type (energiesData) :: proposedEnergies
 
     ! Local variables
     integer :: triPerProc, i, j, indj, nPerProc, triPerAt, nExpMax, nExpRe
@@ -74,13 +73,11 @@ contains
        ! Set up on root
        if (processRank .eq. root) then
 
-          ! Move an atom
-          !call moveAt(posArray,N_a,dist, newPosAt,move)
-          !if (textOutput) then
-          !  print *, '------------------------'
-          !  print *, "Moving atom", move
-          !  print *, "                 "
-          !end if
+          if (textOutput) then
+            print *, '------------------------'
+            print *, "Moving atom", move
+            print *, "                 "
+          end if
 
           ! Re-calculate interatomicDistances for the new atomic positions
           call makeXdgNonAdd(proposedPosition%N_a,proposedPosition%posArray, proposedEnergies%interatomicDistances)
@@ -183,11 +180,11 @@ contains
           call totalEnergyNonAdd(proposedEnergies%tripletEnergies,proposedPosition%N_tri, &
                                  proposedEnergies%Utotal)
 
-          !if (textOutput) then          
-          !  print *, "The non-additive energy after the move is", proposedEnergies%Utotal
-          !  print *, '------------------------'
-          !  print *, ' '
-          !end if
+          if (textOutput) then          
+            print *, "The non-additive energy after the move is", proposedEnergies%Utotal
+            print *, '------------------------'
+            print *, ' '
+          end if
 
        end if
 
@@ -226,7 +223,7 @@ contains
     end if
 
     return
-  end subroutine tmpi_calcAtomMoveEnergy
+  end function tmpi_calcAtomMoveEnergy
 
 
   subroutine initialAsserts(N_a)
