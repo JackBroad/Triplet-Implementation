@@ -36,7 +36,8 @@ contains
     ! Local variables
     integer :: maxDataSize, maxnSum, reDataSize, reNsum
 
-    call initialAsserts(currentPosition%N_a)
+    call initialAsserts(currentPosition%N_a,currentPosition%N_tri, &
+                        currentPosition%N_distances)
     call declareConstantsAndRowsOfPermutationMatrix()
 
 
@@ -150,13 +151,22 @@ contains
   end function tmpi_calcFullSimBoxEnergy
 
 
-  subroutine initialAsserts(N_a)
-    ! Input variables
-    integer, intent(in) :: N_a
+  subroutine initialAsserts(N_a,N_tri,N_distances)
+    integer, intent(in) :: N_a, N_tri, N_distances
+    integer :: N_tri_ex
 
     if ( processRank == root ) then
 
-       call assertTrue( N_a>0 , 'tmpi_calcFullSimBoxEnergy argument N_a should be >0')
+       N_tri_ex = N_a**3
+       N_tri_ex = N_tri_ex - 3*N_a**2
+       N_tri_ex = N_tri_ex + 2*N_a
+       N_tri_ex = N_tri_ex / 6
+
+       call assertTrue(N_a > 0, 'tmpi_calcFullSimBoxEnergy: should have N_a > 0')
+       call assertTrue(N_tri .eq. N_tri_ex, &
+       'tmpi_calcFullSimBoxEnergy: should have N_tri = (N_a^3 - 3N_a^2 + 2N_a) / 6')
+       call assertTrue(N_distances .eq. ((N_a * N_a) - N_a) / 2, &
+       'tmpi_calcFullSimBoxEnergy: should have N_distances = (N_a^2 - N_a) / 2')
 
     end if
 
@@ -176,12 +186,11 @@ contains
   
 
   subroutine finalAsserts(N_a)
-    ! Input variables
     integer, intent(in) :: N_a
 
     if ( processRank == root ) then
 
-       call assertTrue( N_a>0 , 'tmpi_calcFullSimBoxEnergy argument N_a should be >0')
+       call assertTrue( N_a>0 , 'tmpi_calcFullSimBoxEnergy: should have N_a > 0')
 
     end if
 

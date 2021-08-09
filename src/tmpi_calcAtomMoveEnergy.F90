@@ -41,6 +41,8 @@ contains
     integer :: i
 
 
+    call initialAsserts(proposedPosition%N_a,proposedPosition%N_tri, &
+                        proposedPosition%N_distances)
     totTime = MPI_Wtime()
     root = 0
     call firstTextOutput()
@@ -61,16 +63,13 @@ contains
 
           ! Re-calculate interatomicDistances for the new atomic positions
           call makeXdgNonAdd(proposedPosition%N_a,proposedPosition%posArray, proposedEnergies%interatomicDistances)
-          print *, 'xdg'
 
           ! Find the indices of the affected exponentials
           call extractChangedExps(proposedPosition%N_a,move,proposedEnergies%interatomicDistances, &
                                   newExpInt,newDists)
-          print *, 'extract exp'
 
           ! Determine which triplets have undergone a change
           call changedTripletInfo(move,proposedPosition)
-          print *, 'update triplets'
 
        end if
 
@@ -152,6 +151,7 @@ contains
 
     ! Finalise MPI and print times taken for each step of calculation
     totTime = MPI_Wtime() - totTime
+    call finalAsserts(proposedPosition%N_a)
     if (processRank .eq. root) then
 
        call finalTextOutput(N_move)
@@ -162,25 +162,36 @@ contains
   end function tmpi_calcAtomMoveEnergy
 
 
-  subroutine initialAsserts(N_a)
-    ! Input variables
-    integer, intent(in) :: N_a
-
+  subroutine initialAsserts(N_a,N_tri,N_distances)
+    integer, intent(in) :: N_a, N_tri, N_distances
+    integer :: N_tri_ex
 
     if ( processRank == root ) then
-       call assertTrue( N_a>0 , 'tmpi_calcFullSimBoxEnergy argument N_a should be >0')
-    endif
+
+       N_tri_ex = N_a**3
+       N_tri_ex = N_tri_ex - 3*N_a**2
+       N_tri_ex = N_tri_ex + 2*N_a
+       N_tri_ex = N_tri_ex / 6
+
+       call assertTrue(N_a > 0, 'tmpi_calcAtomMoveEnergy: should have N_a > 0')
+       call assertTrue(N_tri .eq. N_tri_ex, &
+       'tmpi_calcAtomMoveEnergy: should have N_tri = (N_a^3 - 3N_a^2 + 2N_a) / 6')
+       call assertTrue(N_distances .eq. ((N_a * N_a) - N_a) / 2, &
+       'tmpi_calcAtomMoveEnergy: should have N_distances = (N_a^2 - N_a) / 2')
+
+    end if
 
   end subroutine initialAsserts
 
 
   subroutine finalAsserts(N_a)
-    ! Input variables
     integer, intent(in) :: N_a
 
-     if ( processRank == root ) then
-       call assertTrue( N_a>0 , 'tmpi_calcFullSimBoxEnergy argument N_a should be >0')
-    endif
+    if ( processRank == root ) then
+
+       call assertTrue( N_a>0 , 'tmpi_calcAtomMoveEnergy: should have N_a > 0')
+
+    end if
 
   end subroutine finalAsserts
 
