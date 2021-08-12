@@ -17,7 +17,7 @@ program main
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
-  Character(len=300) :: positionFile = 'AtomicPositions5.txt'
+  Character(len=300) :: positionFile = 'AtomicPositions400.txt'
   type (energiesData) :: currentEnergies, proposedEnergies
   type (positionData) :: currentPosition, proposedPosition
 
@@ -48,9 +48,7 @@ program main
                        proposedPosition%posArray,move)
 
 
-  !call tmpi_calcAtomMoveEnergy(20,move,proposedPosition,currentEnergies, &
-  !                             proposedEnergies)
-  proposedEnergies = tmpi_calcAtomMoveEnergy(20,move,proposedPosition,currentEnergies)
+  proposedEnergies = tmpi_calcAtomMoveEnergy(1,move,proposedPosition,currentEnergies)
 
 
   deallocate(alpha)

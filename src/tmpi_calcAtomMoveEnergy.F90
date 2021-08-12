@@ -16,7 +16,9 @@ module tmpi_calcAtomMoveEnergy_mod
 
   integer :: triPerAt, nPerProc, nExpMax, nExpRe, nTriMax, nTriRe
   integer :: triPerProc, j
-  double precision :: totTime, moveTime
+  double precision :: totTime, moveTime, expTime, sumTime, setTime
+  double precision :: gatherExpTime, gatherTripTime, xTime
+  double precision :: extractTime, tripTime
   integer, allocatable :: changedTriplets(:,:), tripIndex(:)
   integer, allocatable :: scounts(:), displs(:), newExpInt(:,:)
   integer, allocatable :: scatterTrip(:,:)
@@ -57,27 +59,36 @@ contains
     do i = 1, N_move
 
        ! Set up on root
+       setTime = MPI_Wtime()
        if (processRank .eq. root) then
 
           call moveTextOutput(move)
 
+          xTime = MPI_Wtime()
           ! Re-calculate interatomicDistances for the new atomic positions
           call makeXdgNonAdd(proposedPosition%N_a,proposedPosition%posArray, proposedEnergies%interatomicDistances)
+          xTime = MPI_Wtime() - xTime
 
+          extractTime = MPI_Wtime()
           ! Find the indices of the affected exponentials
           call extractChangedExps(proposedPosition%N_a,move,proposedEnergies%interatomicDistances, &
                                   newExpInt,newDists)
+          extractTime = MPI_Wtime() - extractTime
 
+          tripTime = MPI_Wtime()
           ! Determine which triplets have undergone a change
           call changedTripletInfo(move,proposedPosition)
+          tripTime = MPI_Wtime() - tripTime
 
        end if
 
        ! Broadcast all requisite data from root
        call MPI_BARRIER(MPI_COMM_WORLD, barError)
        call broadcastRootData(proposedPosition,proposedEnergies,move)
+       setTime = MPI_Wtime() - setTime
 
        ! Prepare dist. data for scattering
+       expTime = MPI_Wtime()
        call getDistScatterData(proposedPosition)
 
        ! Allocate arrays for dist. scattering on first loop
@@ -92,10 +103,12 @@ contains
                          scatterDists, nPerProc, MPI_DOUBLE_PRECISION, &
                          root, MPI_COMM_WORLD, ierror)
 
-       ! Update exponentials in changed triplets
+       ! Update exponentials of distances affected by the move
        call calculateExponentialsNonAdd(nPerProc,N_tp,nArgs,trainData, &
                                         hyperParams(1),scatterDists, &
                                         changeExpData)
+       expTime = MPI_Wtime() - expTime
+       gatherExpTime = MPI_Wtime()
 
        ! Gather in all updated exps and broadcast the resultant matrix to all procs
        call MPI_gatherv(changeExpData, N_tp*nArgs*nPerProc, MPI_DOUBLE_PRECISION, &
@@ -106,8 +119,10 @@ contains
 
        ! Update the exponential matrix
        call updateExpMatrix(proposedPosition, proposedEnergies)
+       gatherExpTime = MPI_Wtime() - gatherExpTime
 
-       ! Prepare trip. data fro sacttering
+       ! Prepare trip. data from scattering
+       sumTime = MPI_Wtime()
        call getTripletScatterData()
 
        ! Allocate requisite arrays for trip. sactter in first loop
@@ -125,6 +140,8 @@ contains
        call tripletEnergiesNonAdd(scatterTrip,proposedEnergies%distancesIntMat,triPerProc,N_tp, &
                                   proposedPosition%N_a,N_p,nArgs,Perm,proposedPosition%N_distances, &
                                   proposedEnergies%expMatrix,alpha,hyperParams(2), newUvec)
+       sumTime = MPI_Wtime() - sumTime
+       gatherTripTime = MPI_Wtime()
        call MPI_gatherv(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, scounts, &
                         displs, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
 
@@ -140,6 +157,7 @@ contains
           call energyTextOutput(proposedEnergies)
 
        end if
+       gatherTripTime = MPI_Wtime() - gatherTripTime
 
     end do
     moveTime = MPI_Wtime() - moveTime
@@ -151,12 +169,13 @@ contains
 
     ! Finalise MPI and print times taken for each step of calculation
     totTime = MPI_Wtime() - totTime
-    call finalAsserts(proposedPosition%N_a)
+    !call finalTextOutput(N_move)
     if (processRank .eq. root) then
 
        call finalTextOutput(N_move)
 
     end if
+    call finalAsserts(proposedPosition%N_a)
 
     return
   end function tmpi_calcAtomMoveEnergy
@@ -366,7 +385,7 @@ contains
 
 
   subroutine finalTextOutput(N_move)
-    integer :: N_move
+    integer, intent(in) :: N_move
 
     if (textOutput) then
 
@@ -374,6 +393,14 @@ contains
                "seconds"
       print *, "The total time for the program to run was", totTime, &
                "seconds"
+      print *, "The time for the exp calc was", expTime
+      print *, "The time for the exp scatter/gather was", gatherExpTime
+      print *, "The time for the sum was", sumTime
+      print *, "The time for the sum scatter/gather was", gatherTripTime
+      print *, "The time for the set-up was", setTime
+      print *, "The time for the Xdg set-up was", xTime
+      print *, "The time for the exp extraction was", extractTime
+      print *, "The time for the triplet set up was ", tripTime
       print *, ' '
       print *, 'Non-additive calculation for atom move complete'
       print *, '========================'
