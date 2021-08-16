@@ -45,13 +45,12 @@ contains
 
     call initialAsserts(proposedPosition%N_a,proposedPosition%N_tri, &
                         proposedPosition%N_distances)
-    totTime = MPI_Wtime()
     root = 0
     call firstTextOutput()
+    totTime = MPI_Wtime()
     call getTriPerAtom(proposedPosition%N_a, triPerAt)
     call allocateArrays(proposedPosition,proposedEnergies)
-    proposedEnergies%distancesIntMat = currentEnergyData%distancesIntMat
-    proposedEnergies%expMatrix = currentEnergyData%expMatrix
+    proposedEnergies = currentEnergyData
 
 
     ! Loop over N moves, moving an atom and re-calculating the energy each time
@@ -64,27 +63,24 @@ contains
 
           call moveTextOutput(move)
 
-          xTime = MPI_Wtime()
-          ! Re-calculate interatomicDistances for the new atomic positions
-          call makeXdgNonAdd(proposedPosition%N_a,proposedPosition%posArray, proposedEnergies%interatomicDistances)
-          xTime = MPI_Wtime() - xTime
-
-          extractTime = MPI_Wtime()
-          ! Find the indices of the affected exponentials
-          call extractChangedExps(proposedPosition%N_a,move,proposedEnergies%interatomicDistances, &
-                                  newExpInt,newDists)
-          extractTime = MPI_Wtime() - extractTime
-
-          tripTime = MPI_Wtime()
-          ! Determine which triplets have undergone a change
-          call changedTripletInfo(move,proposedPosition)
-          tripTime = MPI_Wtime() - tripTime
-
        end if
 
-       ! Broadcast all requisite data from root
-       call MPI_BARRIER(MPI_COMM_WORLD, barError)
-       call broadcastRootData(proposedPosition,proposedEnergies,move)
+       xTime = MPI_Wtime()
+       ! Re-calculate interatomicDistances for the new atomic positions
+       call makeXdgNonAdd(proposedPosition%N_a,proposedPosition%posArray, proposedEnergies%interatomicDistances)
+       !call updateXdg(move,proposedPosition%N_a,proposedPosition%posArray, proposedEnergies%interatomicDistances)
+       xTime = MPI_Wtime() - xTime
+
+       extractTime = MPI_Wtime()
+       ! Find the indices of the affected exponentials
+       call extractChangedExps(proposedPosition%N_a,move,proposedEnergies%interatomicDistances, &
+                               newExpInt,newDists)
+       extractTime = MPI_Wtime() - extractTime
+
+       tripTime = MPI_Wtime()
+       ! Determine which triplets have undergone a change
+       call changedTripletInfo(move,proposedPosition)
+       tripTime = MPI_Wtime() - tripTime
        setTime = MPI_Wtime() - setTime
 
        ! Prepare dist. data for scattering
@@ -98,10 +94,9 @@ contains
 
        end if
 
-       ! Scatter distances across processes
-       call MPI_scatterv(newDists, scounts, displs, MPI_DOUBLE_PRECISION, &
-                         scatterDists, nPerProc, MPI_DOUBLE_PRECISION, &
-                         root, MPI_COMM_WORLD, ierror)
+       ! Read distances for each process to take for exp calculation
+       scatterDists = newDists(1+displs(processRank+1):displs(processRank+1)+&
+                      scounts(processRank+1))
 
        ! Update exponentials of distances affected by the move
        call calculateExponentialsNonAdd(nPerProc,N_tp,nArgs,trainData, &
@@ -133,13 +128,14 @@ contains
        end if
 
        ! Scatter triplets across processes
-       call MPI_scatterv(changedTriplets, scounts*3, displs*3, MPI_INT, scatterTrip, &
-                         triPerProc*3, MPI_INT, root, MPI_COMM_WORLD, ierror)
+       scatterTrip = changedTriplets(1:3,1+displs(processRank+1):displs(processRank+1)+&
+                     scounts(processRank+1))
 
        ! Calculate the non-additive energies for the changed triplets and gather on root
        call tripletEnergiesNonAdd(scatterTrip,proposedEnergies%distancesIntMat,triPerProc,N_tp, &
                                   proposedPosition%N_a,N_p,nArgs,Perm,proposedPosition%N_distances, &
                                   proposedEnergies%expMatrix,alpha,hyperParams(2), newUvec)
+       call MPI_BARRIER(MPI_COMM_WORLD, barError)
        sumTime = MPI_Wtime() - sumTime
        gatherTripTime = MPI_Wtime()
        call MPI_gatherv(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, scounts, &
@@ -169,7 +165,6 @@ contains
 
     ! Finalise MPI and print times taken for each step of calculation
     totTime = MPI_Wtime() - totTime
-    !call finalTextOutput(N_move)
     if (processRank .eq. root) then
 
        call finalTextOutput(N_move)
@@ -228,7 +223,6 @@ contains
     allocate(displs(clusterSize))
     allocate(proposedEnergies%interatomicDistances(proposedPosition%N_a, &
              proposedPosition%N_a))
-    !allocate(proposedPosition%posArray(proposedPosition%N_a,3))
     allocate(tripIndex(triPerAt))
 
   end subroutine allocateArrays
@@ -275,21 +269,21 @@ contains
   end subroutine changedTripletInfo
 
 
-  subroutine broadcastRootData(proposedPosition,proposedEnergies,move)
-    type (positionData) :: proposedPosition
-    type (energiesData) :: proposedEnergies
-    integer :: move
+!  subroutine broadcastRootData(proposedPosition,proposedEnergies,move)
+!    type (positionData) :: proposedPosition
+!    type (energiesData) :: proposedEnergies
+!    integer :: move
 
-    call MPI_Bcast(newExpInt, 2*(proposedPosition%N_a-1), MPI_INT, root, &
-                   MPI_COMM_WORLD, ierror)
-    call MPI_Bcast(proposedEnergies%interatomicDistances, &
-                   proposedPosition%N_a*proposedPosition%N_a, &
-                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-    call MPI_Bcast(proposedPosition%posArray, 3*proposedPosition%N_a, &
-                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-    call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
+!    call MPI_Bcast(newExpInt, 2*(proposedPosition%N_a-1), MPI_INT, root, &
+!                   MPI_COMM_WORLD, ierror)
+!    call MPI_Bcast(proposedEnergies%interatomicDistances, &
+!                   proposedPosition%N_a*proposedPosition%N_a, &
+!                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+!    call MPI_Bcast(proposedPosition%posArray, 3*proposedPosition%N_a, &
+!                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+!    call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
 
-  end subroutine broadcastRootData
+!  end subroutine broadcastRootData
 
 
   subroutine getDistScatterData(proposedPosition)
@@ -568,6 +562,44 @@ contains
 
   return
   end subroutine findChangedTriIndex  
+
+
+  subroutine updateXdg(move,N_a,positions, X)
+    implicit none
+    ! Arguments
+    integer, intent(in) :: move, N_a
+    double precision, intent(in) :: positions(N_a,3)
+    double precision, intent(inout) :: X(N_a,N_a)
+    ! Local variables
+    integer :: i
+    double precision :: changedPosition(3)
+
+    ! Identify the position of the moved atom
+    changedPosition = positions(move,:)
+
+    ! Find the distances between this atom and all others
+    do i = 1, N_a
+      if (i .lt. move) then
+
+        X(i,move) = (positions(i,1) - changedPosition(1))**2 + &
+                    (positions(i,2) - changedPosition(2))**2 + &
+                    (positions(i,3) - changedPosition(3))**2
+        X(i,move) = (X(i,move))**0.5
+        X(move,i) = X(i,move)
+
+      else if (i .gt. move) then
+
+        X(move,i) = (positions(i,1) - changedPosition(1))**2 + &
+                    (positions(i,2) - changedPosition(2))**2 + &
+                    (positions(i,3) - changedPosition(3))**2
+        X(move,i) = (X(move,i))**0.5
+        X(i,move) = X(move,i)
+
+      end if
+    end do
+
+    return
+  end subroutine updateXdg
     
   
 end module tmpi_calcAtomMoveEnergy_mod

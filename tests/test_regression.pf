@@ -48,7 +48,6 @@ contains
 
     if( processRank == root ) then
        print *,'========================Regression tests============================'
-       print *,'If many tests fail, check that triplet_mod reads smallAlpha.txt and smallTrainingSet.txt'
 
        call getDistsAndTripletsPerProcNonAdd(nDist,nTrips,nProc,distsPerProc,tripsPerProc)
        @assertEqual(distsPerProc, 3,'Distances per processor #1')
@@ -343,10 +342,14 @@ contains
                                
     currentEnergies = tmpi_calcFullSimBoxEnergy(currentPosition)
 
-    uVec_Ex = (/ -36.447687049554496,-42.826746144585805,-115.37904762300680, &
-                 -39.315816583964079,-35.145291686734041,-40.420576004505804, &
-                 -57.148919337879079,-87.423280140314134,-110.11337614380483, &
-                 -50.353330971893016  /)
+    allocate(tripDist(3,currentPosition%N_tri))
+    call findChangedDistsPerTrip(currentPosition%N_a,currentPosition%N_tri,triplets, &
+                                 currentEnergies%interatomicDistances, tripDist)
+    do i = 1, currentPosition%N_tri
+
+      uVec_Ex(i) = energyCheckCalc(tripDist(:,i)) ! Energies of each triplet
+
+    end do
 
     if( processRank == root) then
 
@@ -354,22 +357,35 @@ contains
 
     end if
 
-    ! Find E when atom moved
+    ! Move atom on root proc
     proposedPosition = currentPosition
-    call initialise_Move(currentPosition%posArray,currentPosition%N_a,1d0, &
-                         proposedPosition%posArray,move)
+    if( processRank == root) then
+
+      call initialise_Move(currentPosition%posArray,currentPosition%N_a,1d0, &
+                           proposedPosition%posArray,move)
+
+    end if
+
+    ! Broadcast new atomic positions
+    call MPI_Bcast(proposedPosition%posArray, 3*proposedPosition%N_a, &
+                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
+
+    ! Calculate changed energies using tmpi code
     proposedEnergies = tmpi_calcAtomMoveEnergy(1,move,proposedPosition,currentEnergies)
 
-    ! Set up new vector of trip energies for comparison
-    allocate(tripDist(3,currentPosition%N_tri))
+    ! Find all triplets for current atomic positions
     call findChangedDistsPerTrip(currentPosition%N_a,currentPosition%N_tri,triplets, &
                                  proposedEnergies%interatomicDistances, tripDist) ! Distances in each triplet after move
+
+    ! Re-calculate energy using RSG's code
     do i = 1, currentPosition%N_tri
       
       uVec_Ex(i) = energyCheckCalc(tripDist(:,i)) ! Energies of each triplet after move
 
     end do
 
+    ! Compare the two sets of triplet energies
     if( processRank == root) then
 
       @assertEqual( proposedEnergies%tripletEnergies, uVec_Ex, low_tol, 'Test atom move energy')

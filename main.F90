@@ -17,7 +17,7 @@ program main
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
-  Character(len=300) :: positionFile = 'AtomicPositions400.txt'
+  Character(len=300) :: positionFile = 'AtomicPositions5.txt'
   type (energiesData) :: currentEnergies, proposedEnergies
   type (positionData) :: currentPosition, proposedPosition
 
@@ -44,8 +44,13 @@ program main
   ! Set-up calls for atom move
   proposedPosition = currentPosition
   dist = 1.5d0
-  call initialise_Move(currentPosition%posArray,currentPosition%N_a,dist, &
-                       proposedPosition%posArray,move)
+  if (processRank .eq. root) then
+    call initialise_Move(currentPosition%posArray,currentPosition%N_a,dist, &
+                         proposedPosition%posArray,move)
+  end if
+  call MPI_Bcast(proposedPosition%posArray, 3*proposedPosition%N_a, &
+                 MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+  call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
 
 
   proposedEnergies = tmpi_calcAtomMoveEnergy(1,move,proposedPosition,currentEnergies)

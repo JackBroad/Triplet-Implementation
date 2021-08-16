@@ -1,5 +1,7 @@
 module triplet_mod
   use GP_variables
+  use mpi_variables
+  
   implicit none
 
 
