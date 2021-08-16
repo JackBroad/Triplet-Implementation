@@ -107,7 +107,7 @@ contains
     double precision :: Xdg(n_at,n_at), Xdg_Ex(n_at,n_at), ud_Ex(3)
     double precision, allocatable :: upperDiag(:)
 
-    call makeXdgNonAdd(n_at,posAt, Xdg)
+    call makeXdg(n_at,posAt, Xdg)
     call makeUDdgNonAdd(n_at,n_dist,Xdg, upperDiag)
     deallocate(posAt)
 
@@ -476,7 +476,7 @@ contains
     allocate(dists(nAt-1),dis_Ex(nAt-1))
     allocate(Xd(nAt,nAt))
 
-    call makeXdgNonAdd(nAt,position, Xd)
+    call makeXdg(nAt,position, Xd)
 
     ! Claim to have moved atom 3; this should change 13, 23, 34, 35
     mover = 3

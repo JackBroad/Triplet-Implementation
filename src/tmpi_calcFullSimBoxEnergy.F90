@@ -12,7 +12,7 @@ module tmpi_calcFullSimBoxEnergy_mod
 
   private
   public  tmpi_calcFullSimBoxEnergy,makeDisIntMatNonAdd,makeUDdgNonAdd, &
-          makeTripletMatrix
+          makeTripletMatrix, makeXdg
 
 
   integer :: dataSize, nSum
@@ -227,8 +227,8 @@ contains
              currentPosition%N_a))
 
     ! Set up the arrays required for the non-additive calculation
-    call makeXdgNonAdd(currentPosition%N_a,currentPosition%posArray, &
-                       currentEnergyData%interatomicDistances)
+    call makeXdg(currentPosition%N_a,currentPosition%posArray, &
+                 currentEnergyData%interatomicDistances)
     call makeDisIntMatNonAdd(currentPosition%N_a, currentEnergyData%distancesIntMat)
     call makeUDdgNonAdd(currentPosition%N_a,currentPosition%N_distances, &
                         currentEnergyData%interatomicDistances, UD_dg)
@@ -426,6 +426,40 @@ contains
 
   return
   end subroutine makeTripletMatrix
+
+
+  subroutine makeXdg(nAt,posArray, X_dg)
+    implicit none
+    integer, intent(in) :: nAt
+    double precision, intent(in) :: posArray(nAt,3)
+    double precision, intent(out) :: X_dg(nAt,nAt)
+    integer :: i, j
+
+    ! Find X_dg for the atomic positions in posArray
+    do i = 1, nAt
+      do j = 1, nAt
+        if (i .eq. j) then
+
+          X_dg(i,j) = 0
+
+        else if (i .lt. j) then
+
+          X_dg(i,j) = (posArray(i,1)-posArray(j,1))**2 + &
+                      (posArray(i,2)-posArray(j,2))**2 + &
+                      (posArray(i,3)-posArray(j,3))**2
+          X_dg(i,j) = (X_dg(i,j))**0.5
+          X_dg(i,j) = 1 / X_dg(i,j) ! Convert to inverse distance
+
+        else
+
+          X_dg(i,j) = X_dg(j,i)
+
+        end if
+      end do
+    end do
+
+  return
+  end subroutine makeXdg
     
   
 end module tmpi_calcFullSimBoxEnergy_mod

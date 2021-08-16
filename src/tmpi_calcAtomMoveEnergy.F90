@@ -65,20 +65,19 @@ contains
 
        end if
 
-       xTime = MPI_Wtime()
        ! Re-calculate interatomicDistances for the new atomic positions
-       call makeXdgNonAdd(proposedPosition%N_a,proposedPosition%posArray, proposedEnergies%interatomicDistances)
-       !call updateXdg(move,proposedPosition%N_a,proposedPosition%posArray, proposedEnergies%interatomicDistances)
+       xTime = MPI_Wtime()
+       call updateXdg(move,proposedPosition%N_a,proposedPosition%posArray, proposedEnergies%interatomicDistances)
        xTime = MPI_Wtime() - xTime
 
-       extractTime = MPI_Wtime()
        ! Find the indices of the affected exponentials
+       extractTime = MPI_Wtime()
        call extractChangedExps(proposedPosition%N_a,move,proposedEnergies%interatomicDistances, &
                                newExpInt,newDists)
        extractTime = MPI_Wtime() - extractTime
 
-       tripTime = MPI_Wtime()
        ! Determine which triplets have undergone a change
+       tripTime = MPI_Wtime()
        call changedTripletInfo(move,proposedPosition)
        tripTime = MPI_Wtime() - tripTime
        setTime = MPI_Wtime() - setTime

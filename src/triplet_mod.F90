@@ -8,35 +8,6 @@ module triplet_mod
 contains
 
 
-! Subroutine to make X_dg for the non-additive calculation
-subroutine makeXdgNonAdd(nAt,posArray, X_dg)
-  implicit none
-  integer, intent(in) :: nAt
-  double precision, intent(in) :: posArray(nAt,3)
-  double precision, intent(out) :: X_dg(nAt,nAt)
-  integer :: i, j
-
-  ! Find X_dg for the atomic positions in posArray
-  do i = 1, nAt
-    do j = 1, nAt
-      if (i .eq. j) then
-        X_dg(i,j) = 0
-      else if (i .lt. j) then
-        X_dg(i,j) = (posArray(i,1)-posArray(j,1))**2 + &
-                    (posArray(i,2)-posArray(j,2))**2 + &
-                    (posArray(i,3)-posArray(j,3))**2
-        X_dg(i,j) = (X_dg(i,j))**0.5
-        X_dg(i,j) = 1 / X_dg(i,j) ! Convert to inverse distance
-      else
-        X_dg(i,j) = X_dg(j,i)
-      end if
-    end do
-  end do
-
-return
-end subroutine makeXdgNonAdd
-
-
 ! Gets distances per process that need exponential calculations for and number
 ! of triplets needed per node for non-additve energy calculation
 subroutine getDistsAndTripletsPerProcNonAdd(nDist,nTrips,nProc, &
