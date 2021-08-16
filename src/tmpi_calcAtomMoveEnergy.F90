@@ -30,14 +30,14 @@ module tmpi_calcAtomMoveEnergy_mod
 contains
 
 
-  function tmpi_calcAtomMoveEnergy(N_move,move,proposedPosition,currentEnergyData) result(proposedEnergies)
+  function tmpi_calcAtomMoveEnergy(N_move,move,proposedPosition,currentEnergyData) result(proposedEnergyData)
     ! Inputs
     integer, intent(in) :: N_move, move
     type (energiesData), intent(in) :: currentEnergyData
     type (positionData), intent(in) :: proposedPosition
 
     ! Output
-    type (energiesData) :: proposedEnergies
+    type (energiesData) :: proposedEnergyData
 
     ! Local variables
     integer :: i
@@ -49,15 +49,15 @@ contains
     call firstTextOutput()
     totTime = MPI_Wtime()
     call getTriPerAtom(proposedPosition%N_a, triPerAt)
-    call allocateArrays(proposedPosition,proposedEnergies)
-    proposedEnergies = currentEnergyData
+    call allocateArrays(proposedPosition,proposedEnergyData)
+    proposedEnergyData = currentEnergyData
 
 
     ! Loop over N moves, moving an atom and re-calculating the energy each time
     moveTime = MPI_Wtime()
     do i = 1, N_move
 
-       ! Set up on root
+       ! Set up
        setTime = MPI_Wtime()
        if (processRank .eq. root) then
 
@@ -67,12 +67,12 @@ contains
 
        ! Re-calculate interatomicDistances for the new atomic positions
        xTime = MPI_Wtime()
-       call updateXdg(move,proposedPosition%N_a,proposedPosition%posArray, proposedEnergies%interatomicDistances)
+       call updateXdg(move,proposedPosition%N_a,proposedPosition%posArray, proposedEnergyData%interatomicDistances)
        xTime = MPI_Wtime() - xTime
 
        ! Find the indices of the affected exponentials
        extractTime = MPI_Wtime()
-       call extractChangedExps(proposedPosition%N_a,move,proposedEnergies%interatomicDistances, &
+       call extractChangedExps(proposedPosition%N_a,move,proposedEnergyData%interatomicDistances, &
                                newExpInt,newDists)
        extractTime = MPI_Wtime() - extractTime
 
@@ -112,7 +112,7 @@ contains
                       MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
 
        ! Update the exponential matrix
-       call updateExpMatrix(proposedPosition, proposedEnergies)
+       call updateExpMatrix(proposedPosition, proposedEnergyData)
        gatherExpTime = MPI_Wtime() - gatherExpTime
 
        ! Prepare trip. data from scattering
@@ -131,9 +131,9 @@ contains
                      scounts(processRank+1))
 
        ! Calculate the non-additive energies for the changed triplets and gather on root
-       call tripletEnergiesNonAdd(scatterTrip,proposedEnergies%distancesIntMat,triPerProc,N_tp, &
+       call tripletEnergiesNonAdd(scatterTrip,proposedEnergyData%distancesIntMat,triPerProc,N_tp, &
                                   proposedPosition%N_a,N_p,nArgs,Perm,proposedPosition%N_distances, &
-                                  proposedEnergies%expMatrix,alpha,hyperParams(2), newUvec)
+                                  proposedEnergyData%expMatrix,alpha,hyperParams(2), newUvec)
        call MPI_BARRIER(MPI_COMM_WORLD, barError)
        sumTime = MPI_Wtime() - sumTime
        gatherTripTime = MPI_Wtime()
@@ -144,12 +144,12 @@ contains
        if (processRank .eq. root) then
 
           ! Update energies of changed triplets
-          call updateChangedTripletEnergies(currentEnergyData, proposedEnergies)
+          call updateChangedTripletEnergies(currentEnergyData, proposedEnergyData)
 
           ! Evaluate total non-add energy after changes and print it to screen
-          call totalEnergyNonAdd(proposedEnergies%tripletEnergies,proposedPosition%N_tri, &
-                                 proposedEnergies%Utotal)
-          call energyTextOutput(proposedEnergies)
+          call totalEnergyNonAdd(proposedEnergyData%tripletEnergies,proposedPosition%N_tri, &
+                                 proposedEnergyData%Utotal)
+          call energyTextOutput(proposedEnergyData)
 
        end if
        gatherTripTime = MPI_Wtime() - gatherTripTime
@@ -171,7 +171,12 @@ contains
     end if
     call finalAsserts(proposedPosition%N_a)
 
-    return
+
+    ! Broadcast the aspects of proposedEnergyData that are unique to root to all other processes
+    !call broadcastEnergyData(proposedEnergyData,proposedPosition)
+
+
+  return
   end function tmpi_calcAtomMoveEnergy
 
 
@@ -209,9 +214,9 @@ contains
   end subroutine finalAsserts
 
 
-  subroutine allocateArrays(proposedPosition,proposedEnergies)
+  subroutine allocateArrays(proposedPosition,proposedEnergyData)
     type (positionData) :: proposedPosition
-    type (energiesData) :: proposedEnergies
+    type (energiesData) :: proposedEnergyData
  
     allocate(newExpInt(2,proposedPosition%N_a-1))
     allocate(newDists(proposedPosition%N_a-1))
@@ -220,7 +225,7 @@ contains
     allocate(newUfull(triPerAt))
     allocate(scounts(clusterSize))
     allocate(displs(clusterSize))
-    allocate(proposedEnergies%interatomicDistances(proposedPosition%N_a, &
+    allocate(proposedEnergyData%interatomicDistances(proposedPosition%N_a, &
              proposedPosition%N_a))
     allocate(tripIndex(triPerAt))
 
@@ -268,21 +273,16 @@ contains
   end subroutine changedTripletInfo
 
 
-!  subroutine broadcastRootData(proposedPosition,proposedEnergies,move)
-!    type (positionData) :: proposedPosition
-!    type (energiesData) :: proposedEnergies
-!    integer :: move
+  subroutine broadcastEnergyData(proposedEnergyData,proposedPosition)
+    type (positionData) :: proposedPosition
+    type (energiesData) :: proposedEnergyData
 
-!    call MPI_Bcast(newExpInt, 2*(proposedPosition%N_a-1), MPI_INT, root, &
-!                   MPI_COMM_WORLD, ierror)
-!    call MPI_Bcast(proposedEnergies%interatomicDistances, &
-!                   proposedPosition%N_a*proposedPosition%N_a, &
-!                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-!    call MPI_Bcast(proposedPosition%posArray, 3*proposedPosition%N_a, &
-!                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-!    call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(proposedEnergyData%tripletEnergies, proposedPosition%N_tri, &
+                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(proposedEnergyData%Utotal, 1, MPI_DOUBLE_PRECISION,  root, &
+                   MPI_COMM_WORLD, ierror)
 
-!  end subroutine broadcastRootData
+  end subroutine broadcastEnergyData
 
 
   subroutine getDistScatterData(proposedPosition)
@@ -303,15 +303,15 @@ contains
   end subroutine allocateDistScatterArrays
 
 
-  subroutine updateExpMatrix(proposedPosition, proposedEnergies)
+  subroutine updateExpMatrix(proposedPosition, proposedEnergyData)
     integer :: indj
     type (positionData) :: proposedPosition
-    type (energiesData) :: proposedEnergies
+    type (energiesData) :: proposedEnergyData
 
     do j = 1, proposedPosition%N_a-1
 
-      indj = proposedEnergies%distancesIntMat(newExpInt(1,j),newExpInt(2,j))
-      proposedEnergies%expMatrix(1:nArgs,1:N_tp,indj) = changeExpMat(1:nArgs,1:N_tp,j)
+      indj = proposedEnergyData%distancesIntMat(newExpInt(1,j),newExpInt(2,j))
+      proposedEnergyData%expMatrix(1:nArgs,1:N_tp,indj) = changeExpMat(1:nArgs,1:N_tp,j)
 
     end do
 
@@ -335,26 +335,26 @@ contains
   end subroutine allocateTripletScatterArrays
 
 
-  subroutine updateChangedTripletEnergies(currentEnergyData, proposedEnergies)
-    type (energiesData) :: currentEnergyData, proposedEnergies
+  subroutine updateChangedTripletEnergies(currentEnergyData, proposedEnergyData)
+    type (energiesData) :: currentEnergyData, proposedEnergyData
 
-    proposedEnergies%tripletEnergies = currentEnergyData%tripletEnergies
+    proposedEnergyData%tripletEnergies = currentEnergyData%tripletEnergies
     do j = 1, triPerAt
 
-      proposedEnergies%tripletEnergies(tripIndex(j)) = newUfull(j)
+      proposedEnergyData%tripletEnergies(tripIndex(j)) = newUfull(j)
 
     end do
 
   end subroutine updateChangedTripletEnergies
 
 
-  subroutine energyTextOutput(proposedEnergies)
-    type (energiesData) :: proposedEnergies
+  subroutine energyTextOutput(proposedEnergyData)
+    type (energiesData) :: proposedEnergyData
 
     if (textOutput) then
 
       print *, "The non-additive energy after the move is", &
-               proposedEnergies%Utotal
+               proposedEnergyData%Utotal
       print *, '------------------------'
       print *, ' '
 
