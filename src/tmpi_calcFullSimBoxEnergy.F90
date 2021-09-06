@@ -215,8 +215,6 @@ contains
   function setupCurrentEnergyDataAndArrays(currentPosition) result(currentEnergyData)
     ! Input variables
     type (positionData), intent(in) :: currentPosition
-    !integer, intent(in) :: N_a, N_tri, N_distances
-    !double precision, intent(in) :: posArray(N_a,3)
        
     ! Output variables
     type (energiesData) :: currentEnergyData

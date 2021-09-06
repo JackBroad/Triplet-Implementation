@@ -14,17 +14,18 @@ module tmpi_calcAtomMoveEnergy_mod
          findChangedTriIndex
 
 
-  integer :: triPerAt, nPerProc, nExpMax, nExpRe, nTriMax, nTriRe
-  integer :: triPerProc, j
+  integer :: triPerAt, nTriMax, nTriRe,triPerProc, j, counter
   double precision :: totTime, moveTime, expTime, sumTime, setTime
-  double precision :: gatherExpTime, gatherTripTime, xTime
+  double precision :: gatherTripTime, xTime
   double precision :: extractTime, tripTime
   integer, allocatable :: changedTriplets(:,:), tripIndex(:)
   integer, allocatable :: scounts(:), displs(:), newExpInt(:,:)
-  integer, allocatable :: scatterTrip(:,:)
-  double precision, allocatable :: newDists(:), changeExpMat(:,:,:)
-  double precision, allocatable :: newUfull(:), changeExpData(:,:,:)
-  double precision, allocatable :: newUvec(:), scatterDists(:)
+  integer, allocatable :: scatterTrip(:,:), indexVector(:)
+  integer, allocatable :: expUpdateInd(:,:),expUpdateIndNoRepeat(:,:)
+  logical, allocatable :: mask(:)
+  double precision, allocatable :: newDists(:), changeExpData(:,:,:)
+  double precision, allocatable :: newUfull(:), newUvec(:)
+  double precision, allocatable :: expUpdate(:), expUpdateNoRepeat(:)
 
 
 contains
@@ -32,7 +33,7 @@ contains
 
   function tmpi_calcAtomMoveEnergy(N_move,move,proposedPosition,currentEnergyData) result(proposedEnergyData)
     ! Inputs
-    integer, intent(in) :: N_move, move
+    integer, intent(in) :: move, N_move
     type (energiesData), intent(in) :: currentEnergyData
     type (positionData), intent(in) :: proposedPosition
 
@@ -81,42 +82,9 @@ contains
        call changedTripletInfo(move,proposedPosition)
        tripTime = MPI_Wtime() - tripTime
        setTime = MPI_Wtime() - setTime
-
-       ! Prepare dist. data for scattering
        expTime = MPI_Wtime()
-       call getDistScatterData(proposedPosition)
 
-       ! Allocate arrays for dist. scattering on first loop
-       if (i .eq. 1) then
-
-         call allocateDistScatterArrays()
-
-       end if
-
-       ! Read distances for each process to take for exp calculation
-       scatterDists = newDists(1+displs(processRank+1):displs(processRank+1)+&
-                      scounts(processRank+1))
-
-       ! Update exponentials of distances affected by the move
-       call calculateExponentialsNonAdd(nPerProc,N_tp,nArgs,trainData, &
-                                        hyperParams(1),scatterDists, &
-                                        changeExpData)
-       expTime = MPI_Wtime() - expTime
-       gatherExpTime = MPI_Wtime()
-
-       ! Gather in all updated exps and broadcast the resultant matrix to all procs
-       call MPI_gatherv(changeExpData, N_tp*nArgs*nPerProc, MPI_DOUBLE_PRECISION, &
-                        changeExpMat, N_tp*nArgs*scounts, N_tp*nArgs*displs, &
-                        MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-       call MPI_Bcast(changeExpMat, N_tp*nArgs*(proposedPosition%N_a-1), &
-                      MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-
-       ! Update the exponential matrix
-       call updateExpMatrix(proposedPosition, proposedEnergyData)
-       gatherExpTime = MPI_Wtime() - gatherExpTime
-
-       ! Prepare trip. data from scattering
-       sumTime = MPI_Wtime()
+       ! Prepare trip. data for scattering
        call getTripletScatterData()
 
        ! Allocate requisite arrays for trip. sactter in first loop
@@ -129,18 +97,35 @@ contains
        ! Scatter triplets across processes
        scatterTrip = changedTriplets(1:3,1+displs(processRank+1):displs(processRank+1)+&
                      scounts(processRank+1))
+       call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
-       ! Calculate the non-additive energies for the changed triplets and gather on root
+       ! Find all distances required on each process for the triplet energy calc. for
+       ! which the exponentials have changed due to the move
+       call getAffectedTripletDistances(move,proposedEnergyData)
+
+       ! Calculate exponentials for the changed, un-repeated distances
+       allocate(changeExpData(nArgs,N_tp,size(expUpdateNoRepeat)))
+       call calculateExponentialsNonAdd(size(expUpdateNoRepeat),N_tp,nArgs,trainData, &
+                                        hyperParams(1),expUpdateNoRepeat, changeExpData)
+       expTime = MPI_Wtime() - expTime
+
+       ! Update the exponential matrix
+       sumTime = MPI_Wtime()
+       call updateExpMatrix(proposedEnergyData)
+
+       ! Calculate the non-additive energies for the changed triplets
        call tripletEnergiesNonAdd(scatterTrip,proposedEnergyData%distancesIntMat,triPerProc,N_tp, &
                                   proposedPosition%N_a,N_p,nArgs,Perm,proposedPosition%N_distances, &
                                   proposedEnergyData%expMatrix,alpha,hyperParams(2), newUvec)
-       call MPI_BARRIER(MPI_COMM_WORLD, barError)
        sumTime = MPI_Wtime() - sumTime
+
+       ! Gather the changed triplet energies on the root process for summation
        gatherTripTime = MPI_Wtime()
        call MPI_gatherv(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, scounts, &
                         displs, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+       gatherTripTime = MPI_Wtime() - gatherTripTime
 
-       ! Find total change in non-add energy from moving atom
+       ! Find total change in non-additive energy from moving an atom
        if (processRank .eq. root) then
 
           ! Update energies of changed triplets
@@ -152,7 +137,6 @@ contains
           call energyTextOutput(proposedEnergyData)
 
        end if
-       gatherTripTime = MPI_Wtime() - gatherTripTime
 
     end do
     moveTime = MPI_Wtime() - moveTime
@@ -166,7 +150,7 @@ contains
     totTime = MPI_Wtime() - totTime
     if (processRank .eq. root) then
 
-       call finalTextOutput(N_move)
+       call finalTextOutput()
 
     end if
     call finalAsserts(proposedPosition%N_a)
@@ -220,7 +204,6 @@ contains
  
     allocate(newExpInt(2,proposedPosition%N_a-1))
     allocate(newDists(proposedPosition%N_a-1))
-    allocate(changeExpMat(nArgs,N_tp,proposedPosition%N_a-1))
     allocate(changedTriplets(3,triPerAt))
     allocate(newUfull(triPerAt))
     allocate(scounts(clusterSize))
@@ -285,33 +268,15 @@ contains
   end subroutine broadcastEnergyData
 
 
-  subroutine getDistScatterData(proposedPosition)
-    type (positionData) :: proposedPosition
-
-     call getNPerProcNonAdd(proposedPosition%N_a-1,clusterSize, nExpMax,nExpRe)
-     call getVarrays(clusterSize,nExpMax,nExpRe, scounts,displs)
-     nPerProc = scounts(processRank+1)
-
-  end subroutine getDistScatterData
-
-
-  subroutine allocateDistScatterArrays()
-
-    allocate(scatterDists(nPerProc))
-    allocate(changeExpData(nArgs,N_tp,nPerProc))
-
-  end subroutine allocateDistScatterArrays
-
-
-  subroutine updateExpMatrix(proposedPosition, proposedEnergyData)
+  subroutine updateExpMatrix(proposedEnergyData)
     integer :: indj
-    type (positionData) :: proposedPosition
     type (energiesData) :: proposedEnergyData
 
-    do j = 1, proposedPosition%N_a-1
+    do j = 1, size(expUpdateNoRepeat)
 
-      indj = proposedEnergyData%distancesIntMat(newExpInt(1,j),newExpInt(2,j))
-      proposedEnergyData%expMatrix(1:nArgs,1:N_tp,indj) = changeExpMat(1:nArgs,1:N_tp,j)
+      indj = proposedEnergyData%distancesIntMat(expUpdateIndNoRepeat(j,1), &
+                                                expUpdateIndNoRepeat(j,2))
+      proposedEnergyData%expMatrix(1:nArgs,1:N_tp,indj) = changeExpData(1:nArgs,1:N_tp,j)
 
     end do
 
@@ -331,6 +296,8 @@ contains
 
     allocate(scatterTrip(3,triPerProc))
     allocate(newUvec(triPerProc))
+    allocate(expUpdate(2*triPerProc))
+    allocate(expUpdateInd(2*triPerProc,2))
 
   end subroutine allocateTripletScatterArrays
 
@@ -365,11 +332,9 @@ contains
 
   subroutine deallocateArrays()
 
-    deallocate(scatterDists)
     deallocate(scatterTrip)
     deallocate(newUvec)
     deallocate(changeExpData)
-    deallocate(changeExpMat)
     deallocate(newExpInt)
     deallocate(newDists)
     deallocate(changedTriplets)
@@ -377,19 +342,17 @@ contains
   end subroutine deallocateArrays
 
 
-  subroutine finalTextOutput(N_move)
-    integer, intent(in) :: N_move
+  subroutine finalTextOutput()
 
     if (textOutput) then
 
-      print *, "The time taken to do", N_move, "moves was", moveTime, &
+      print *, "The time taken to do all moves was", moveTime, &
                "seconds"
       print *, "The total time for the program to run was", totTime, &
                "seconds"
       print *, "The time for the exp calc was", expTime
-      print *, "The time for the exp scatter/gather was", gatherExpTime
       print *, "The time for the sum was", sumTime
-      print *, "The time for the sum scatter/gather was", gatherTripTime
+      print *, "The time to gather the triplet energies was", gatherTripTime
       print *, "The time for the set-up was", setTime
       print *, "The time for the Xdg set-up was", xTime
       print *, "The time for the exp extraction was", extractTime
@@ -403,6 +366,78 @@ contains
     end if
 
   end subroutine finalTextOutput
+
+
+  subroutine getAffectedTripletDistances(move,proposedEnergyData)
+    implicit none
+    integer, intent(in) :: move
+    type (energiesData) :: proposedEnergyData
+
+    counter = 0
+    do j = 1, triPerProc
+      if (scatterTrip(1,j) .eq. move) then
+
+        counter = counter + 1
+        expUpdate(counter) = &
+        proposedEnergyData%interatomicDistances(move,scatterTrip(2,j))
+        expUpdateInd(counter,1) = move
+        expUpdateInd(counter,2) = scatterTrip(2,j)
+        counter = counter + 1
+        expUpdate(counter) = &
+        proposedEnergyData%interatomicDistances(move,scatterTrip(3,j))
+        expUpdateInd(counter,1) = move
+        expUpdateInd(counter,2) = scatterTrip(3,j)
+
+      else if (scatterTrip(2,j) .eq. move) then
+
+        counter = counter + 1
+        expUpdate(counter) = &
+        proposedEnergyData%interatomicDistances(scatterTrip(1,j),move)
+        expUpdateInd(counter,1) = scatterTrip(1,j)
+        expUpdateInd(counter,2) = move
+        counter = counter + 1
+        expUpdate(counter) = &
+        proposedEnergyData%interatomicDistances(move,scatterTrip(3,j))
+        expUpdateInd(counter,1) = move
+        expUpdateInd(counter,2) = scatterTrip(3,j)
+
+      else
+
+        counter = counter + 1
+        expUpdate(counter) = &
+        proposedEnergyData%interatomicDistances(scatterTrip(1,j),move)
+        expUpdateInd(counter,1) = scatterTrip(1,j)
+        expUpdateInd(counter,2) = move
+        counter = counter + 1
+        expUpdate(counter) = &
+        proposedEnergyData%interatomicDistances(scatterTrip(2,j),move)
+        expUpdateInd(counter,1) = scatterTrip(2,j)
+        expUpdateInd(counter,2) = move
+
+      end if
+    end do
+
+    ! Remove repeat distances
+    allocate(mask(2*triPerProc))
+    mask = .TRUE.
+    do j = 2*triPerProc,2,-1
+      mask(j) = .NOT.(ANY(expUpdate(:j-1)==expUpdate(j)))
+    end do
+    allocate(indexVector, source=PACK([(j,j=1,2*triPerProc)], mask))
+    allocate(expUpdateNoRepeat, source=expUpdate(indexVector))
+    deallocate(indexVector)
+
+    ! Do the same for the distance indices
+    mask = .TRUE.
+    do j = 2*triPerProc,2,-1
+      mask(j) = .NOT.(ANY(expUpdateInd(:j-1,1)==expUpdateInd(j,1) .AND. &
+                expUpdateInd(:j-1,2)==expUpdateInd(j,2)))
+    end do
+    allocate(indexVector, source=PACK([(j,j=1,2*triPerProc)], mask))
+    allocate(expUpdateIndNoRepeat, source=expUpdateInd(indexVector,:))
+
+  return
+  end subroutine getAffectedTripletDistances
 
 
   subroutine getTriPerAtom(nAt, nPer)
@@ -584,6 +619,7 @@ contains
                     (positions(i,2) - changedPosition(2))**2 + &
                     (positions(i,3) - changedPosition(3))**2
         X(i,move) = (X(i,move))**0.5
+        X(i,move) = 1 / X(i,move)
         X(move,i) = X(i,move)
 
       else if (i .gt. move) then
@@ -592,6 +628,7 @@ contains
                     (positions(i,2) - changedPosition(2))**2 + &
                     (positions(i,3) - changedPosition(3))**2
         X(move,i) = (X(move,i))**0.5
+        X(move,i) = 1 / X(move,i)
         X(i,move) = X(move,i)
 
       end if
