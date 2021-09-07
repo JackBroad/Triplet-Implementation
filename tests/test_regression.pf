@@ -319,6 +319,10 @@ contains
     type (energiesData) :: currentEnergies, proposedEnergies
     type (positionData) :: currentPosition, proposedPosition
 
+
+    !========================Build the actual results (put into own subroutine)============
+    
+    !!! Should be in main code - load when GP data are are loaded!!!
     Perm(1,:) = (/1, 2, 3/)
     Perm(2,:) = (/1, 3, 2/)
     Perm(3,:) = (/2, 1, 3/)
@@ -326,6 +330,7 @@ contains
     Perm(5,:) = (/3, 1, 2/)
     Perm(6,:) = (/3, 2, 1/)
 
+    !!! Should be in expected results
     triplets(:,1) = (/ 1,2,3 /)
     triplets(:,2) = (/ 1,2,4 /)
     triplets(:,3) = (/ 1,2,5 /)
@@ -339,9 +344,10 @@ contains
 
     call initialise_Positions(name, currentPosition%posArray,currentPosition%N_a)
     call initialise_Variables(currentPosition%N_a, currentPosition%N_tri, currentPosition%N_distances)
-                               
+!!! Change to currentPosition = initialise_positionDataStruct( name)                            
     currentEnergies = tmpi_calcFullSimBoxEnergy(currentPosition)
 
+    !! ============Build expected results========================
     allocate(tripDist(3,currentPosition%N_tri))
     call findChangedDistsPerTrip(currentPosition%N_a,currentPosition%N_tri,triplets, &
                                  currentEnergies%interatomicDistances, tripDist)
@@ -351,6 +357,8 @@ contains
 
     end do
 
+    
+    !================ Perform tests ================================
     if( processRank == root) then
 
         @assertEqual( currentEnergies%tripletEnergies, uVec_Ex, low_tol, 'Test full non-add energy')

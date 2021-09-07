@@ -17,7 +17,7 @@ program main
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
-  Character(len=300) :: positionFile = 'AtomicPositions400.txt'
+  Character(len=300) :: positionFile = 'AtomicPositions5.txt'
   type (energiesData) :: currentEnergies, proposedEnergies
   type (positionData) :: currentPosition, proposedPosition
 
