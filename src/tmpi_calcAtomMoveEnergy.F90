@@ -31,9 +31,9 @@ module tmpi_calcAtomMoveEnergy_mod
 contains
 
 
-  function tmpi_calcAtomMoveEnergy(N_move,move,proposedPosition,currentEnergyData) result(proposedEnergyData)
+  function tmpi_calcAtomMoveEnergy(move,proposedPosition,currentEnergyData) result(proposedEnergyData)
     ! Inputs
-    integer, intent(in) :: move, N_move
+    integer, intent(in) :: move!, N_move
     type (energiesData), intent(in) :: currentEnergyData
     type (positionData), intent(in) :: proposedPosition
 
@@ -56,7 +56,6 @@ contains
 
     ! Loop over N moves, moving an atom and re-calculating the energy each time
     moveTime = MPI_Wtime()
-    do i = 1, N_move
 
        ! Set up
        setTime = MPI_Wtime()
@@ -86,13 +85,7 @@ contains
 
        ! Prepare trip. data for scattering
        call getTripletScatterData()
-
-       ! Allocate requisite arrays for trip. sactter in first loop
-       if (i .eq. 1) then
-
-         call allocateTripletScatterArrays()
-
-       end if
+       call allocateTripletScatterArrays()
 
        ! Scatter triplets across processes
        scatterTrip = changedTriplets(1:3,1+displs(processRank+1):displs(processRank+1)+&
@@ -138,7 +131,6 @@ contains
 
        end if
 
-    end do
     moveTime = MPI_Wtime() - moveTime
 
 

@@ -654,7 +654,7 @@ contains
     call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
 
     ! Calculate changed energies using tmpi code
-    proposedEnergies = tmpi_calcAtomMoveEnergy(1,move,proposedPosition,currentEnergies) !<- remove initial argument "1"
+    proposedEnergies = tmpi_calcAtomMoveEnergy(move,proposedPosition,currentEnergies) !<- remove initial argument "1"
 
   return
   end subroutine getAtomMoveEnergy
