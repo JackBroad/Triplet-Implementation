@@ -29,25 +29,20 @@ program main
 
   ! Set-up calls for full calc
   call initialise_GP_NonAdd(hyperParametersFile, alphaFile, trainingSetFile)
-  call initialise_Positions(positionFile, currentPosition%posArray, &
-                            currentPosition%N_a)
-  call initialise_Variables(currentPosition%N_a, currentPosition%N_tri, &
-                            currentPosition%N_distances)
-  
+  currentPosition = initialise_positionDataStruct(positionFile)  
 
+
+  ! Calculate energy for full sim box
   currentEnergies = tmpi_calcFullSimBoxEnergy(currentPosition)
-
-
   call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
   ! Set-up calls for atom move
-  proposedPosition = currentPosition
+  !proposedPosition = currentPosition
   dist = 1.5d0
-  if (processRank .eq. root) then
-    call initialise_Move(currentPosition%posArray,currentPosition%N_a,dist, &
-                         proposedPosition%posArray,move)
-  end if
+  !if (processRank .eq. root) then
+  call initialise_Move(currentPosition,dist, proposedPosition,move)
+  !end if
   call MPI_Bcast(proposedPosition%posArray, 3*proposedPosition%N_a, &
                  MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
   call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)

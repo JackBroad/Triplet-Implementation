@@ -46,7 +46,6 @@ contains
 
        call initialTextOutput()
        currentEnergyData = setupCurrentEnergyDataAndArrays(currentPosition)
-       Perm = setupPermutationMatrix()
 
     end if
 
