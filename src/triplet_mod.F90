@@ -226,7 +226,7 @@ end subroutine findChangedIndPerTrip
 
 
 ! Returns the distances in all triplets after a move
-subroutine findChangedDistsPerTrip(nAt,nPerAt,changedTri,X, indPerTrip)
+subroutine findTripletDistances(nAt,nPerAt,changedTri,X, indPerTrip)
   implicit none
   integer, intent(in) :: nAt, nPerAt, changedTri(3,nPerAt)
   double precision, intent(in) :: X(nAt,nAt)
@@ -246,7 +246,7 @@ subroutine findChangedDistsPerTrip(nAt,nPerAt,changedTri,X, indPerTrip)
   end do
 
 return
-end subroutine findChangedDistsPerTrip
+end subroutine findTripletDistances
 
 
 function energyCheckCalc(xStar) result(PES_GP)

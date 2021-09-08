@@ -157,7 +157,7 @@ contains
 
 
     ! Broadcast the aspects of proposedEnergyData that are unique to root to all other processes
-    !call broadcastEnergyData(proposedEnergyData,proposedPosition)
+    call broadcastEnergyData(proposedEnergyData,proposedPosition)
 
 
   return
@@ -208,6 +208,9 @@ contains
     allocate(newUfull(triPerAt))
     allocate(scounts(clusterSize))
     allocate(displs(clusterSize))
+    if (allocated(proposedEnergyData%interatomicDistances)) then
+      deallocate(proposedEnergyData%interatomicDistances)
+    end if
     allocate(proposedEnergyData%interatomicDistances(proposedPosition%N_a, &
              proposedPosition%N_a))
     allocate(tripIndex(triPerAt))
@@ -260,8 +263,8 @@ contains
     type (positionData) :: proposedPosition
     type (energiesData) :: proposedEnergyData
 
-    call MPI_Bcast(proposedEnergyData%tripletEnergies, proposedPosition%N_tri, &
-                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+!    call MPI_Bcast(proposedEnergyData%tripletEnergies, proposedPosition%N_tri, &
+!                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
     call MPI_Bcast(proposedEnergyData%Utotal, 1, MPI_DOUBLE_PRECISION,  root, &
                    MPI_COMM_WORLD, ierror)
 
@@ -338,6 +341,14 @@ contains
     deallocate(newExpInt)
     deallocate(newDists)
     deallocate(changedTriplets)
+    deallocate(newUfull)
+    deallocate(scounts)
+    deallocate(displs)
+    deallocate(expUpdate)
+    deallocate(expUpdateInd)
+    deallocate(expUpdateNoRepeat)
+    deallocate(expUpdateIndNoRepeat)
+    deallocate(tripIndex)
 
   end subroutine deallocateArrays
 
@@ -435,6 +446,7 @@ contains
     end do
     allocate(indexVector, source=PACK([(j,j=1,2*triPerProc)], mask))
     allocate(expUpdateIndNoRepeat, source=expUpdateInd(indexVector,:))
+    deallocate(mask,indexVector)
 
   return
   end subroutine getAffectedTripletDistances

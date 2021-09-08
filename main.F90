@@ -12,12 +12,12 @@ program main
   include 'mpif.h'
 
 
-  integer :: move
+  integer :: move, i
   double precision :: dist
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
-  Character(len=300) :: positionFile = 'AtomicPositions5.txt'
+  Character(len=300) :: positionFile = 'AtomicPositions400.txt'
   type (energiesData) :: currentEnergies, proposedEnergies
   type (positionData) :: currentPosition, proposedPosition
 
@@ -37,19 +37,17 @@ program main
   call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
-  ! Set-up calls for atom move
-  !proposedPosition = currentPosition
+  ! Atom move
   dist = 1.5d0
-  !if (processRank .eq. root) then
+  do i = 1, 3
   call initialise_Move(currentPosition,dist, proposedPosition,move)
-  !end if
   call MPI_Bcast(proposedPosition%posArray, 3*proposedPosition%N_a, &
                  MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
   call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
 
 
   proposedEnergies = tmpi_calcAtomMoveEnergy(1,move,proposedPosition,currentEnergies)
-
+  end do
 
   deallocate(alpha)
   deallocate(trainData)
