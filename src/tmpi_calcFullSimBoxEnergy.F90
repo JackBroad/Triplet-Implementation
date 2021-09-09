@@ -237,18 +237,6 @@ contains
   end function setupCurrentEnergyDataAndArrays
 
 
-  function setupPermutationMatrix() result(Perm)
-    integer :: Perm(6,3)
-
-    Perm(1,:) = (/1, 2, 3/)
-    Perm(2,:) = (/1, 3, 2/)
-    Perm(3,:) = (/2, 1, 3/)
-    Perm(4,:) = (/2, 3, 1/)
-    Perm(5,:) = (/3, 1, 2/)
-    Perm(6,:) = (/3, 2, 1/)
-
-  end function setupPermutationMatrix
-
   subroutine broadcastRootData()
 
     call MPI_Bcast(hyperParams, 3, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, &

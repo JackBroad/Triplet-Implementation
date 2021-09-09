@@ -13,6 +13,7 @@ program main
 
 
   integer :: move, i
+  logical :: seed=.false.
   double precision :: dist
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
@@ -40,7 +41,7 @@ program main
   ! Atom move
   dist = 1.5d0
   do i = 1, 3
-  call initialise_Move(currentPosition,dist, proposedPosition,move)
+  call initialise_Move(currentPosition,dist,seed, proposedPosition,move)
   call MPI_Bcast(proposedPosition%posArray, 3*proposedPosition%N_a, &
                  MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
   call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)

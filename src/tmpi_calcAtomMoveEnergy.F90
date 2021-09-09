@@ -40,9 +40,6 @@ contains
     ! Output
     type (energiesData) :: proposedEnergyData
 
-    ! Local variables
-    integer :: i
-
 
     call initialAsserts(proposedPosition%N_a,proposedPosition%N_tri, &
                         proposedPosition%N_distances)

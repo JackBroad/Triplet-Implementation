@@ -97,42 +97,39 @@ end subroutine initialise_Variables
 ! index of the moved atom.
 ! Takes Cartesian atomic positions (pos), the no. of atoms (num)
 ! and the max. distance to move in any direction (dMax) as arguments
-subroutine initialise_Move(currentPos,dMax,  newPos,mover)
+subroutine initialise_Move(currentPos,dMax,addSeed,  newPos,mover)
   implicit none
+  logical, intent(in) :: addSeed
   double precision, intent(in) :: dMax
   type (positionData), intent(in) :: currentPos
   integer, intent(out) :: mover
   type (positionData), intent(out) :: newPos
-  integer :: icol, irow
+  integer :: icol, irow, seed(8) ! Min. size for seed array
   double precision :: randNo
 
   newPos = currentPos
   if (processRank .eq. root) then
-  ! Pick an atom at random to move (can't generate random int in fortran, hence
-  ! the work-around)
+    if (addSeed .eqv. .true.) then
+      seed = 168389234
+      call random_seed(put=seed)
+    end if
   call random_number(randNo)
   mover = 1 + FLOOR(newPos%N_a*randNo)
+!  print *, 'moving atom', mover
 
   ! Change the position of the atom in newPos
   do irow = 1, newPos%N_a
-    do icol = 1, 3
-      ! Set each element of newPos to be the same as the equiv. in pos
-      !newPos(irow,icol) = pos(irow,icol)
-      ! If in row corresponding to moving atom, change coords of this atom in
-      ! newPos
-      if (irow .eq. mover) then
+    if (irow .eq. mover) then
+      do icol = 1, 3
         call random_number(randNo)
         newPos%posArray(irow,icol) = newPos%posArray(irow,icol) + (2.0*randNo-1) &
                                      * dMax
-      end if
-    end do
+        !print *, 'moved', (2.0*randNo-1)*dMax, 'in direction', icol
+      end do
+    end if
   end do
   end if
   
-!  call MPI_Bcast(newPos%posArray, 3*newPos%N_a, MPI_DOUBLE_PRECISION, &
-!                 root, MPI_COMM_WORLD, ierror)
-!  call MPI_Bcast(mover, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
-
 return
 end subroutine initialise_Move
 

@@ -305,11 +305,13 @@ contains
   @test
   subroutine test_cluster_energies_and_move()
     implicit none
-    character(len=40) :: name='AtomicPositions5.txt'
-    double precision :: tripEnergies_Ex(10), tripDist(3,10)
-    integer :: move
     type (energiesData) :: currentEnergies, proposedEnergies
     type (positionData) :: currentPosition, proposedPosition
+    character(len=40) :: name='AtomicPositions5.txt'
+    double precision :: tripEnergies_Ex(10), tripDist(3,10)
+    double precision :: expectedPosition(3)
+    logical :: seed=.true.
+    integer :: move, expectedMove
 
 
     !****** Create a simulation box and test that total energy is correct**********
@@ -335,7 +337,7 @@ contains
 
 
     !================Calculate the actual results================
-    call getAtomMoveEnergy(currentPosition,1d0,currentEnergies, proposedPosition,move, &
+    call getAtomMoveEnergy(currentPosition,1d0,currentEnergies,seed, proposedPosition,move, &
                            proposedEnergies)
     !================End of actual results================
 
@@ -344,6 +346,8 @@ contains
     ! Find all triplets for current atomic positions
     !rename findChangedDistsPerTrip
     call getExpectedAtomMoveEnergy(proposedPosition,proposedEnergies,tripDist, tripEnergies_Ex)
+    expectedPosition = getExpectedPosition(currentPosition,move)
+    expectedMove = 2
     !================End of expected results================
 
     !================Test====================
@@ -352,6 +356,8 @@ contains
     ! Compare the two sets of triplet energies
     if( processRank == root) then
       @assertEqual( proposedEnergies%tripletEnergies, tripEnergies_Ex, low_tol, 'Test atom move energy')
+      @assertEqual( move, expectedMove, 'Test which atom has moved')
+      @assertEqual( proposedPosition%posArray(move,:), expectedPosition, low_tol, 'Test where atom has moved to')
     end if
 
   end subroutine test_cluster_energies_and_move
@@ -636,17 +642,18 @@ contains
   end subroutine getExpectedSimBoxEnergy
 
 
-  subroutine getAtomMoveEnergy(currentPosition,dist,currentEnergies, proposedPosition,move,&
+  subroutine getAtomMoveEnergy(currentPosition,dist,currentEnergies,seed, proposedPosition,move,&
                                proposedEnergies)
     implicit none
     type (positionData), intent(in) :: currentPosition
     type (energiesData), intent(in) :: currentEnergies
     double precision, intent(in) :: dist
+    logical, intent(in) :: seed
     type (positionData), intent(out) :: proposedPosition
     type (energiesData), intent(out) :: proposedEnergies
     integer, intent(out) :: move
 
-    call initialise_Move(currentPosition,dist, proposedPosition,move)
+    call initialise_Move(currentPosition,dist,seed, proposedPosition,move)
 
     ! Broadcast new atomic positions - should be initialise move but couldn't due to MPI errors
     call MPI_Bcast(proposedPosition%posArray, 3*proposedPosition%N_a, &
@@ -680,6 +687,22 @@ contains
 
   return
   end subroutine getExpectedAtomMoveEnergy
+
+
+  function getExpectedPosition(currentPosition,mover) result(expectedPosition)
+    implicit none
+    integer, intent(in) :: mover
+    type (positionData), intent(in) :: currentPosition
+    double precision :: expectedPosition(3)
+
+    expectedPosition = currentPosition%posArray(mover,:)
+    ! Add seeded values of moves in each direction
+    expectedPosition(1) = expectedPosition(1) + 0.40315380977949444
+    expectedPosition(2) = expectedPosition(2) - 0.05015726548652677
+    expectedPosition(3) = expectedPosition(3) + 0.17527585430106662
+
+  return
+  end function getExpectedPosition
 
 
 end module test_regression
