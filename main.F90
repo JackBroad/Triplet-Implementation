@@ -40,7 +40,7 @@ program main
 
   ! Atom move
   dist = 1.5d0
-  do i = 1, 3
+  do i = 1, 30
   call initialise_Move(currentPosition,dist,seed, proposedPosition,move)
   call MPI_Bcast(proposedPosition%posArray, 3*proposedPosition%N_a, &
                  MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)

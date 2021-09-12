@@ -16,8 +16,8 @@ module tmpi_calcAtomMoveEnergy_mod
 
   integer :: triPerAt, nTriMax, nTriRe,triPerProc, j, counter
   double precision :: totTime, moveTime, expTime, sumTime, setTime
-  double precision :: gatherTripTime, xTime
-  double precision :: extractTime, tripTime
+  double precision :: gatherTripTime, xTime, shareExpTime, tripTime
+  double precision :: extractTime
   integer, allocatable :: changedTriplets(:,:), tripIndex(:)
   integer, allocatable :: scounts(:), displs(:), newExpInt(:,:)
   integer, allocatable :: scatterTrip(:,:), indexVector(:)
@@ -101,7 +101,8 @@ contains
 
        ! Update the exponential matrix
        sumTime = MPI_Wtime()
-       call updateExpMatrix(proposedEnergyData)
+       call updateExpMatrix(proposedEnergyData,changeExpData,expUpdateIndNoRepeat, & 
+                            size(expUpdateNoRepeat))
 
        ! Calculate the non-additive energies for the changed triplets
        call tripletEnergiesNonAdd(scatterTrip,proposedEnergyData%distancesIntMat,triPerProc,N_tp, &
@@ -127,6 +128,11 @@ contains
           call energyTextOutput(proposedEnergyData)
 
        end if
+
+       shareExpTime = MPI_Wtime()
+       call MPI_BARRIER(MPI_COMM_WORLD, barError)
+       call shareChangedExponentials(proposedEnergyData)
+       shareExpTime = MPI_Wtime() - shareExpTime
 
     moveTime = MPI_Wtime() - moveTime
 
@@ -212,11 +218,11 @@ contains
     if (processRank .eq. root) then
        if (textOutput) then
 
-         print *, ' '
-         print *, ' '
-         print *, '========================'
-         print *, 'Beginning non-additive calculation for atom move'
-         print *, ' '
+         !print *, ' '
+         !print *, ' '
+         !print *, '========================'
+         !print *, 'Beginning non-additive calculation for atom move'
+         !print *, ' '
 
       end if
     end if
@@ -229,9 +235,9 @@ contains
 
     if (textOutput) then
 
-      print *, '------------------------'
-      print *, "Moving atom", move
-      print *, "                 "
+      !print *, '------------------------'
+      !print *, "Moving atom", move
+      !print *, "                 "
 
     end if
 
@@ -260,15 +266,15 @@ contains
   end subroutine broadcastEnergyData
 
 
-  subroutine updateExpMatrix(proposedEnergyData)
-    integer :: indj
+  subroutine updateExpMatrix(proposedEnergyData,changeData,expInd,length)
+    integer :: indj, length, expInd(length,2)
+    double precision :: changeData(nArgs,N_tp,length)
     type (energiesData) :: proposedEnergyData
 
-    do j = 1, size(expUpdateNoRepeat)
+    do j = 1, length
 
-      indj = proposedEnergyData%distancesIntMat(expUpdateIndNoRepeat(j,1), &
-                                                expUpdateIndNoRepeat(j,2))
-      proposedEnergyData%expMatrix(1:nArgs,1:N_tp,indj) = changeExpData(1:nArgs,1:N_tp,j)
+      indj = proposedEnergyData%distancesIntMat(expInd(j,1), expInd(j,2))
+      proposedEnergyData%expMatrix(1:nArgs,1:N_tp,indj) = changeData(1:nArgs,1:N_tp,j)
 
     end do
 
@@ -312,10 +318,10 @@ contains
 
     if (textOutput) then
 
-      print *, "The non-additive energy after the move is", &
-               proposedEnergyData%Utotal
-      print *, '------------------------'
-      print *, ' '
+      !print *, "The non-additive energy after the move is", &
+      !         proposedEnergyData%Utotal
+      !print *, '------------------------'
+      !print *, ' '
 
     end if
 
@@ -346,21 +352,22 @@ contains
 
     if (textOutput) then
 
-      print *, "The time taken to do all moves was", moveTime, &
-               "seconds"
-      print *, "The total time for the program to run was", totTime, &
-               "seconds"
-      print *, "The time for the exp calc was", expTime
-      print *, "The time for the sum was", sumTime
-      print *, "The time to gather the triplet energies was", gatherTripTime
-      print *, "The time for the set-up was", setTime
-      print *, "The time for the Xdg set-up was", xTime
-      print *, "The time for the exp extraction was", extractTime
-      print *, "The time for the triplet set up was ", tripTime
-      print *, ' '
-      print *, 'Non-additive calculation for atom move complete'
-      print *, '========================'
-      print *, ' '
+      !print *, "The time taken to do all moves was", moveTime, &
+      !         "seconds"
+      !print *, "The total time for the program to run was", totTime, &
+      !         "seconds"
+      !print *, "The time for the exp calc was", expTime
+      !print *, "The time for the sum was", sumTime
+      !print *, "The time to gather the triplet energies was", gatherTripTime
+      !print *, "The time for the set-up was", setTime
+      !print *, "The time for the Xdg set-up was", xTime
+      !print *, "The time for the exp extraction was", extractTime
+      !print *, "The time for the triplet set up was ", tripTime
+      !print *, ' '
+      !print *, 'Non-additive calculation for atom move complete'
+      print *, moveTime,expTime,sumTime,shareExpTime,gatherTripTime,setTime
+      !print *, '========================'
+      !print *, ' '
       print *, ' '
 
     end if
@@ -439,6 +446,65 @@ contains
 
   return
   end subroutine getAffectedTripletDistances
+
+
+  subroutine shareChangedExponentials(proposedEnergyData)
+    implicit none
+    integer :: length, lengthVec(clusterSize), sumLength
+    integer :: maxLength, reLength
+    type (energiesData) :: proposedEnergyData
+    integer, allocatable :: changeExpInd(:,:)
+    integer, allocatable :: expUpdateNoRepeatTrans(:,:)
+    double precision, allocatable :: changeExpMat(:,:,:)
+
+    ! Only need to do anything if >1 process present
+    if (clusterSize .gt. 1) then
+
+      ! Find number of changed exps across all processors
+      length = size(expUpdateNoRepeat)
+      call MPI_gather(length, 1, MPI_INT, lengthVec, 1, MPI_INT, root, &
+                      MPI_COMM_WORLD, ierror)
+      call MPI_Bcast(lengthVec, clusterSize, MPI_INT, root, MPI_COMM_WORLD, &
+                     ierror)
+      call MPI_BARRIER(MPI_COMM_WORLD, barError)
+
+      ! Find displacement of each process when gathering exps
+      displs(1) = 0
+      do j = 2, clusterSize
+        displs(j) = sum(lengthVec(1:j-1))
+      end do
+      sumLength = sum(lengthVec)
+
+      ! Gather changed exponentials to root
+      allocate(changeExpMat(nArgs,N_tp,sumLength))
+      call MPI_gatherv(changeExpData, N_tp*nArgs*length, MPI_DOUBLE_PRECISION, &
+                       changeExpMat, N_tp*nArgs*lengthVec, N_tp*nArgs*displs, &
+                       MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+
+      ! Gather indices if changed exponentials to root
+      allocate(changeExpInd(2,sumLength))
+      allocate(expUpdateNoRepeatTrans(2,length))
+      expUpdateNoRepeatTrans = transpose(expUpdateIndNoRepeat)
+      call MPI_gatherv(expUpdateNoRepeatTrans, 2*length, MPI_INT, changeExpInd, &
+                       2*lengthVec, 2*displs, MPI_INT, 1, MPI_COMM_WORLD, ierror)
+    
+      ! Broadcast updated exps and indices
+      !=======Would trimming the repeats prior to Bcasting be good here?=======
+      call MPI_Bcast(changeExpMat, N_tp*nArgs*sumLength, MPI_DOUBLE_PRECISION, &
+                     root, MPI_COMM_WORLD, ierror)
+      call MPI_Bcast(changeExpInd, 2*sumLength, MPI_INT, 1, MPI_COMM_WORLD, &
+                     ierror)
+
+      ! Update exp matrix on all processes
+      changeExpInd = transpose(changeExpInd)
+      call updateExpMatrix(proposedEnergyData,changeExpMat,changeExpInd, &
+                           sumLength)
+      deallocate(changeExpMat,changeExpInd)
+
+    end if
+
+  return
+  end subroutine shareChangedExponentials
 
 
   subroutine getTriPerAtom(nAt, nPer)
