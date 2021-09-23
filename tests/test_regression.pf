@@ -321,6 +321,7 @@ contains
     if( processRank == root) then
         @assertEqual( currentEnergies%tripletEnergies, tripEnergies_Ex, low_tol, 'Test full non-add energy')
     end if
+<<<<<<< HEAD
 
 
 
@@ -328,6 +329,15 @@ contains
     call getAtomMoveEnergy(currentPosition,1d0,currentEnergies,seed, proposedPosition,move, &
                            proposedEnergies)
 
+=======
+    
+
+
+    !*************** Now move an atom and test the revised energy*****************
+    call getAtomMoveEnergy(currentPosition,1d0,currentEnergies,seed, proposedPosition,move, &
+         proposedEnergies)
+    
+>>>>>>> 535073a4a8842e326cdf9d8ada8fff3adaaa629d
     call getExpectedAtomMoveEnergy(proposedPosition,proposedEnergies,tripDist, tripEnergies_Ex)
     expectedPosition = getExpectedPosition(currentPosition,move)
     expectedMove = 2
@@ -625,6 +635,7 @@ contains
   end subroutine getExpectedSimBoxEnergy
 
 
+  !!!! Move this into main code!!!!!!
   subroutine getAtomMoveEnergy(currentPosition,dist,currentEnergies,seed, proposedPosition,move,&
                                proposedEnergies) !!! Remove output arguments and make into a function returning a double (delta E)
     implicit none
@@ -648,7 +659,7 @@ contains
     ! Calculate changed energies using tmpi code
     proposedEnergies = tmpi_calcAtomMoveEnergy(move,proposedPosition,currentEnergies) !<- remove initial argument "1"
 
-  return
+  return !the change in energy
   end subroutine getAtomMoveEnergy
 
 
