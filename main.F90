@@ -1,11 +1,13 @@
 program main
   use mpi_variables
+  use expShare_variables
   use GP_Variables
   use triplet_mod
   use tmpi_calcFullSimBoxEnergy_mod, only: tmpi_calcFullSimBoxEnergy
   use tmpi_calcAtomMoveEnergy_mod, only: tmpi_calcAtomMoveEnergy
   use energiesData_Module, only: energiesData
   use positionData_Module, only: positionData
+  use updateData
   use assert_module
   use initialise_Module
   implicit none
@@ -13,7 +15,7 @@ program main
 
 
   integer :: move, i
-  logical :: seed=.false.
+  logical :: seed=.false., acceptMove
   double precision :: dist
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
@@ -40,18 +42,29 @@ program main
 
   ! Atom move
   dist = 1.5d0
-  do i = 1, 30
-  call initialise_Move(currentPosition,dist,seed, proposedPosition,move)
-  call MPI_Bcast(proposedPosition%posArray, 3*proposedPosition%N_a, &
+  acceptMove = .true.
+  do i = 1, 150
+    call initialise_Move(currentPosition,currentEnergies,dist,seed, &
+                         proposedPosition,proposedEnergies,move)
+    call MPI_Bcast(proposedPosition%posArray, 3*proposedPosition%N_a, &
                  MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-  call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
 
+    proposedEnergies = tmpi_calcAtomMoveEnergy(move,proposedPosition,currentEnergies)
 
-  proposedEnergies = tmpi_calcAtomMoveEnergy(move,proposedPosition,currentEnergies)
+    if (acceptMove .eqv. .true.) then
+      call updateDataAfterMove(proposedEnergies,proposedPosition, &
+                               currentEnergies,currentPosition)
+    end if
   end do
 
   deallocate(alpha)
   deallocate(trainData)
+  deallocate(expUpdate)
+  deallocate(expUpdateInd)
+  deallocate(expUpdateNoRepeat)
+  deallocate(expUpdateIndNoRepeat)
+  deallocate(changeExpData)
 
 
   call MPI_FINALIZE(ierror)

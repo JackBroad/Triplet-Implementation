@@ -59,7 +59,8 @@ contains
     call MPI_Bcast(currentPosition%N_tri, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
     call MPI_Bcast(currentPosition%N_distances, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
     call broadcastRootData()
-    call broadcastCurrentEnergyData(currentEnergyData,currentPosition%N_a)
+    call broadcastCurrentEnergyData(currentEnergyData,currentPosition%N_a, &
+                                    currentPosition%N_tri)
 
 
     ! Determine max no. of elements of UD_dg to send to each process for exp
@@ -248,14 +249,15 @@ contains
   end subroutine broadcastRootData
 
 
-  subroutine broadcastCurrentEnergyData(currentEnergyData,N_a)
-    integer, intent(in) :: N_a
+  subroutine broadcastCurrentEnergyData(currentEnergyData,N_a,N_tri)
+    integer, intent(in) :: N_a, N_tri
     type (energiesData) :: currentEnergyData
 
     if (processRank .ne. root) then
 
        allocate(currentEnergyData%distancesIntMat(N_a,N_a))
        allocate(currentEnergyData%interatomicDistances(N_a,N_a))
+       allocate(currentEnergyData%tripletEnergies(N_tri))
 
     end if
 
@@ -263,6 +265,8 @@ contains
     call MPI_Bcast(currentEnergyData%distancesIntMat, N_a*N_a, MPI_INT, root, &
                    MPI_COMM_WORLD, ierror)
     call MPI_Bcast(currentEnergyData%interatomicDistances, N_a*N_a, &
+                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(currentEnergyData%tripletEnergies, N_tri, &
                    MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
 
   end subroutine broadcastCurrentEnergyData

@@ -1,7 +1,8 @@
 module triplet_mod
   use GP_variables
   use mpi_variables
-  
+  use energiesData_Module, only: energiesData
+  use positionData_Module, only: positionData  
   implicit none
 
 
@@ -310,6 +311,21 @@ function energyCheckCalc(xStar) result(PES_GP)
   PES_GP=kKernTotal * expVar
 !  print *, 'Non-additive E:', PES_GP
 end function energyCheckCalc
+
+
+  subroutine updateExpMatrix(proposedEnergyData,changeData,expInd,length)
+    integer :: indj, length, expInd(length,2), j
+    double precision :: changeData(nArgs,N_tp,length)
+    type (energiesData) :: proposedEnergyData
+
+    do j = 1, length
+
+      indj = proposedEnergyData%distancesIntMat(expInd(j,1), expInd(j,2))
+      proposedEnergyData%expMatrix(1:nArgs,1:N_tp,indj) = changeData(1:nArgs,1:N_tp,j)
+
+    end do
+
+  end subroutine updateExpMatrix
 
 
 end module triplet_mod

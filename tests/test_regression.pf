@@ -653,7 +653,8 @@ contains
     type (energiesData), intent(out) :: proposedEnergies
     integer, intent(out) :: move
 
-    call initialise_Move(currentPosition,dist,seed, proposedPosition,move)
+    call initialise_Move(currentPosition,currentEnergies,dist,seed, &
+                         proposedPosition,proposedEnergies,move)
 
     ! Broadcast new atomic positions - should be initialise move but couldn't due to MPI errors
     call MPI_Bcast(proposedPosition%posArray, 3*proposedPosition%N_a, &

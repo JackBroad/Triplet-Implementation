@@ -1,5 +1,6 @@
 module tmpi_calcAtomMoveEnergy_mod
   use mpi_variables
+  use expShare_variables
   use triplet_mod
   use GP_variables, only: hyperParams,alpha,Perm,trainData,N_tp,nArgs,N_p
   use energiesData_Module, only: energiesData
@@ -21,11 +22,9 @@ module tmpi_calcAtomMoveEnergy_mod
   integer, allocatable :: changedTriplets(:,:), tripIndex(:)
   integer, allocatable :: scounts(:), displs(:), newExpInt(:,:)
   integer, allocatable :: scatterTrip(:,:), indexVector(:)
-  integer, allocatable :: expUpdateInd(:,:),expUpdateIndNoRepeat(:,:)
   logical, allocatable :: mask(:)
-  double precision, allocatable :: newDists(:), changeExpData(:,:,:)
-  double precision, allocatable :: newUfull(:), newUvec(:)
-  double precision, allocatable :: expUpdate(:), expUpdateNoRepeat(:)
+  double precision, allocatable :: newDists(:), newUvec(:)
+  double precision, allocatable :: newUfull(:)
 
 
 contains
@@ -94,6 +93,9 @@ contains
        call getAffectedTripletDistances(move,proposedEnergyData)
 
        ! Calculate exponentials for the changed, un-repeated distances
+       if (allocated(changeExpData)) then
+         deallocate(changeExpData)
+       end if
        allocate(changeExpData(nArgs,N_tp,size(expUpdateNoRepeat)))
        call calculateExponentialsNonAdd(size(expUpdateNoRepeat),N_tp,nArgs,trainData, &
                                         hyperParams(1),expUpdateNoRepeat, changeExpData)
@@ -130,8 +132,9 @@ contains
        end if
 
        shareExpTime = MPI_Wtime()
-       call MPI_BARRIER(MPI_COMM_WORLD, barError)
-       call shareChangedExponentials(proposedEnergyData)
+!       call MPI_BARRIER(MPI_COMM_WORLD, barError)
+!       call updateDataAfterMove(proposedEnergyData,proposedPosition, &
+!                                currentEnergyData,currentPositionData)
        shareExpTime = MPI_Wtime() - shareExpTime
 
     moveTime = MPI_Wtime() - moveTime
@@ -149,10 +152,6 @@ contains
 
     end if
     call finalAsserts(proposedPosition%N_a)
-
-
-    ! Broadcast the aspects of proposedEnergyData that are unique to root to all other processes
-    call broadcastEnergyData(proposedEnergyData,proposedPosition)
 
 
   return
@@ -254,33 +253,6 @@ contains
   end subroutine changedTripletInfo
 
 
-  subroutine broadcastEnergyData(proposedEnergyData,proposedPosition)
-    type (positionData) :: proposedPosition
-    type (energiesData) :: proposedEnergyData
-
-!    call MPI_Bcast(proposedEnergyData%tripletEnergies, proposedPosition%N_tri, &
-!                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-    call MPI_Bcast(proposedEnergyData%Utotal, 1, MPI_DOUBLE_PRECISION,  root, &
-                   MPI_COMM_WORLD, ierror)
-
-  end subroutine broadcastEnergyData
-
-
-  subroutine updateExpMatrix(proposedEnergyData,changeData,expInd,length)
-    integer :: indj, length, expInd(length,2)
-    double precision :: changeData(nArgs,N_tp,length)
-    type (energiesData) :: proposedEnergyData
-
-    do j = 1, length
-
-      indj = proposedEnergyData%distancesIntMat(expInd(j,1), expInd(j,2))
-      proposedEnergyData%expMatrix(1:nArgs,1:N_tp,indj) = changeData(1:nArgs,1:N_tp,j)
-
-    end do
-
-  end subroutine updateExpMatrix
-
-
   subroutine getTripletScatterData()
 
     call getNPerProcNonAdd(triPerAt,clusterSize, nTriMax,nTriRe)
@@ -294,7 +266,13 @@ contains
 
     allocate(scatterTrip(3,triPerProc))
     allocate(newUvec(triPerProc))
+    if (allocated(expUpdate)) then
+      deallocate(expUpdate)
+    end if
     allocate(expUpdate(2*triPerProc))
+    if (allocated(expUpdateInd)) then
+      deallocate(expUpdateInd)
+    end if
     allocate(expUpdateInd(2*triPerProc,2))
 
   end subroutine allocateTripletScatterArrays
@@ -332,17 +310,12 @@ contains
 
     deallocate(scatterTrip)
     deallocate(newUvec)
-    deallocate(changeExpData)
     deallocate(newExpInt)
     deallocate(newDists)
     deallocate(changedTriplets)
     deallocate(newUfull)
     deallocate(scounts)
     deallocate(displs)
-    deallocate(expUpdate)
-    deallocate(expUpdateInd)
-    deallocate(expUpdateNoRepeat)
-    deallocate(expUpdateIndNoRepeat)
     deallocate(tripIndex)
 
   end subroutine deallocateArrays
@@ -431,6 +404,9 @@ contains
       mask(j) = .NOT.(ANY(expUpdate(:j-1)==expUpdate(j)))
     end do
     allocate(indexVector, source=PACK([(j,j=1,2*triPerProc)], mask))
+    if (allocated(expUpdateNoRepeat)) then
+      deallocate(expUpdateNoRepeat)
+    end if
     allocate(expUpdateNoRepeat, source=expUpdate(indexVector))
     deallocate(indexVector)
 
@@ -441,70 +417,14 @@ contains
                 expUpdateInd(:j-1,2)==expUpdateInd(j,2)))
     end do
     allocate(indexVector, source=PACK([(j,j=1,2*triPerProc)], mask))
+    if (allocated(expUpdateIndNoRepeat)) then
+      deallocate(expUpdateIndNoRepeat)
+    end if
     allocate(expUpdateIndNoRepeat, source=expUpdateInd(indexVector,:))
     deallocate(mask,indexVector)
 
   return
   end subroutine getAffectedTripletDistances
-
-
-  subroutine shareChangedExponentials(proposedEnergyData)
-    implicit none
-    integer :: length, lengthVec(clusterSize), sumLength
-    integer :: maxLength, reLength
-    type (energiesData) :: proposedEnergyData
-    integer, allocatable :: changeExpInd(:,:)
-    integer, allocatable :: expUpdateNoRepeatTrans(:,:)
-    double precision, allocatable :: changeExpMat(:,:,:)
-
-    ! Only need to do anything if >1 process present
-    if (clusterSize .gt. 1) then
-
-      ! Find number of changed exps across all processors
-      length = size(expUpdateNoRepeat)
-      call MPI_gather(length, 1, MPI_INT, lengthVec, 1, MPI_INT, root, &
-                      MPI_COMM_WORLD, ierror)
-      call MPI_Bcast(lengthVec, clusterSize, MPI_INT, root, MPI_COMM_WORLD, &
-                     ierror)
-      call MPI_BARRIER(MPI_COMM_WORLD, barError)
-
-      ! Find displacement of each process when gathering exps
-      displs(1) = 0
-      do j = 2, clusterSize
-        displs(j) = sum(lengthVec(1:j-1))
-      end do
-      sumLength = sum(lengthVec)
-
-      ! Gather changed exponentials to root
-      allocate(changeExpMat(nArgs,N_tp,sumLength))
-      call MPI_gatherv(changeExpData, N_tp*nArgs*length, MPI_DOUBLE_PRECISION, &
-                       changeExpMat, N_tp*nArgs*lengthVec, N_tp*nArgs*displs, &
-                       MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-
-      ! Gather indices if changed exponentials to root
-      allocate(changeExpInd(2,sumLength))
-      allocate(expUpdateNoRepeatTrans(2,length))
-      expUpdateNoRepeatTrans = transpose(expUpdateIndNoRepeat)
-      call MPI_gatherv(expUpdateNoRepeatTrans, 2*length, MPI_INT, changeExpInd, &
-                       2*lengthVec, 2*displs, MPI_INT, 1, MPI_COMM_WORLD, ierror)
-    
-      ! Broadcast updated exps and indices
-      !=======Would trimming the repeats prior to Bcasting be good here?=======
-      call MPI_Bcast(changeExpMat, N_tp*nArgs*sumLength, MPI_DOUBLE_PRECISION, &
-                     root, MPI_COMM_WORLD, ierror)
-      call MPI_Bcast(changeExpInd, 2*sumLength, MPI_INT, 1, MPI_COMM_WORLD, &
-                     ierror)
-
-      ! Update exp matrix on all processes
-      changeExpInd = transpose(changeExpInd)
-      call updateExpMatrix(proposedEnergyData,changeExpMat,changeExpInd, &
-                           sumLength)
-      deallocate(changeExpMat,changeExpInd)
-
-    end if
-
-  return
-  end subroutine shareChangedExponentials
 
 
   subroutine getTriPerAtom(nAt, nPer)

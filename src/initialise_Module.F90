@@ -1,6 +1,7 @@
 module initialise_Module
   use GP_variables
   use positionData_Module, only: positionData
+  use energiesData_Module, only: energiesData
   use mpi_variables
   implicit none
   !include 'mpif.h'
@@ -97,17 +98,21 @@ end subroutine initialise_Variables
 ! index of the moved atom.
 ! Takes Cartesian atomic positions (pos), the no. of atoms (num)
 ! and the max. distance to move in any direction (dMax) as arguments
-subroutine initialise_Move(currentPos,dMax,addSeed,  newPos,mover)
+subroutine initialise_Move(currentPos,currentEnergy,dMax,addSeed, &
+                           newPos,newEnergy,mover)
   implicit none
   logical, intent(in) :: addSeed
   double precision, intent(in) :: dMax
   type (positionData), intent(in) :: currentPos
+  type (energiesData), intent(in) :: currentEnergy
   integer, intent(out) :: mover
   type (positionData), intent(out) :: newPos
+  type (energiesData), intent(out) :: newEnergy
   integer :: icol, irow, seed(8) ! Min. size for seed array
   double precision :: randNo
 
   newPos = currentPos
+  newEnergy = currentEnergy
   if (processRank .eq. root) then
     if (addSeed .eqv. .true.) then
       seed = 168389234

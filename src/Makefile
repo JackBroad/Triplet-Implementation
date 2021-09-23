@@ -1,5 +1,5 @@
 FC :=  mpif90
-SRCS := assert.F90 DataStructures.F90 MPI_Variables.F90 GP_Variables.F90 initialise_Module.F90 triplet_mod.F90 tmpi_calcFullSimBoxEnergy.F90 tmpi_calcAtomMoveEnergy.F90 
+SRCS := assert.F90 DataStructures.F90 MPI_Variables.F90 GP_Variables.F90 initialise_Module.F90 triplet_mod.F90 updateDataModule.F90 tmpi_calcFullSimBoxEnergy.F90 tmpi_calcAtomMoveEnergy.F90 
 OBJS := $(SRCS:%.F90=%.o)
 
 MODS=$(wildcard mod*.f90)
