@@ -315,36 +315,19 @@ contains
 
 
     !****** Create a simulation box and test that total energy is correct**********
-    
-    !========================Get the actual results========================
     call getSimBoxEnergy(name, currentPosition,currentEnergies)
-    !========================Got actual results====================
-
-    
-    !========================Get expected results========================
     call getExpectedSimBoxEnergy(currentPosition,currentEnergies, tripDist,tripEnergies_Ex)
-    !========================Got expected results====================
     
-
-    !================ Perform tests ================================
     if( processRank == root) then
         @assertEqual( currentEnergies%tripletEnergies, tripEnergies_Ex, low_tol, 'Test full non-add energy')
     end if
-    !================Tests performed================
+
 
 
     !*************** Now move an atom and test the revised energy*****************
-
-
-    !================Calculate the actual results================
     call getAtomMoveEnergy(currentPosition,1d0,currentEnergies,seed, proposedPosition,move, &
                            proposedEnergies)
-    !================End of actual results================
 
-
-    !================Calculate expected results================
-    ! Find all triplets for current atomic positions
-    !rename findChangedDistsPerTrip
     call getExpectedAtomMoveEnergy(proposedPosition,proposedEnergies,tripDist, tripEnergies_Ex)
     expectedPosition = getExpectedPosition(currentPosition,move)
     expectedMove = 2
@@ -643,7 +626,7 @@ contains
 
 
   subroutine getAtomMoveEnergy(currentPosition,dist,currentEnergies,seed, proposedPosition,move,&
-                               proposedEnergies)
+                               proposedEnergies) !!! Remove output arguments and make into a function returning a double (delta E)
     implicit none
     type (positionData), intent(in) :: currentPosition
     type (energiesData), intent(in) :: currentEnergies
@@ -654,11 +637,12 @@ contains
     integer, intent(out) :: move
 
     call initialise_Move(currentPosition,currentEnergies,dist,seed, &
-                         proposedPosition,proposedEnergies,move)
+                         proposedPosition,proposedEnergies,move) !! Remove - move now chosen outside function
 
+    !!! Create a new data structure that contains moved atom number and it's new position
     ! Broadcast new atomic positions - should be initialise move but couldn't due to MPI errors
     call MPI_Bcast(proposedPosition%posArray, 3*proposedPosition%N_a, &
-                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror) !< - probably unnecessarily large - change so it's just the moved atom and displace or new position?
     call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
 
     ! Calculate changed energies using tmpi code
