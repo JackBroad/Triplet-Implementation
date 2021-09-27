@@ -5,6 +5,7 @@ program main
   use triplet_mod
   use tmpi_calcFullSimBoxEnergy_mod, only: tmpi_calcFullSimBoxEnergy
   use tmpi_calcAtomMoveEnergy_mod, only: tmpi_calcAtomMoveEnergy
+  use toyMove_Module, only: toyMove
   use energiesData_Module, only: energiesData
   use positionData_Module, only: positionData
   use updateData
@@ -43,14 +44,15 @@ program main
   ! Atom move
   dist = 1.5d0
   acceptMove = .true.
-  do i = 1, 150
+  do i = 1, 3
     call initialise_Move(currentPosition,currentEnergies,dist,seed, &
                          proposedPosition,proposedEnergies,move)
-    call MPI_Bcast(proposedPosition%posArray, 3*proposedPosition%N_a, &
-                 MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
     call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(proposedPosition%posArray(move,:), 3, MPI_DOUBLE_PRECISION, &
+                   root, MPI_COMM_WORLD, ierror)
 
-    proposedEnergies = tmpi_calcAtomMoveEnergy(move,proposedPosition,currentEnergies)
+    !proposedEnergies = tmpi_calcAtomMoveEnergy(move,proposedPosition,currentEnergies)
+    proposedEnergies = toyMove(move,proposedPosition,currentEnergies)
 
     if (acceptMove .eqv. .true.) then
       call updateDataAfterMove(proposedEnergies,proposedPosition, &

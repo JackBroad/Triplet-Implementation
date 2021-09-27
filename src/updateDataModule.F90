@@ -17,10 +17,6 @@ contains
     type (positionData) :: proposedPosition
     type (energiesData) :: proposedEnergyData
 
-    if (processRank .ne. 0) then
-      print *, size(proposedEnergyData%tripletEnergies)
-      print *, proposedPosition%N_tri
-    end if
     call MPI_Bcast(proposedEnergyData%tripletEnergies, proposedPosition%N_tri, &
                    MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
     call MPI_Bcast(proposedEnergyData%Utotal, 1, MPI_DOUBLE_PRECISION,  root, &

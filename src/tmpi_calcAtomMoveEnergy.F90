@@ -86,7 +86,6 @@ contains
        ! Scatter triplets across processes
        scatterTrip = changedTriplets(1:3,1+displs(processRank+1):displs(processRank+1)+&
                      scounts(processRank+1))
-       call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
        ! Find all distances required on each process for the triplet energy calc. for
        ! which the exponentials have changed due to the move
@@ -130,12 +129,6 @@ contains
           call energyTextOutput(proposedEnergyData)
 
        end if
-
-       shareExpTime = MPI_Wtime()
-!       call MPI_BARRIER(MPI_COMM_WORLD, barError)
-!       call updateDataAfterMove(proposedEnergyData,proposedPosition, &
-!                                currentEnergyData,currentPositionData)
-       shareExpTime = MPI_Wtime() - shareExpTime
 
     moveTime = MPI_Wtime() - moveTime
 
