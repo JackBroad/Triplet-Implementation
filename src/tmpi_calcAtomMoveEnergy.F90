@@ -11,8 +11,8 @@ module tmpi_calcAtomMoveEnergy_mod
   include 'mpif.h'
 
   private
-  public tmpi_calcAtomMoveEnergy,getChangedTriplets,extractChangedExps,getTriPerAtom, &
-         findChangedTriIndex
+  public tmpi_calcAtomMoveEnergy,getChangedTripletData,extractChangedExps,getTriPerAtom, &
+         findChangedTriIndex, getChangedTriplets
 
 
   integer :: triPerAt, nTriMax, nTriRe,triPerProc, j, counter
@@ -74,7 +74,8 @@ contains
 
        ! Determine which triplets have undergone a change
        tripTime = MPI_Wtime()
-       call changedTripletInfo(move,proposedPosition)
+       call getChangedTripletData(move,proposedPosition%N_a,proposedPosition%N_tri,triPerAt, &
+                                  proposedEnergyData%triMat, tripIndex,changedTriplets)
        tripTime = MPI_Wtime() - tripTime
        setTime = MPI_Wtime() - setTime
        expTime = MPI_Wtime()
@@ -234,16 +235,6 @@ contains
     end if
 
   end subroutine moveTextOutput
-
-
-  subroutine changedTripletInfo(move,proposedPosition)
-    integer :: move
-    type (positionData) :: proposedPosition
-
-    call getChangedTriplets(move,proposedPosition%N_a,triPerAt, changedTriplets)
-    call findChangedTriIndex(triPerAt,proposedPosition%N_a,move, tripIndex)
-
-  end subroutine changedTripletInfo
 
 
   subroutine getTripletScatterData()
@@ -473,7 +464,68 @@ contains
   end subroutine extractChangedExps
 
 
-  subroutine getChangedTriplets(atom,nAt,nPerAt, changedTriplets)
+  subroutine getChangedTripletData(atom,nAt,nTri,nPerAt,tripMat, tripletIndex,changedTriplets)
+    implicit none
+    integer, intent(in) :: atom, nAt, nTri, nPerAt, tripMat(3,nTri)
+    integer, intent(out) :: changedTriplets(3,nPerAt), tripletIndex(nPerAt)
+    integer :: i, counter
+    logical :: mask(nTri)
+
+    counter = 0
+    mask = any(tripMat .eq. atom, 1) ! Vector that's 'true' for any col of tripMat containing moved atom
+    do i = 1, nTri
+      if (mask(i) .eqv. .true.) then
+        counter = counter + 1
+        tripletIndex(counter) = i
+        changedTriplets(:,counter) = tripMat(:,i)
+      end if
+    end do
+
+  return
+  end subroutine getChangedTripletData
+
+
+  subroutine updateXdg(move,N_a,positions, X)
+    implicit none
+    ! Arguments
+    integer, intent(in) :: move, N_a
+    double precision, intent(in) :: positions(N_a,3)
+    double precision, intent(inout) :: X(N_a,N_a)
+    ! Local variables
+    integer :: i
+    double precision :: changedPosition(3)
+
+    ! Identify the position of the moved atom
+    changedPosition = positions(move,:)
+
+    ! Find the distances between this atom and all others
+    do i = 1, N_a
+      if (i .lt. move) then
+
+        X(i,move) = (positions(i,1) - changedPosition(1))**2 + &
+                    (positions(i,2) - changedPosition(2))**2 + &
+                    (positions(i,3) - changedPosition(3))**2
+        X(i,move) = (X(i,move))**0.5
+        X(i,move) = 1 / X(i,move)
+        X(move,i) = X(i,move)
+
+      else if (i .gt. move) then
+
+        X(move,i) = (positions(i,1) - changedPosition(1))**2 + &
+                    (positions(i,2) - changedPosition(2))**2 + &
+                    (positions(i,3) - changedPosition(3))**2
+        X(move,i) = (X(move,i))**0.5
+        X(move,i) = 1 / X(move,i)
+        X(i,move) = X(move,i)
+
+      end if
+    end do
+
+    return
+  end subroutine updateXdg
+
+
+subroutine getChangedTriplets(atom,nAt,nPerAt, changedTriplets)
     implicit none
     integer, intent(in) :: atom, nAt, nPerAt
     integer, intent(out) :: changedTriplets(3,nPerAt)
@@ -575,47 +627,7 @@ contains
     end do
 
   return
-  end subroutine findChangedTriIndex  
-
-
-  subroutine updateXdg(move,N_a,positions, X)
-    implicit none
-    ! Arguments
-    integer, intent(in) :: move, N_a
-    double precision, intent(in) :: positions(N_a,3)
-    double precision, intent(inout) :: X(N_a,N_a)
-    ! Local variables
-    integer :: i
-    double precision :: changedPosition(3)
-
-    ! Identify the position of the moved atom
-    changedPosition = positions(move,:)
-
-    ! Find the distances between this atom and all others
-    do i = 1, N_a
-      if (i .lt. move) then
-
-        X(i,move) = (positions(i,1) - changedPosition(1))**2 + &
-                    (positions(i,2) - changedPosition(2))**2 + &
-                    (positions(i,3) - changedPosition(3))**2
-        X(i,move) = (X(i,move))**0.5
-        X(i,move) = 1 / X(i,move)
-        X(move,i) = X(i,move)
-
-      else if (i .gt. move) then
-
-        X(move,i) = (positions(i,1) - changedPosition(1))**2 + &
-                    (positions(i,2) - changedPosition(2))**2 + &
-                    (positions(i,3) - changedPosition(3))**2
-        X(move,i) = (X(move,i))**0.5
-        X(move,i) = 1 / X(move,i)
-        X(i,move) = X(move,i)
-
-      end if
-    end do
-
-    return
-  end subroutine updateXdg
+  end subroutine findChangedTriIndex
     
   
 end module tmpi_calcAtomMoveEnergy_mod

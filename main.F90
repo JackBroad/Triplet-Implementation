@@ -21,7 +21,7 @@ program main
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
-  Character(len=300) :: positionFile = 'AtomicPositions5.txt'
+  Character(len=300) :: positionFile = 'AtomicPositions400.txt'
   type (energiesData) :: currentEnergies, proposedEnergies
   type (positionData) :: currentPosition, proposedPosition
 
@@ -44,7 +44,7 @@ program main
   ! Atom move
   dist = 1.5d0
   acceptMove = .true.
-  do i = 1, 3
+  do i = 1, 150
     call initialise_Move(currentPosition,currentEnergies,dist,seed, &
                          proposedPosition,proposedEnergies,move)
     call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)

@@ -18,7 +18,7 @@ module tmpi_calcFullSimBoxEnergy_mod
   integer :: dataSize, nSum
   double precision :: totTime, setUpTime, expTime, sumTime
   integer, allocatable :: scounts(:), displs(:)
-  integer, allocatable :: triMat(:,:), triScatter(:,:)
+  integer, allocatable :: triScatter(:,:)
   double precision, allocatable :: UD_dg(:), scatterData(:)
   double precision, allocatable :: expData(:,:,:), uVec(:)
 
@@ -110,7 +110,7 @@ contains
 
 
     ! Scatter the triplet matrix
-    call MPI_scatterv(triMat, scounts*3, displs*3, MPI_INT, triScatter, nSum*3, MPI_INT, &
+    call MPI_scatterv(currentEnergyData%triMat, scounts*3, displs*3, MPI_INT, triScatter, nSum*3, MPI_INT, &
                       root, MPI_COMM_WORLD, ierror)
 
 
@@ -232,8 +232,9 @@ contains
                         currentEnergyData%interatomicDistances, UD_dg)
 
     ! Set up array of a all possible triplets
-    allocate(triMat(3,currentPosition%N_tri))
-    call makeTripletMatrix(currentPosition%N_a,currentPosition%N_tri, triMat)
+    allocate(currentEnergyData%triMat(3,currentPosition%N_tri))
+    call makeTripletMatrix(currentPosition%N_a,currentPosition%N_tri, &
+                           currentEnergyData%triMat)
 
   end function setupCurrentEnergyDataAndArrays
 
@@ -258,6 +259,7 @@ contains
        allocate(currentEnergyData%distancesIntMat(N_a,N_a))
        allocate(currentEnergyData%interatomicDistances(N_a,N_a))
        allocate(currentEnergyData%tripletEnergies(N_tri))
+       allocate(currentEnergyData%triMat(3,N_tri))
 
     end if
 
@@ -268,6 +270,8 @@ contains
                    MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
     call MPI_Bcast(currentEnergyData%tripletEnergies, N_tri, &
                    MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(currentEnergyData%triMat, 3*N_tri, MPI_INT, &
+                   root, MPI_COMM_WORLD, ierror)
 
   end subroutine broadcastCurrentEnergyData
 
@@ -315,7 +319,6 @@ contains
     if (processRank .eq. root) then
 
        deallocate(UD_dg)
-       deallocate(triMat)
 
     end if
 
