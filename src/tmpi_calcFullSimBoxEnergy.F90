@@ -39,9 +39,12 @@ contains
     call initialAsserts(currentPosition%N_a,currentPosition%N_tri, &
                         currentPosition%N_distances)
     call declareConstantsAndRowsOfPermutationMatrix()
+    textOutput = .false.
 
 
     ! Set up on root
+    totTime = MPI_Wtime()
+    setUpTime = MPI_Wtime()
     if (processRank .eq. root) then
 
        call initialTextOutput()
@@ -98,12 +101,13 @@ contains
 
 
     ! Broadcast expMatrix to all processes so that sum can be parallelised
-    sumTime = MPI_Wtime()
     call MPI_Bcast(currentEnergyData%expMatrix, N_tp*nArgs*currentPosition%N_distances, MPI_DOUBLE_PRECISION, &
                    root, MPI_COMM_WORLD, ierror)
+    expTime = MPI_Wtime() - expTime
 
 
     ! Determine actual no. of elements to send to each process for triplet calc.
+    sumTime = MPI_Wtime()
     call getNPerProcNonAdd(currentPosition%N_tri,clusterSize, maxnSum,reNsum)
     call getVarrays(clusterSize,maxNsum,reNsum, scounts,displs)
     call getnSumAndTripletArrays()
@@ -143,6 +147,8 @@ contains
     if (processRank .eq. root) then
 
        call finalTextOutput()
+       print *, totTime, setUpTime, expTime, sumTime
+       print *, ' '
 
     end if
     call finalAsserts(currentPosition%N_a)
@@ -233,8 +239,7 @@ contains
 
     ! Set up array of a all possible triplets
     allocate(currentEnergyData%triMat(3,currentPosition%N_tri))
-    call makeTripletMatrix(currentPosition%N_a,currentPosition%N_tri, &
-                           currentEnergyData%triMat)
+    currentEnergyData%triMat = makeTripletMatrix(currentPosition%N_a,currentPosition%N_tri)
 
   end function setupCurrentEnergyDataAndArrays
 
@@ -395,10 +400,10 @@ contains
 
   ! Uses the number of atoms (nAt) and number of triplets (nTri) to build a matrix
   ! of all possible triplets
-  subroutine makeTripletMatrix(nAt,nTri, tripletMatrix)
+  function makeTripletMatrix(nAt,nTri) result(tripletMatrix)
     implicit none
     integer, intent(in) :: nAt, nTri
-    integer, intent(out) :: tripletMatrix(3,nTri)
+    integer :: tripletMatrix(3,nTri)
     integer :: al, be, ga, counter
 
     counter = 0
@@ -417,7 +422,7 @@ contains
     end do
 
   return
-  end subroutine makeTripletMatrix
+  end function makeTripletMatrix
 
 
   subroutine makeXdg(nAt,posArray, X_dg)

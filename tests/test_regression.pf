@@ -165,7 +165,7 @@ contains
       triMat_Ex(1:3,3) = (/1,3,4/)
       triMat_Ex(1:3,4) = (/2,3,4/)
 
-      call makeTripletMatrix(nAt,nTri, triMatrix)
+      triMatrix = makeTripletMatrix(nAt,nTri)
 
       @assertEqual(triMatrix, triMat_Ex, 'Test triplet matrix')
 
@@ -463,7 +463,7 @@ contains
     implicit none
     integer :: nAt=7, n, n_Ex
 
-    call getTriPerAtom(nAt, n)
+    n = getTriPerAtom(nAt)
 
     n_Ex = 15
 
@@ -482,7 +482,7 @@ contains
     integer, allocatable :: triInd(:,:), tInd_Ex(:,:)
     integer, allocatable :: changeInd (:,:), cInd_Ex(:,:)
 
-    call getTriPerAtom(nAt, nPerAt)
+    nPerAt = getTriPerAtom(nAt)
 
     allocate(triInd(3,nPerAt),tInd_Ex(3,nPerAt))
     allocate(changeInd(2,nPerAt),cInd_Ex(2,nPerAt))
@@ -635,7 +635,7 @@ contains
     double precision :: tripDist(3,10)
     double precision, intent(out) :: tripEnergies_Ex(10)
 
-    call makeTripletMatrix(5,10, triplets)
+    triplets = makeTripletMatrix(5,10)
 
     call findTripletDistances(currentPosition%N_a,currentPosition%N_tri,triplets, &
                               currentEnergies%interatomicDistances, tripDist)
@@ -676,7 +676,7 @@ contains
     double precision :: tripDist(3,10)
     double precision, intent(out) :: tripEnergies_Ex(10)
 
-    call makeTripletMatrix(5,10, triplets)
+    triplets = makeTripletMatrix(5,10)
 
     call findTripletDistances(proposedPosition%N_a,proposedPosition%N_tri,triplets, &
                               proposedEnergies%interatomicDistances, tripDist)
