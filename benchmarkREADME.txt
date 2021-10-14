@@ -4,8 +4,7 @@ To benchmark the speed increase with the number of processes of a given tmpi or 
 
 2) Run './build_and_run.sh' to generate the 'triplet.out' file (if there are lots of atoms, use more processes for this step!)
 
-3) Run './run_benchmarking_jobs.sh N_proc storageDir', where N_proc is the maximum desired number of processes (int) and storageDir is the name of the 
-   directory in which data will be stored, to run the jobs.
+3) Run './run_benchmarking_jobs.sh N_proc', where N_proc is the maximum desired number of processes (int), to run the jobs.
 
-4) When all from the previous step are complete, run './run_benchmarking_plots.sh N_proc storageDir', where N_proc and storageDir are exactly as they 
-   were in (3), to generate the plots and stor them in storageDir.
+4) When all jobs from the previous step are complete, run './run_benchmarking_plots.sh N_proc storageDir', where N_proc is unchanged from (3) and
+   storgaeDir is the name of the new directory where all data and plots will be stored (string).
