@@ -21,7 +21,7 @@ program main
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
-  Character(len=300) :: positionFile = 'AtomicPositions800.txt'
+  Character(len=300) :: positionFile = 'AtomicPositions500.txt'
   type (energiesData) :: currentEnergies, proposedEnergies
   type (positionData) :: currentPosition, proposedPosition
 
@@ -77,7 +77,7 @@ program main
       print *, 1, 1, 1, 1 ! For benchmarking
     end if
 
-    do i = 1, 65
+    do i = 1, 300
 
       !***********Toy move code***********
       !proposedEnergies = toyMove(currentPosition)

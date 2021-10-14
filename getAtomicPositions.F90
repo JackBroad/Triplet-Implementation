@@ -1,12 +1,12 @@
 program getAtomicPositions
   implicit none
-  integer :: nAt = 800, i, j
+  integer :: nAt = 500, i, j
   double precision :: random
   double precision, allocatable :: positions(:,:)
 
   allocate(positions(nAt,3))
 
-  open(1, file='AtomicPositions800.txt', status='new')
+  open(1, file='AtomicPositions500.txt', status='new')
   write(1,*) nAt
 
   do i = 1, nAt
