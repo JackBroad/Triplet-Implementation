@@ -5,7 +5,7 @@ program main
   use triplet_mod
   use tmpi_calcFullSimBoxEnergy_mod, only: tmpi_calcFullSimBoxEnergy
   use tmpi_calcAtomMoveEnergy_mod, only: tmpi_calcAtomMoveEnergy
-  use toyMove_Module, only: toyMove, toyMoveDistScatter
+  use toyMove_Module, only: toyMove, toyMoveDistScatter, toyMoveMinimalScatter
   use energiesData_Module, only: energiesData
   use positionData_Module, only: positionData
   use updateData
@@ -16,12 +16,12 @@ program main
 
 
   integer :: move, i
-  logical :: setSeed=.false., acceptMove=.true., useToyCode=.false.
+  logical :: setSeed=.false., acceptMove=.true., useToyCode=.true.
   double precision :: dist, time
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
-  Character(len=300) :: positionFile = 'AtomicPositions5.txt'
+  Character(len=300) :: positionFile = 'AtomicPositions800.txt'
   type (energiesData) :: currentEnergies, proposedEnergies
   type (positionData) :: currentPosition, proposedPosition
 
@@ -73,11 +73,16 @@ program main
 
   else
 
-    do i = 1, 75
+    if (processRank .eq. root) then
+      print *, 1, 1, 1, 1 ! For benchmarking
+    end if
+
+    do i = 1, 65
 
       !***********Toy move code***********
       !proposedEnergies = toyMove(currentPosition)
-      proposedEnergies = toyMoveDistScatter(currentPosition)
+      !proposedEnergies = toyMoveDistScatter(currentPosition)
+      proposedEnergies = toyMoveMinimalScatter(currentPosition)
 
     end do
 

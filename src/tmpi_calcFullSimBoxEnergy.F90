@@ -148,7 +148,6 @@ contains
 
        call finalTextOutput()
        print *, totTime, setUpTime, expTime, sumTime
-       print *, ' '
 
     end if
     call finalAsserts(currentPosition%N_a)
