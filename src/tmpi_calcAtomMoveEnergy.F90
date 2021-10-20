@@ -16,7 +16,7 @@ module tmpi_calcAtomMoveEnergy_mod
          getTripletScatterData
 
 
-  integer :: triPerAt, nTriMax, nTriRe,triPerProc, j, counter
+  integer :: N_changed_triplets, nTriMax, nTriRe,triPerProc, j, counter
   double precision :: totTime, moveTime, expTime, sumTime, setTime
   double precision :: gatherTripTime, xTime, shareExpTime, tripTime
   double precision :: extractTime
@@ -31,9 +31,9 @@ module tmpi_calcAtomMoveEnergy_mod
 contains
 
 
-  function tmpi_calcAtomMoveEnergy(move,proposedPosition,currentEnergyData) result(proposedEnergyData)
+  function tmpi_calcAtomMoveEnergy(atomToMove,proposedPosition,currentEnergyData) result(proposedEnergyData)
     ! Inputs
-    integer, intent(in) :: move!, N_move
+    integer, intent(in) :: atomToMove!, N_move
     type (energiesData), intent(in) :: currentEnergyData
     type (positionData), intent(in) :: proposedPosition
 
@@ -44,10 +44,9 @@ contains
     call initialAsserts(proposedPosition%N_a,proposedPosition%N_tri, &
                         proposedPosition%N_distances)
     textOutput = .false.
-    root = 0
     call firstTextOutput()
     moveTime = MPI_Wtime()
-    triPerAt = getTriPerAtom(proposedPosition%N_a)
+    N_changed_triplets = getTriPerAtom(proposedPosition%N_a)
     call allocateArrays(proposedPosition,proposedEnergyData)
     proposedEnergyData = currentEnergyData
 
@@ -56,26 +55,26 @@ contains
     setTime = MPI_Wtime()
     if (processRank .eq. root) then
 
-       call moveTextOutput(move)
+       call moveTextOutput(atomToMove)
 
     end if
 
 
     ! Re-calculate interatomicDistances for the new atomic positions
     xTime = MPI_Wtime()
-    call updateXdg(move,proposedPosition%N_a,proposedPosition%posArray, proposedEnergyData%interatomicDistances)
+    call updateXdg(atomToMove,proposedPosition%N_a,proposedPosition%posArray, proposedEnergyData%interatomicDistances)
     xTime = MPI_Wtime() - xTime
 
     ! Find the indices of the affected exponentials
     extractTime = MPI_Wtime()
-    call extractChangedExps(proposedPosition%N_a,move,proposedEnergyData%interatomicDistances, &
+    call extractChangedExps(proposedPosition%N_a,atomToMove,proposedEnergyData%interatomicDistances, &
                             newExpInt,newDists)
     extractTime = MPI_Wtime() - extractTime
 
     ! Determine which triplets have undergone a change
     tripTime = MPI_Wtime()
-    call getChangedTripletInfo(move,proposedPosition)
-    !call getChangedTripletData(move,proposedPosition%N_a,proposedPosition%N_tri,triPerAt, &
+    call getChangedTripletInfo(atomToMove,proposedPosition)
+    !call getChangedTripletData(atomToMove,proposedPosition%N_a,proposedPosition%N_tri,triPerAt, &
     !                           proposedEnergyData%triMat, tripIndex,changedTriplets)
     tripTime = MPI_Wtime() - tripTime
     setTime = MPI_Wtime() - setTime
@@ -91,7 +90,7 @@ contains
 
     ! Find all distances required on each process for the triplet energy calc. for
     ! which the exponentials have changed due to the move
-    call getAffectedTripletDistances(move,proposedEnergyData)
+    call getAffectedTripletDistances(atomToMove,proposedEnergyData)
 
     ! Calculate exponentials for the changed, un-repeated distances
     if (allocated(changeExpData)) then
@@ -194,8 +193,8 @@ contains
  
     allocate(newExpInt(2,proposedPosition%N_a-1))
     allocate(newDists(proposedPosition%N_a-1))
-    allocate(changedTriplets(3,triPerAt))
-    allocate(newUfull(triPerAt))
+    allocate(changedTriplets(3,N_changed_triplets))
+    Allocate(newUfull(N_changed_triplets))
     allocate(scounts(clusterSize))
     allocate(displs(clusterSize))
     if (allocated(proposedEnergyData%interatomicDistances)) then
@@ -203,7 +202,7 @@ contains
     end if
     allocate(proposedEnergyData%interatomicDistances(proposedPosition%N_a, &
              proposedPosition%N_a))
-    allocate(tripIndex(triPerAt))
+    allocate(tripIndex(N_changed_triplets))
 
   end subroutine allocateArrays
 
@@ -241,7 +240,7 @@ contains
 
   subroutine getTripletScatterData()
 
-    call getNPerProcNonAdd(triPerAt,clusterSize, nTriMax,nTriRe)
+    call getNPerProcNonAdd(N_changed_triplets,clusterSize, nTriMax,nTriRe)
     call getVarrays(clusterSize,nTriMax,nTriRe, scounts,displs)
     triPerProc = scounts(processRank+1)
 
@@ -268,7 +267,7 @@ contains
     type (energiesData) :: currentEnergyData, proposedEnergyData
 
     proposedEnergyData%tripletEnergies = currentEnergyData%tripletEnergies
-    do j = 1, triPerAt
+    do j = 1, N_changed_triplets
 
       proposedEnergyData%tripletEnergies(tripIndex(j)) = newUfull(j)
 
@@ -491,8 +490,8 @@ contains
     integer :: move
     type (positionData) :: proposedPosition
 
-    call getChangedTriplets(move,proposedPosition%N_a,triPerAt, changedTriplets)
-    call findChangedTriIndex(triPerAt,proposedPosition%N_a,move, tripIndex)
+    call getChangedTriplets(move,proposedPosition%N_a,N_changed_triplets, changedTriplets)
+    call findChangedTriIndex(N_changed_triplets,proposedPosition%N_a,move, tripIndex)
 
   end subroutine getChangedTripletInfo
 
