@@ -47,6 +47,7 @@ contains
       randomNo = 10*randomNo
       moveEnergyData%expMatrix(:,:,i) = randomNo
     end do
+    moveEnergyData%triMat = makeTripletMatrix(oldPositionData%N_a,oldPositionData%N_tri)
     moveTime = MPI_Wtime()
     triPerAt = getTriPerAtom(oldPositionData%N_a)
     nChangedDists = oldPositionData%N_a-1
@@ -64,9 +65,9 @@ contains
     call getVarrays(clusterSize,nTriMax,nTriRe, scounts,displs)
     triPerProc = scounts(processRank+1)
     allocate(scatterTrip(3,triPerProc))
-    !moveEnergyData%triMat = makeTripletMatrix(oldPositionData%N_a,oldPositionData%N_tri)
     do i = 1, triPerProc
-      scatterTrip(:,i) = (/1,2,3/)
+    !  scatterTrip(:,i) = (/1,2,3/)
+       scatterTrip(:,i) = moveEnergyData%triMat(:,i)
     end do
     allocate(newUvec(triPerProc))
     allocate(newUfull(oldPositionData%N_tri))
@@ -283,9 +284,6 @@ contains
     frmt = '(I5.5)'
     write(clusterString,frmt) clusterSize
     N_p = 6
-    !if (processRank .eq. root) then
-    !  open(1,file='nCalcsPerProc-'//trim(clusterString)//'.txt',status='new')
-    !end if
 
     do i = 1, nTrip
  
@@ -325,11 +323,6 @@ contains
       uVec(i) = 0.5 * firstSum
 
     end do
-
-    !if (processRank .eq. root) then
-    !  write(1,*) counter
-    !  close(1)
-    !end if
 
   end subroutine toyTripletSum
 

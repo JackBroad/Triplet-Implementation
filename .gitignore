@@ -17,3 +17,4 @@ myJob.sh
 tmp*
 *.a
 *-data.txt
+*.err

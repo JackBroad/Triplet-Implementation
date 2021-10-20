@@ -121,7 +121,6 @@ subroutine initialise_Move(currentPos,currentEnergy,dMax,addSeed, &
     end if
   call random_number(randNumber)
   mover = 1 + FLOOR(newPos%N_a*randNumber)
-!  print *, 'moving atom', mover
 
   ! Change the position of the atom in newPos
   do irow = 1, newPos%N_a
@@ -130,7 +129,6 @@ subroutine initialise_Move(currentPos,currentEnergy,dMax,addSeed, &
         call random_number(randNumber)
         newPos%posArray(irow,icol) = newPos%posArray(irow,icol) + (2.0*randNumber-1) &
                                      * dMax
-        !print *, 'moved', (2.0*randNumber-1)*dMax, 'in direction', icol
       end do
     end if
   end do
