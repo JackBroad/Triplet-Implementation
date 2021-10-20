@@ -47,7 +47,7 @@ program main
 
 
     ! Atom move
-    do i = 1, 10
+    do i = 1, 150
       call initialise_Move(currentPosition,currentEnergies,dist,setSeed, &
                            proposedPosition,proposedEnergies,move)
       call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
@@ -74,10 +74,10 @@ program main
   else
 
     if (processRank .eq. root) then
-      print *, 1, 1, 1, 1 ! For benchmarking
+      print *, 1, 1, 1, 1 ! Keeps output in format the b/marking script expects
     end if
 
-    do i = 1, 300
+    do i = 1, 500
 
       !***********Toy move code***********
       !proposedEnergies = toyMove(currentPosition)

@@ -16,3 +16,4 @@ deltaGamma*.txt
 myJob.sh
 tmp*
 *.a
+*-data.txt

@@ -7,4 +7,4 @@ To benchmark the speed increase with the number of processes of a given tmpi or 
 3) Run './run_benchmarking_jobs.sh N_proc', where N_proc is the maximum desired number of processes (int), to run the jobs.
 
 4) When all jobs from the previous step are complete, run './run_benchmarking_plots.sh N_proc storageDir', where N_proc is unchanged from (3) and
-   storgaeDir is the name of the new directory where all data and plots will be stored (string).
+   storgaeDir is the name of the new directory in which all data and plots will be stored (string).

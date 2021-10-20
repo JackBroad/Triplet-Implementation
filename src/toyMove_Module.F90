@@ -42,12 +42,15 @@ contains
     call allocateToyDataStructArrays(oldPositionData,moveEnergyData)
     call setUpEnergyData(oldPositionData,moveEnergyData)
     call makeDisIntMatNonAdd(oldPositionData%N_a,moveEnergyData%distancesIntMat)
-    call random_number(randomNo)
-    randomNo = 10*randomNo
+    do i = 1, oldPositionData%N_distances
+      call random_number(randomNo)
+      randomNo = 10*randomNo
+      moveEnergyData%expMatrix(:,:,i) = randomNo
+    end do
     moveTime = MPI_Wtime()
     triPerAt = getTriPerAtom(oldPositionData%N_a)
     nChangedDists = oldPositionData%N_a-1
-    moveEnergyData%expMatrix = randomNo
+    !moveEnergyData%expMatrix = randomNo
 
     ! Find no. of dists per proc
     allocate(scounts(clusterSize))
@@ -61,8 +64,10 @@ contains
     call getVarrays(clusterSize,nTriMax,nTriRe, scounts,displs)
     triPerProc = scounts(processRank+1)
     allocate(scatterTrip(3,triPerProc))
-    moveEnergyData%triMat = makeTripletMatrix(oldPositionData%N_a,oldPositionData%N_tri)
-    scatterTrip = moveEnergyData%triMat(:,1:triPerProc)
+    !moveEnergyData%triMat = makeTripletMatrix(oldPositionData%N_a,oldPositionData%N_tri)
+    do i = 1, triPerProc
+      scatterTrip(:,i) = (/1,2,3/)
+    end do
     allocate(newUvec(triPerProc))
     allocate(newUfull(oldPositionData%N_tri))
 
@@ -70,12 +75,6 @@ contains
     do i = 1, nChangedDists
       moveEnergyData%expMatrix(:,:,i) = i*2d0 + i
     end do
-
-    if (processRank .eq. i-1) then
-    do i = 1, oldPositionData%N_a
-      !print *, moveEnergyData%expMatrix(:,:,i)
-    end do
-    end if
 
     ! Sum over the triplets
     call toyTripletSum(scatterTrip,triPerProc,moveEnergyData%expMatrix, &
@@ -104,7 +103,7 @@ contains
     implicit none
     type (positionData) :: oldPositionData
     type (energiesData) :: moveEnergyData
-    double precision :: randomNo
+    double precision :: randomNo, uTotPerProc
     double precision, allocatable :: changedDists(:), scatterDists(:)
     double precision, allocatable :: changeExpData(:,:,:), changeExpMat(:,:,:)
     integer :: nChangedDists, distsPerProc, i
@@ -113,10 +112,13 @@ contains
     call allocateToyDataStructArrays(oldPositionData,moveEnergyData)
     call setUpEnergyData(oldPositionData,moveEnergyData)
     call makeDisIntMatNonAdd(oldPositionData%N_a,moveEnergyData%distancesIntMat)
-    call random_number(randomNo)
-    randomNo = 10*randomNo
-    moveEnergyData%expMatrix = randomNo
+    do i = 1, oldPositionData%N_distances
+      call random_number(randomNo)
+      randomNo = 10*randomNo
+      moveEnergyData%expMatrix(:,:,i) = randomNo
+    end do
     moveTime = MPI_Wtime()
+    !moveEnergyData%expMatrix = randomNo
     triPerAt = getTriPerAtom(oldPositionData%N_a)
     nChangedDists = oldPositionData%N_a-1
 
@@ -202,15 +204,16 @@ contains
     call makeDisIntMatNonAdd(oldPositionData%N_a,moveEnergyData%distancesIntMat)
     call random_number(randomNo)
     randomNo = 10*randomNo
-    moveEnergyData%expMatrix = randomNo
 
     ! Each move changes triPerAt triplets and N_a-1 distances,
     ! so we only need to share the first triPerAt cols of the
     ! triplet matrix and alter N_a-1 sets of exponentials in
     ! expMat
     moveTime = MPI_Wtime()
+    moveEnergyData%expMatrix = randomNo
     triPerAt = getTriPerAtom(oldPositionData%N_a)
     nChangedDists = oldPositionData%N_a-1
+
     do i = 1, nChangedDists
       moveEnergyData%expMatrix(:,:,i) = i*2d0 + i
     end do
@@ -273,12 +276,20 @@ contains
     integer, intent(in) :: nTrip, nAt, tripletData(3,nTrip), nDists, intMat(nAt,nAt)
     double precision, intent(in) :: expMat(nArgs,N_tp,nDists)
     double precision, intent(out) :: uVec(nTrip)
-    integer :: i, k, al, be, ga, alDis, beDis, gaDis
+    integer :: i, k, al, be, ga, alDis, beDis, gaDis, counter
     double precision :: firstSum, secndSum, expProd
+    character (len=10) :: clusterString, frmt
 
+    frmt = '(I5.5)'
+    write(clusterString,frmt) clusterSize
     N_p = 6
+    !if (processRank .eq. root) then
+    !  open(1,file='nCalcsPerProc-'//trim(clusterString)//'.txt',status='new')
+    !end if
 
     do i = 1, nTrip
+ 
+      counter = counter + 1
 
       al = tripletData(1,i)
       be = tripletData(2,i)
@@ -292,9 +303,13 @@ contains
 
       do j = 1, N_tp
 
+        counter = counter + 1
+
         secndSum = 0d0
 
         do k = 1, N_p
+
+          counter = counter + 1
 
           expProd = expMat(Perm(k,1),j,alDis) * expMat(Perm(k,2),j,beDis) * &
                     expMat(Perm(k,3),j,gaDis)
@@ -310,6 +325,11 @@ contains
       uVec(i) = 0.5 * firstSum
 
     end do
+
+    !if (processRank .eq. root) then
+    !  write(1,*) counter
+    !  close(1)
+    !end if
 
   end subroutine toyTripletSum
 

@@ -16,7 +16,7 @@ atomMoveMat = np.zeros((maxProcs,4))
 for i in range (1,maxProcs+1):
   counter = i-1
   string = '-data.txt'
-  data = pa.read_csv(dirString+'/'+str(i)+string,  delim_whitespace=True, header=None)
+  data = pa.read_csv(str(i)+string,  delim_whitespace=True, header=None)
   data = data.values
   nData = len(data)
   fullBoxMat[counter,:] = data[0,:]
@@ -26,7 +26,6 @@ for i in range (1,maxProcs+1):
 
 fullT0 = fullBoxMat[0,0]
 moveT0 = atomMoveMat[0,0]
-print(fullT0,moveT0)
 for j in range (0,maxProcs):
   fullBoxMat[j,0]=fullT0/fullBoxMat[j,0]
   atomMoveMat[j,0]=moveT0/atomMoveMat[j,0]
@@ -50,10 +49,7 @@ mp.grid()
 mp.xlabel(r"$N_{p}}$")
 mp.ylabel(r"t$_1$ / t$_{N_{p}}$")
 mp.legend(loc="upper left")
-mp.xlim(0,16)
-mp.ylim(0,4)
-mp.savefig(dirString+'/'+'fullBoxToySpeedUp.pdf',bbox_inches = "tight")
-mp.show()
+mp.savefig(dirString+'/'+'fullBoxSpeedUp.pdf',bbox_inches = "tight")
 
 figg=mp.figure()
 ax2=figg.add_subplot(111)
@@ -62,7 +58,4 @@ mp.grid()
 mp.xlabel(r"$N_{p}}$")
 mp.ylabel(r"t$_1$ / t$_{N_{p}}$")
 mp.legend(loc="upper left")
-mp.xlim(0,16)
-mp.ylim(0,4)
-mp.savefig(dirString+'/'+'atomMoveToySpeedUp.pdf',bbox_inches = "tight")
-mp.show()
+mp.savefig(dirString+'/'+'atomMoveSpeedUp.pdf',bbox_inches = "tight")
