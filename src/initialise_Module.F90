@@ -1,5 +1,6 @@
 module initialise_Module
   use mpi_variables
+  use dataStructure_variables
   use triplet_mod
   use GP_variables, only: hyperParams,alpha,Perm,trainData,N_tp,nArgs,N_p
   use positionData_Module, only: positionData
@@ -99,42 +100,37 @@ end subroutine initialise_Variables
 ! index of the moved atom.
 ! Takes Cartesian atomic positions (pos), the no. of atoms (num)
 ! and the max. distance to move in any direction (dMax) as arguments
-subroutine initialise_Move(currentPos,currentEnergy,dMax,addSeed, &
-                           newPos,newEnergy,mover)
-!  implicit none
+subroutine initialise_Move(dMax,addSeed, mover)
+  implicit none
   logical, intent(in) :: addSeed
   double precision, intent(in) :: dMax
-  type (positionData), intent(in) :: currentPos
-  type (energiesData), intent(in) :: currentEnergy
   integer, intent(out) :: mover
-  type (positionData), intent(out) :: newPos
-  type (energiesData), intent(out) :: newEnergy
   integer :: icol, irow, seed(8) ! Min. size for seed array
   double precision :: randNumber
 
-  newPos = currentPos
-  newEnergy = currentEnergy
+  proposedPositionData = currentPositionData
+  proposedEnergyData = currentEnergyData
   if (processRank .eq. root) then
     if (addSeed .eqv. .true.) then
       seed = 168389234
       call random_seed(put=seed)
     end if
   call random_number(randNumber)
-  mover = 1 + FLOOR(newPos%N_a*randNumber)
+  mover = 1 + FLOOR(proposedPositionData%N_a*randNumber)
 
   ! Change the position of the atom in newPos
-  do irow = 1, newPos%N_a
+  do irow = 1, proposedPositionData%N_a
     if (irow .eq. mover) then
       do icol = 1, 3
         call random_number(randNumber)
-        newPos%posArray(irow,icol) = newPos%posArray(irow,icol) + (2.0*randNumber-1) &
-                                     * dMax
+        proposedPositionData%posArray(irow,icol) = proposedPositionData%posArray(irow,icol) &
+                                                   + (2.0*randNumber-1) * dMax
       end do
     end if
   end do
   end if
   !call MPI_Bcast(mover, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
-  !call MPI_Bcast(newPos%posArray(mover,:), 3, MPI_DOUBLE_PRECISION, &
+  !call MPI_Bcast(proposedPositionData%posArray(mover,:), 3, MPI_DOUBLE_PRECISION, &
   !               root, MPI_COMM_WORLD, ierror)
   
 return

@@ -1,6 +1,6 @@
 module test_regression
-  !use mpi
   use mpi_variables
+  use dataStructure_variables
   use triplet_mod
   use tmpi_calcFullSimBoxEnergy_mod
   use tmpi_calcAtomMoveEnergy_mod
@@ -19,8 +19,6 @@ module test_regression
   double precision, allocatable :: expoData(:,:,:)
   integer, allocatable :: disMat(:,:)
   integer :: n_tri, n_at, n_dist, move
-  type (energiesData) :: currentEnergies, proposedEnergies
-  type (positionData) :: currentPosition, proposedPosition
 
 contains
 
@@ -173,86 +171,6 @@ contains
 
   end subroutine test_triMat
 
-  @test
-  subroutine test_scatter()
-    implicit none
-    integer :: bigVec(4), procVec(2), bigMat(2,2), root=0
-    integer :: procVec_Ex(2)
-
-    if( processRank == root ) then
-
-      bigVec(1:4) = (/ 1,2,3,4 /)
-      bigMat(1,1:2) = (/ 1,2 /)
-      bigMat(2,1:2) = (/ 3,4 /)
-
-    end if
-
-    call MPI_Scatter(bigVec, 2, MPI_INT, procVec, 2, MPI_INT, root, MPI_COMM_WORLD, ierror)
-
-    if( processRank == root ) then
-
-      procVec_Ex(1) = 1
-      procVec_Ex(2) = 2
-      @assertEqual(procVec, procVec_Ex, 'Test scatter')
-
-    else if( processRank == 1) then
-
-      procVec_Ex(1) = 3
-      procVec_Ex(2) = 4
-      @assertEqual(procVec, procVec_Ex, 'Test scatter')
-
-    end if
-
-    call MPI_Scatter(bigMat, 2, MPI_INT, procVec, 2, MPI_INT, root, MPI_COMM_WORLD, ierror)
-
-    if( processRank == root ) then
-
-      procVec_Ex(1) = 1
-      procVec_Ex(2) = 3
-      @assertEqual(procVec, procVec_Ex, 'Test scatter')
-
-    else if( processRank == 1) then
-
-      procVec_Ex(1) = 2
-      procVec_Ex(2) = 4
-      @assertEqual(procVec, procVec_Ex, 'Test scatter')
-
-    end if
-
-  end subroutine test_scatter
-
-  @test
-  subroutine test_gather()
-    implicit none
-    integer :: bigMat(3,2), procVec(3), bigMat_Ex(3,2)
-
-    if( processRank == root) then
-
-      procVec(1) = 1
-      procVec(2) = 2
-      procVec(3) = 3
-
-    else if( processRank == 1) then
-
-      procVec(1) = 4
-      procVec(2) = 5
-      procVec(3) = 6
-
-    end if
-
-    bigMat_Ex(1,1:2) = (/ 1,4 /)
-    bigMat_Ex(2,1:2) = (/ 2,5 /)
-    bigMat_Ex(3,1:2) = (/ 3,6 /)
-
-    call MPI_Gather(procVec, 3, MPI_INT, bigMat, 3, MPI_INT, root, MPI_COMM_WORLD, ierror)
-
-    if( processRank == root) then
-
-      @assertEqual(bigMat, bigMat_Ex, 'Test gather')
-
-    end if
-
-  end subroutine test_gather
 
   @test
   subroutine test_exp_calc()
@@ -310,24 +228,25 @@ contains
   subroutine test_cluster_energies_and_move()
     implicit none
     character(len=40) :: name='AtomicPositions5.txt'
-    double precision :: tripEnergies_Ex(10), tripDist(3,10)
+    double precision :: fullEnergy, fullEnergy_Ex, tripDist(3,10)
+    double precision :: moveEnergy, moveEnergy_Ex
     double precision :: expectedPosition(3)
     logical :: seed=.true.
     integer :: expectedMove
 
 
     !****** Create a simulation box and test that total energy is correct**********
-    call getSimBoxEnergy(name)
-    call getExpectedSimBoxEnergy(tripDist,tripEnergies_Ex)
+    fullEnergy = getSimBoxEnergy(name)
+    fullEnergy_Ex = getExpectedSimBoxEnergy(tripDist)
     
     if( processRank == root) then
-        @assertEqual( currentEnergies%tripletEnergies, tripEnergies_Ex, low_tol, 'Test full non-add energy')
+        @assertEqual( fullEnergy, fullEnergy_Ex, low_tol, 'Test full non-add energy')
     end if
 
 
     !*************** Now move an atom and test the revised energy*****************
-    call getAtomMoveEnergy(1d0,seed)    
-    call getExpectedAtomMoveEnergy(tripDist, tripEnergies_Ex)
+    moveEnergy = getAtomMoveEnergy(1d0,seed)    
+    moveEnergy_Ex = getExpectedAtomMoveEnergy(tripDist)
     expectedPosition = getExpectedPosition(move)
     expectedMove = 2
 
@@ -337,9 +256,9 @@ contains
     !Test that 'move' has the expected value
     !Test that proposed configuration of moved atom is as expected
     if( processRank == root) then
-      @assertEqual( proposedEnergies%tripletEnergies, tripEnergies_Ex, low_tol, 'Test atom move energy')
+      @assertEqual( moveEnergy, moveEnergy_Ex, low_tol, 'Test atom move energy')
       @assertEqual( move, expectedMove, 'Test which atom has moved')
-      @assertEqual( proposedPosition%posArray(move,:), expectedPosition, low_tol, 'Test where atom has moved to')
+      @assertEqual( proposedPositionData%posArray(move,:), expectedPosition, low_tol, 'Test where atom has moved to')
     end if
 
   end subroutine test_cluster_energies_and_move
@@ -585,30 +504,21 @@ contains
     implicit none
 
     ! Update data
-    if( processRank == root) then
-    print *, 'Old total energies (before update)'
-    print *, proposedEnergies%Utotal
-    print *, currentEnergies%Utotal
-    print *, ' '
-    end if
-    call updateDataAfterMove(proposedEnergies,proposedPosition, &
-                             currentEnergies,currentPosition)
+    call updateDataAfterMove(proposedEnergyData,proposedPositionData, &
+                             currentEnergyData,currentPositionData)
     
     ! First, test that the current and proposed exps are the same after update
     if( processRank == root) then
-      @assertEqual(proposedEnergies%expMatrix, currentEnergies%expMatrix, low_tol)
-      print *, 'New total energies (after update)'
-      print *, proposedEnergies%Utotal
-      print *, currentEnergies%Utotal
+      @assertEqual(proposedEnergyData%expMatrix, currentEnergyData%expMatrix, low_tol)
     end if
 
     ! Now test if a dummy energy is correctly updated
-    proposedEnergies%Utotal = 1d0
-    call updateDataAfterMove(proposedEnergies,proposedPosition, &
-                             currentEnergies,currentPosition)
+    proposedEnergyData%Utotal = 1d0
+    call updateDataAfterMove(proposedEnergyData,proposedPositionData, &
+                             currentEnergyData,currentPositionData)
 
     if( processRank == root) then
-      @assertEqual(proposedEnergies%Utotal, currentEnergies%Utotal, low_tol)
+      @assertEqual(proposedEnergyData%Utotal, currentEnergyData%Utotal, low_tol)
     end if
 
   end subroutine test_data_update
@@ -619,75 +529,75 @@ contains
   end subroutine test_finalize
 
 
-  subroutine getSimBoxEnergy(name)
+  double precision function getSimBoxEnergy(name)
     implicit none
     Character(len=300) :: name
 
-    currentPosition = initialise_positionDataStruct(name)
-    currentEnergies = tmpi_calcFullSimBoxEnergy(currentPosition)
+    currentPositionData = initialise_positionDataStruct(name)
+    getSimBoxEnergy = tmpi_calcFullSimBoxEnergy()
   return
-  end subroutine getSimBoxEnergy
+  end function getSimBoxEnergy
 
 
-  subroutine getExpectedSimBoxEnergy(tripDist,tripEnergies_Ex)
+  double precision function getExpectedSimBoxEnergy(tripDist)
     implicit none
     integer :: triplets(3,10), i
-    double precision :: tripDist(3,10)
-    double precision, intent(out) :: tripEnergies_Ex(10)
+    double precision :: tripDist(3,10), tripEnergies_Ex(10)
 
     triplets = makeTripletMatrix(5,10)
 
-    call findTripletDistances(currentPosition%N_a,currentPosition%N_tri,triplets, &
-                              currentEnergies%interatomicDistances, tripDist)
+    call findTripletDistances(currentPositionData%N_a,currentPositionData%N_tri,triplets, &
+                              currentEnergyData%interatomicDistances, tripDist)
 
-    do i = 1, currentPosition%N_tri
+    do i = 1, currentPositionData%N_tri
       tripEnergies_Ex(i) = energyCheckCalc(tripDist(:,i)) ! Energies of each triplet
     end do
 
+    getExpectedSimBoxEnergy = sum(tripEnergies_Ex)
+
   return
-  end subroutine getExpectedSimBoxEnergy
+  end function getExpectedSimBoxEnergy
 
 
-  !!!! Move this into main code!!!!!!
-  subroutine getAtomMoveEnergy(dist,seed) !!! Remove output arguments and make into a function returning a double (delta E)
+  double precision function getAtomMoveEnergy(dist,seed)
     implicit none
     double precision, intent(in) :: dist
     logical, intent(in) :: seed
 
-    call initialise_Move(currentPosition,currentEnergies,dist,seed, &
-                         proposedPosition,proposedEnergies,move) !! Remove - move now chosen outside function
+    call initialise_Move(dist,seed, move) !! Remove - move now chosen outside function
 
     !!! Create a new data structure that contains moved atom number and it's new position
     ! Broadcast new atomic positions - should be initialise move but couldn't due to MPI errors
     call MPI_Bcast(move, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
-    call MPI_Bcast(proposedPosition%posArray(move,1:3), 3, MPI_DOUBLE_PRECISION, root, &
+    call MPI_Bcast(proposedPositionData%posArray(move,1:3), 3, MPI_DOUBLE_PRECISION, root, &
                    MPI_COMM_WORLD, ierror)
 
     ! Calculate changed energies using tmpi code
-    proposedEnergies = tmpi_calcAtomMoveEnergy(move,proposedPosition,currentEnergies)
+    getAtomMoveEnergy = tmpi_calcAtomMoveEnergy(move)
 
-  return !the change in energy
-  end subroutine getAtomMoveEnergy
+  return
+  end function getAtomMoveEnergy
 
 
-  subroutine getExpectedAtomMoveEnergy(tripDist, tripEnergies_Ex)
+  double precision function getExpectedAtomMoveEnergy(tripDist)
     implicit none
     integer :: triplets(3,10), i
-    double precision :: tripDist(3,10)
-    double precision, intent(out) :: tripEnergies_Ex(10)
+    double precision :: tripDist(3,10), tripEnergies_Ex(10)
 
     triplets = makeTripletMatrix(5,10)
 
-    call findTripletDistances(proposedPosition%N_a,proposedPosition%N_tri,triplets, &
-                              proposedEnergies%interatomicDistances, tripDist)
+    call findTripletDistances(proposedPositionData%N_a,proposedPositionData%N_tri,triplets, &
+                              proposedEnergyData%interatomicDistances, tripDist)
 
     ! Re-calculate energy using RSG's code
-    do i = 1, proposedPosition%N_tri
+    do i = 1, proposedPositionData%N_tri
       tripEnergies_Ex(i) = energyCheckCalc(tripDist(:,i)) ! Energies of each triplet after move
    end do
 
+   getExpectedAtomMoveEnergy = sum(tripEnergies_Ex)
+
   return
-  end subroutine getExpectedAtomMoveEnergy
+  end function getExpectedAtomMoveEnergy
 
 
   function getExpectedPosition(mover) result(expectedPosition)
@@ -695,7 +605,7 @@ contains
     integer, intent(in) :: mover
     double precision :: expectedPosition(3)
 
-    expectedPosition = currentPosition%posArray(mover,:)
+    expectedPosition = currentPositionData%posArray(mover,:)
     ! Add seeded values of moves in each direction
     expectedPosition(1) = expectedPosition(1) + 0.40315380977949444
     expectedPosition(2) = expectedPosition(2) - 0.05015726548652677

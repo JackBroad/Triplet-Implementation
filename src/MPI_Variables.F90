@@ -15,3 +15,13 @@ module expShare_variables
   double precision, allocatable :: changeExpData(:,:,:)
 
 end module expShare_variables
+
+module dataStructure_variables
+  use energiesData_Module, only: energiesData
+  use positionData_Module, only: positionData
+  implicit none
+
+  type (energiesData) :: currentEnergyData, proposedEnergyData
+  type (positionData) :: currentPositionData, proposedPositionData
+
+end module dataStructure_variables

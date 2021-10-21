@@ -1,6 +1,7 @@
 module tmpi_calcAtomMoveEnergy_mod
   use mpi_variables
   use expShare_variables
+  use dataStructure_variables
   use triplet_mod
   use GP_variables, only: hyperParams,alpha,Perm,trainData,N_tp,nArgs,N_p
   use energiesData_Module, only: energiesData
@@ -31,24 +32,18 @@ module tmpi_calcAtomMoveEnergy_mod
 contains
 
 
-  function tmpi_calcAtomMoveEnergy(move,proposedPosition,currentEnergyData) result(proposedEnergyData)
+  double precision function tmpi_calcAtomMoveEnergy(move)
     ! Inputs
-    integer, intent(in) :: move!, N_move
-    type (energiesData), intent(in) :: currentEnergyData
-    type (positionData), intent(in) :: proposedPosition
-
-    ! Output
-    type (energiesData) :: proposedEnergyData
+    integer, intent(in) :: move
 
 
-    call initialAsserts(proposedPosition%N_a,proposedPosition%N_tri, &
-                        proposedPosition%N_distances)
-    textOutput = .false.
+    call initialAsserts(proposedPositionData%N_a,proposedPositionData%N_tri, &
+                        proposedPositionData%N_distances)
     root = 0
     call firstTextOutput()
     moveTime = MPI_Wtime()
-    triPerAt = getTriPerAtom(proposedPosition%N_a)
-    call allocateArrays(proposedPosition,proposedEnergyData)
+    triPerAt = getTriPerAtom(proposedPositionData%N_a)
+    call allocateArrays(proposedPositionData,proposedEnergyData)
     proposedEnergyData = currentEnergyData
 
 
@@ -63,19 +58,19 @@ contains
 
     ! Re-calculate interatomicDistances for the new atomic positions
     xTime = MPI_Wtime()
-    call updateXdg(move,proposedPosition%N_a,proposedPosition%posArray, proposedEnergyData%interatomicDistances)
+    call updateXdg(move,proposedPositionData%N_a,proposedPositionData%posArray, proposedEnergyData%interatomicDistances)
     xTime = MPI_Wtime() - xTime
 
     ! Find the indices of the affected exponentials
     extractTime = MPI_Wtime()
-    call extractChangedExps(proposedPosition%N_a,move,proposedEnergyData%interatomicDistances, &
+    call extractChangedExps(proposedPositionData%N_a,move,proposedEnergyData%interatomicDistances, &
                             newExpInt,newDists)
     extractTime = MPI_Wtime() - extractTime
 
     ! Determine which triplets have undergone a change
     tripTime = MPI_Wtime()
-    call getChangedTripletInfo(move,proposedPosition)
-    !call getChangedTripletData(move,proposedPosition%N_a,proposedPosition%N_tri,triPerAt, &
+    call getChangedTripletInfo(move,proposedPositionData)
+    !call getChangedTripletData(move,proposedPositionData%N_a,proposedPositionData%N_tri,triPerAt, &
     !                           proposedEnergyData%triMat, tripIndex,changedTriplets)
     tripTime = MPI_Wtime() - tripTime
     setTime = MPI_Wtime() - setTime
@@ -109,7 +104,7 @@ contains
     ! Calculate the non-additive energies for the changed triplets
     sumTime = MPI_Wtime()
     call tripletEnergiesNonAdd(scatterTrip,proposedEnergyData%distancesIntMat,triPerProc,N_tp, &
-                               proposedPosition%N_a,N_p,nArgs,Perm,proposedPosition%N_distances, &
+                               proposedPositionData%N_a,N_p,nArgs,Perm,proposedPositionData%N_distances, &
                                proposedEnergyData%expMatrix,alpha,hyperParams(2), newUvec)
 
     ! Gather the changed triplet energies on the root process for summation
@@ -119,17 +114,19 @@ contains
     gatherTripTime = MPI_Wtime() - gatherTripTime
 
     ! Find total change in non-additive energy from moving an atom
+    proposedEnergyData%Utotal=0d0
     if (processRank .eq. root) then
 
        ! Update energies of changed triplets
        call updateChangedTripletEnergies(currentEnergyData, proposedEnergyData)
 
        ! Evaluate total non-add energy after changes and print it to screen
-       call totalEnergyNonAdd(proposedEnergyData%tripletEnergies,proposedPosition%N_tri, &
+       call totalEnergyNonAdd(proposedEnergyData%tripletEnergies,proposedPositionData%N_tri, &
                               proposedEnergyData%Utotal)
        call energyTextOutput(proposedEnergyData)
 
     end if
+    tmpi_calcAtomMoveEnergy = proposedEnergyData%Utotal
     sumTime = MPI_Wtime() - sumTime
 
 
@@ -144,10 +141,9 @@ contains
     if (processRank .eq. root) then
 
        call finalTextOutput()
-       print *, moveTime, setTime, expTime, sumTime
 
     end if
-    call finalAsserts(proposedPosition%N_a)
+    call finalAsserts(proposedPositionData%N_a)
 
 
   return
@@ -188,9 +184,9 @@ contains
   end subroutine finalAsserts
 
 
-  subroutine allocateArrays(proposedPosition,proposedEnergyData)
+  subroutine allocateArrays(proposedPosition,proposedEnergy)
     type (positionData) :: proposedPosition
-    type (energiesData) :: proposedEnergyData
+    type (energiesData) :: proposedEnergy
  
     allocate(newExpInt(2,proposedPosition%N_a-1))
     allocate(newDists(proposedPosition%N_a-1))
@@ -198,10 +194,10 @@ contains
     allocate(newUfull(triPerAt))
     allocate(scounts(clusterSize))
     allocate(displs(clusterSize))
-    if (allocated(proposedEnergyData%interatomicDistances)) then
-      deallocate(proposedEnergyData%interatomicDistances)
+    if (allocated(proposedEnergy%interatomicDistances)) then
+      deallocate(proposedEnergy%interatomicDistances)
     end if
-    allocate(proposedEnergyData%interatomicDistances(proposedPosition%N_a, &
+    allocate(proposedEnergy%interatomicDistances(proposedPosition%N_a, &
              proposedPosition%N_a))
     allocate(tripIndex(triPerAt))
 
@@ -264,26 +260,26 @@ contains
   end subroutine allocateTripletScatterArrays
 
 
-  subroutine updateChangedTripletEnergies(currentEnergyData, proposedEnergyData)
-    type (energiesData) :: currentEnergyData, proposedEnergyData
+  subroutine updateChangedTripletEnergies(currentEnergy, proposedEnergy)
+    type (energiesData) :: currentEnergy, proposedEnergy
 
-    proposedEnergyData%tripletEnergies = currentEnergyData%tripletEnergies
+    proposedEnergy%tripletEnergies = currentEnergy%tripletEnergies
     do j = 1, triPerAt
 
-      proposedEnergyData%tripletEnergies(tripIndex(j)) = newUfull(j)
+      proposedEnergy%tripletEnergies(tripIndex(j)) = newUfull(j)
 
     end do
 
   end subroutine updateChangedTripletEnergies
 
 
-  subroutine energyTextOutput(proposedEnergyData)
-    type (energiesData) :: proposedEnergyData
+  subroutine energyTextOutput(proposedEnergy)
+    type (energiesData) :: proposedEnergy
 
     if (textOutput) then
 
       !print *, "The non-additive energy after the move is", &
-      !         proposedEnergyData%Utotal
+      !         proposedEnergy%Utotal
       !print *, '------------------------'
       !print *, ' '
 
@@ -324,20 +320,19 @@ contains
       !print *, "The time for the triplet set up was ", tripTime
       !print *, ' '
       !print *, 'Non-additive calculation for atom move complete'
-      print *, moveTime,expTime,sumTime,shareExpTime,gatherTripTime,setTime
+      print *, moveTime, setTime, expTime, sumTime
       !print *, '========================'
       !print *, ' '
-      print *, ' '
 
     end if
 
   end subroutine finalTextOutput
 
 
-  subroutine getAffectedTripletDistances(move,proposedEnergyData)
+  subroutine getAffectedTripletDistances(move,proposedEnergy)
     implicit none
     integer, intent(in) :: move
-    type (energiesData) :: proposedEnergyData
+    type (energiesData) :: proposedEnergy
 
     counter = 0
     do j = 1, triPerProc
@@ -345,12 +340,12 @@ contains
 
         counter = counter + 1
         expUpdate(counter) = &
-        proposedEnergyData%interatomicDistances(move,scatterTrip(2,j))
+        proposedEnergy%interatomicDistances(move,scatterTrip(2,j))
         expUpdateInd(counter,1) = move
         expUpdateInd(counter,2) = scatterTrip(2,j)
         counter = counter + 1
         expUpdate(counter) = &
-        proposedEnergyData%interatomicDistances(move,scatterTrip(3,j))
+        proposedEnergy%interatomicDistances(move,scatterTrip(3,j))
         expUpdateInd(counter,1) = move
         expUpdateInd(counter,2) = scatterTrip(3,j)
 
@@ -358,12 +353,12 @@ contains
 
         counter = counter + 1
         expUpdate(counter) = &
-        proposedEnergyData%interatomicDistances(scatterTrip(1,j),move)
+        proposedEnergy%interatomicDistances(scatterTrip(1,j),move)
         expUpdateInd(counter,1) = scatterTrip(1,j)
         expUpdateInd(counter,2) = move
         counter = counter + 1
         expUpdate(counter) = &
-        proposedEnergyData%interatomicDistances(move,scatterTrip(3,j))
+        proposedEnergy%interatomicDistances(move,scatterTrip(3,j))
         expUpdateInd(counter,1) = move
         expUpdateInd(counter,2) = scatterTrip(3,j)
 
@@ -371,12 +366,12 @@ contains
 
         counter = counter + 1
         expUpdate(counter) = &
-        proposedEnergyData%interatomicDistances(scatterTrip(1,j),move)
+        proposedEnergy%interatomicDistances(scatterTrip(1,j),move)
         expUpdateInd(counter,1) = scatterTrip(1,j)
         expUpdateInd(counter,2) = move
         counter = counter + 1
         expUpdate(counter) = &
-        proposedEnergyData%interatomicDistances(scatterTrip(2,j),move)
+        proposedEnergy%interatomicDistances(scatterTrip(2,j),move)
         expUpdateInd(counter,1) = scatterTrip(2,j)
         expUpdateInd(counter,2) = move
 
