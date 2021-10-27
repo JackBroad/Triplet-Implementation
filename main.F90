@@ -17,7 +17,7 @@ program main
 
 
   integer :: movedAtom, i
-  logical :: setSeed=.false., acceptMove=.true., useToyCode=.true.
+  logical :: setSeed=.false., acceptMove=.false., useToyCode=.false.
   double precision :: dist, time, fullEnergy, moveEnergy
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
@@ -65,8 +65,8 @@ program main
     deallocate(trainData)
     deallocate(expUpdate)
     deallocate(expUpdateInd)
-    deallocate(expUpdateNoRepeat)
-    deallocate(expUpdateIndNoRepeat)
+    !deallocate(expUpdateNoRepeat)
+    !deallocate(expUpdateIndNoRepeat)
     deallocate(changeExpData)
 
   else

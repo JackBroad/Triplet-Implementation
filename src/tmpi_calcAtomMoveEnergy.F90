@@ -18,9 +18,9 @@ module tmpi_calcAtomMoveEnergy_mod
 
 
   integer :: N_changed_triplets, nTriMax, nTriRe,triPerProc, j, counter
-  double precision :: totTime, moveTime, expTime, sumTime, setTime
-  double precision :: gatherTripTime, xTime, shareExpTime, tripTime
-  double precision :: extractTime
+  double precision :: moveTime, expTime, sumTime, setTime
+  double precision :: gatherAndSumTime, xTime, tripTime
+  double precision :: extractTime, tripSumTime
   integer, allocatable :: changedTriplets(:,:), tripIndex(:)
   integer, allocatable :: scounts(:), displs(:), newExpInt(:,:)
   integer, allocatable :: scatterTrip(:,:), indexVector(:)
@@ -37,43 +37,97 @@ contains
     integer, intent(in) :: atomToMove
 
 
+    ! Set up calculation
+    moveTime = MPI_Wtime()
+    setTime = MPI_Wtime()
+    call setUpCalculation(atomToMove)
+    setTime = MPI_Wtime() - setTime
+
+
+    ! Re-calculate changed exponentials
+    expTime = MPI_Wtime()
+    call changedExponentialCalculation(atomToMove)
+    expTime = MPI_Wtime() - expTime
+
+
+    ! Find the new energy after the move by summing over triplet energies
+    sumTime = MPI_Wtime()
+    call changedTripletEnergyCalc(atomToMove)
+    tmpi_calcAtomMoveEnergy = proposedEnergyData%Utotal
+    sumTime = MPI_Wtime() - sumTime
+
+
+    ! Deallocate all arrays
+    call deallocateArrays()
+    moveTime = MPI_Wtime() - moveTime
+
+
+    ! Finalise MPI and print times taken for each step of calculation
+    if (processRank .eq. root) then
+       call finalTextOutput()
+    end if
+    call finalAsserts(proposedPositionData%N_a)
+
+
+  return
+  end function tmpi_calcAtomMoveEnergy
+
+
+  subroutine setUpCalculation(mover)
+    implicit none
+    integer, intent(in) :: mover
+
+    ! Initial set-up and asserts
     call initialAsserts(proposedPositionData%N_a,proposedPositionData%N_tri, &
                         proposedPositionData%N_distances)
-    call firstTextOutput()
-    moveTime = MPI_Wtime()
     N_changed_triplets = getTriPerAtom(proposedPositionData%N_a)
     call allocateArrays(proposedPositionData,proposedEnergyData)
-    proposedEnergyData = currentEnergyData
-
-
-    ! Set up
-    setTime = MPI_Wtime()
-    if (processRank .eq. root) then
-
-       call moveTextOutput(atomToMove)
-
-    end if
-
 
     ! Re-calculate interatomicDistances for the new atomic positions
     xTime = MPI_Wtime()
-    call updateXdg(atomToMove,proposedPositionData%N_a,proposedPositionData%posArray, proposedEnergyData%interatomicDistances)
+    call updateXdg(mover,proposedPositionData%N_a,proposedPositionData%posArray, &
+                   proposedEnergyData%interatomicDistances)
     xTime = MPI_Wtime() - xTime
 
-    ! Find the indices of the affected exponentials
+  return
+  end subroutine setUpCalculation
+
+
+  subroutine changedExponentialCalculation(mover)
+    implicit none
+    integer, intent(in) :: mover
+
+    ! Find changed exps
     extractTime = MPI_Wtime()
-    call extractChangedExps(proposedPositionData%N_a,atomToMove,proposedEnergyData%interatomicDistances, &
+    call extractChangedExps(proposedPositionData%N_a,mover,proposedEnergyData%interatomicDistances, &
                             newExpInt,newDists)
+    expUpdateNoRepeat = newDists
+    expUpdateIndNoRepeat = newExpInt
     extractTime = MPI_Wtime() - extractTime
 
-    ! Determine which triplets have undergone a change
+    ! Calculate new values of changed exps
+    if (allocated(changeExpData)) then
+      deallocate(changeExpData)
+    end if
+    allocate(changeExpData(nArgs,N_tp,proposedPositionData%N_a-1))
+    call calculateExponentialsNonAdd(proposedPositionData%N_a-1,N_tp,nArgs,trainData, &
+                                     hyperParams(1),newDists, changeExpData)
+
+    ! Update exp array
+    call updateExpMatrix(proposedEnergyData,changeExpData, newExpInt, &
+                         proposedPositionData%N_a-1)
+
+  return
+  end subroutine changedExponentialCalculation
+
+
+  subroutine changedTripletEnergyCalc(mover)
+    implicit none
+    integer, intent(in) :: mover
+
+    ! Determine which triplets have changed
     tripTime = MPI_Wtime()
-    call getChangedTripletInfo(atomToMove,proposedPositionData)
-    !call getChangedTripletData(atomToMove,proposedPositionData%N_a,proposedPositionData%N_tri,triPerAt, &
-    !                           proposedEnergyData%triMat, tripIndex,changedTriplets)
-    tripTime = MPI_Wtime() - tripTime
-    setTime = MPI_Wtime() - setTime
-    expTime = MPI_Wtime()
+    call getChangedTripletInfo(mover,proposedPositionData)
 
     ! Prepare trip. data for scattering
     call getTripletScatterData()
@@ -81,72 +135,35 @@ contains
 
     ! Scatter triplets across processes
     scatterTrip = changedTriplets(1:3,1+displs(processRank+1):displs(processRank+1)+&
-                  scounts(processRank+1))
-
-    ! Find all distances required on each process for the triplet energy calc. for
-    ! which the exponentials have changed due to the move
-    call getAffectedTripletDistances(atomToMove,proposedEnergyData)
-
-    ! Calculate exponentials for the changed, un-repeated distances
-    if (allocated(changeExpData)) then
-      deallocate(changeExpData)
-    end if
-    allocate(changeExpData(nArgs,N_tp,size(expUpdateNoRepeat)))
-    call calculateExponentialsNonAdd(size(expUpdateNoRepeat),N_tp,nArgs,trainData, &
-                                     hyperParams(1),expUpdateNoRepeat, changeExpData)
-
-    ! Update the exponential matrix
-    call updateExpMatrix(proposedEnergyData,changeExpData,expUpdateIndNoRepeat, & 
-                         size(expUpdateNoRepeat))
-    expTime = MPI_Wtime() - expTime
+                                  scounts(processRank+1))
+    tripTime = MPI_Wtime() - tripTime
 
     ! Calculate the non-additive energies for the changed triplets
-    sumTime = MPI_Wtime()
+    tripSumTime = MPI_Wtime()
     call tripletEnergiesNonAdd(scatterTrip,proposedEnergyData%distancesIntMat,triPerProc,N_tp, &
                                proposedPositionData%N_a,N_p,nArgs,Perm,proposedPositionData%N_distances, &
                                proposedEnergyData%expMatrix,alpha,hyperParams(2), newUvec)
+    tripSumTime = MPI_Wtime() - tripSumTime
 
     ! Gather the changed triplet energies on the root process for summation
-    gatherTripTime = MPI_Wtime()
+    gatherAndSumTime = MPI_Wtime()
     call MPI_gatherv(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, scounts, &
                      displs, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-    gatherTripTime = MPI_Wtime() - gatherTripTime
 
-    ! Find total change in non-additive energy from moving an atom
+    ! Find new total non-additive energy after moving an atom
     proposedEnergyData%Utotal=0d0
     if (processRank .eq. root) then
-
        ! Update energies of changed triplets
-       call updateChangedTripletEnergies(currentEnergyData, proposedEnergyData)
+       call updateChangedTripletEnergies()
 
-       ! Evaluate total non-add energy after changes and print it to screen
+       ! Evaluate total non-add energy after move
        call totalEnergyNonAdd(proposedEnergyData%tripletEnergies,proposedPositionData%N_tri, &
                               proposedEnergyData%Utotal)
-       call energyTextOutput(proposedEnergyData)
-
     end if
-    tmpi_calcAtomMoveEnergy = proposedEnergyData%Utotal
-    sumTime = MPI_Wtime() - sumTime
-
-
-    ! Deallocate all arrays
-    call deallocateArrays()
-
-
-    moveTime = MPI_Wtime() - moveTime
-
-
-    ! Finalise MPI and print times taken for each step of calculation
-    if (processRank .eq. root) then
-
-       call finalTextOutput()
-
-    end if
-    call finalAsserts(proposedPositionData%N_a)
-
+    gatherAndSumTime = MPI_Wtime() - gatherAndSumTime
 
   return
-  end function tmpi_calcAtomMoveEnergy
+  end subroutine changedTripletEnergyCalc
 
 
   subroutine initialAsserts(N_a,N_tri,N_distances)
@@ -187,7 +204,7 @@ contains
     type (positionData) :: proposedPosition
     type (energiesData) :: proposedEnergy
  
-    allocate(newExpInt(2,proposedPosition%N_a-1))
+    allocate(newExpInt(proposedPosition%N_a-1,2))
     allocate(newDists(proposedPosition%N_a-1))
     allocate(changedTriplets(3,N_changed_triplets))
     Allocate(newUfull(N_changed_triplets))
@@ -201,37 +218,6 @@ contains
     allocate(tripIndex(N_changed_triplets))
 
   end subroutine allocateArrays
-
-
-  subroutine firstTextOutput()
-
-    if (processRank .eq. root) then
-       if (textOutput) then
-
-         !print *, ' '
-         !print *, ' '
-         !print *, '========================'
-         !print *, 'Beginning non-additive calculation for atom move'
-         !print *, ' '
-
-      end if
-    end if
-
-  end subroutine firstTextOutput
-
-
-  subroutine moveTextOutput(atomToMove)
-    integer :: atomToMove
-
-    if (textOutput) then
-
-      !print *, '------------------------'
-      !print *, "Moving atom", atomToMove
-      !print *, "                 "
-
-    end if
-
-  end subroutine moveTextOutput
 
 
   subroutine getTripletScatterData()
@@ -250,46 +236,27 @@ contains
     if (allocated(expUpdate)) then
       deallocate(expUpdate)
     end if
-    allocate(expUpdate(2*triPerProc))
+    !allocate(expUpdate(2*triPerProc))
+    allocate(expUpdate(proposedPositionData%N_a-1))
     if (allocated(expUpdateInd)) then
       deallocate(expUpdateInd)
     end if
-    allocate(expUpdateInd(2*triPerProc,2))
+    !allocate(expUpdateInd(2*triPerProc,2))
+    allocate(expUpdateInd(proposedPositionData%N_a-1,2))
 
   end subroutine allocateTripletScatterArrays
 
 
-  subroutine updateChangedTripletEnergies(currentEnergy, proposedEnergy)
-    type (energiesData) :: currentEnergy, proposedEnergy
+  subroutine updateChangedTripletEnergies()
 
-<<<<<<< HEAD
-    proposedEnergy%tripletEnergies = currentEnergy%tripletEnergies
-    do j = 1, triPerAt
-=======
     proposedEnergyData%tripletEnergies = currentEnergyData%tripletEnergies
     do j = 1, N_changed_triplets
->>>>>>> 3d603238f439e540aa9a6f85b3860b4d588a7e32
 
-      proposedEnergy%tripletEnergies(tripIndex(j)) = newUfull(j)
+      proposedEnergyData%tripletEnergies(tripIndex(j)) = newUfull(j)
 
     end do
 
   end subroutine updateChangedTripletEnergies
-
-
-  subroutine energyTextOutput(proposedEnergy)
-    type (energiesData) :: proposedEnergy
-
-    if (textOutput) then
-
-      !print *, "The non-additive energy after the move is", &
-      !         proposedEnergy%Utotal
-      !print *, '------------------------'
-      !print *, ' '
-
-    end if
-
-  end subroutine energyTextOutput
 
 
   subroutine deallocateArrays()
@@ -310,24 +277,8 @@ contains
   subroutine finalTextOutput()
 
     if (textOutput) then
-
-      !print *, "The time taken to do all moves was", moveTime, &
-      !         "seconds"
-      !print *, "The total time for the program to run was", totTime, &
-      !         "seconds"
-      !print *, "The time for the exp calc was", expTime
-      !print *, "The time for the sum was", sumTime
-      !print *, "The time to gather the triplet energies was", gatherTripTime
-      !print *, "The time for the set-up was", setTime
-      !print *, "The time for the Xdg set-up was", xTime
-      !print *, "The time for the exp extraction was", extractTime
-      !print *, "The time for the triplet set up was ", tripTime
-      !print *, ' '
-      !print *, 'Non-additive calculation for atom move complete'
-      print *, moveTime, setTime, expTime, sumTime
-      !print *, '========================'
-      !print *, ' '
-
+      !print *, moveTime, setTime, expTime, sumTime
+      print *, sumTime, tripTime, tripSumTime, gatherAndSumTime
     end if
 
   end subroutine finalTextOutput
@@ -437,27 +388,27 @@ contains
     implicit none
     integer, intent(in) :: num, atInd
     double precision, intent(in) :: Xdg(num,num)
-    integer, intent(out) :: change(2,num-1)
+    integer, intent(out) :: change(num-1,2)
     double precision, intent(out) :: dists(num-1)
     integer :: i, j
 
     do i = 1, num
       if (i .lt. atInd) then
 
-        change(1,i) = i
-        change(2,i) = atInd
+        change(i,1) = i
+        change(i,2) = atInd
 
       else if (i .gt. atInd) then
 
-        change(1,i-1) = atInd
-        change(2,i-1) = i
+        change(i-1,1) = atInd
+        change(i-1,2) = i
 
       end if
     end do
 
     do j = 1, num-1
 
-      dists(j) = Xdg(change(1,j),change(2,j))
+      dists(j) = Xdg(change(j,1),change(j,2))
 
     end do
 
@@ -465,9 +416,9 @@ contains
   end subroutine extractChangedExps
 
 
-  subroutine getChangedTripletData(atom,nAt,nTri,nPerAt,tripMat, tripletIndex,changedTriplets)
+  subroutine getChangedTripletData(atom,nTri,nPerAt,tripMat, tripletIndex,changedTriplets)
     implicit none
-    integer, intent(in) :: atom, nAt, nTri, nPerAt, tripMat(3,nTri)
+    integer, intent(in) :: atom, nTri, nPerAt, tripMat(3,nTri)
     integer, intent(out) :: changedTriplets(3,nPerAt), tripletIndex(nPerAt)
     integer :: i, counter
     logical :: mask(nTri)
@@ -492,6 +443,10 @@ contains
 
     call getChangedTriplets(move,proposedPosition%N_a,N_changed_triplets, changedTriplets)
     call findChangedTriIndex(N_changed_triplets,proposedPosition%N_a,move, tripIndex)
+    !changedTriplets = currentEnergyData%triMat(1:3,1:N_changed_triplets)
+    !do j = 1, N_changed_triplets
+    !  tripIndex(j) = j
+    !end do
 
   end subroutine getChangedTripletInfo
 

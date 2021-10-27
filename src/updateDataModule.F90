@@ -27,7 +27,7 @@ contains
   subroutine shareChangedExponentials(proposedEnergyData)
     implicit none
     integer :: length, lengthVec(clusterSize), sumLength
-    integer :: maxLength, reLength, j, disp(clusterSize)
+    integer :: j, disp(clusterSize)
     type (energiesData) :: proposedEnergyData
     integer, allocatable :: changeExpInd(:,:)
     integer, allocatable :: expUpdateNoRepeatTrans(:,:)
@@ -73,7 +73,7 @@ contains
                      ierror)
 
       ! Update exp matrix on all processes
-      changeExpInd = transpose(changeExpInd)
+      !changeExpInd = transpose(changeExpInd)
       call updateExpMatrix(proposedEnergyData,changeExpMat,changeExpInd, &
                            sumLength)
       deallocate(changeExpMat,changeExpInd)
@@ -90,7 +90,7 @@ contains
     type (energiesData) :: proposedEnergyData, currentEnergyData
     type (positionData) :: proposedPositionData, currentPositionData
 
-    call shareChangedExponentials(proposedEnergyData)
+    !call shareChangedExponentials(proposedEnergyData)
     call broadcastEnergyData(proposedEnergyData,proposedPositionData)
 
     currentEnergyData = proposedEnergyData

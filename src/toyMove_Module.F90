@@ -34,9 +34,9 @@ contains
     type (positionData) :: oldPositionData
     type (energiesData) :: moveEnergyData
     double precision :: uTotPerProc, U, randomNo
-    double precision, allocatable :: changedDists(:), scatterDists(:), uVector(:)
-    double precision, allocatable :: changeExpData(:,:,:), changeExpMat(:,:,:)
-    integer :: nChangedDists, distsPerProc, i
+    double precision, allocatable :: uVector(:)
+    integer :: nChangedDists, i
+    integer :: atomToMove=1
 
     ! Set up
     call allocateToyDataStructArrays(oldPositionData,moveEnergyData)
@@ -51,31 +51,40 @@ contains
     moveTime = MPI_Wtime()
     triPerAt = getTriPerAtom(oldPositionData%N_a)
     nChangedDists = oldPositionData%N_a-1
-    !moveEnergyData%expMatrix = randomNo
 
-    ! Find no. of dists per proc
-    allocate(scounts(clusterSize))
-    allocate(displs(clusterSize))
-    call getNPerProcNonAdd(nChangedDists,clusterSize, nTriMax,nTriRe)
-    call getVarrays(clusterSize,nTriMax,nTriRe, scounts,displs)
-    distsPerProc = scounts(processRank+1)
+    ! Do exp calculation
+    if (allocated(newDists)) then
+      deallocate(newDists)
+    end if
+    if (allocated(newExpInt)) then
+      deallocate(newExpInt)
+    end if
+    allocate(newDists(nChangedDists),newExpInt(nChangedDists,2))
+    call extractChangedExps(oldPositionData%N_a,atomToMove,moveEnergyData%interatomicDistances, &
+                            newExpInt,newDists)
+    if (allocated(changeExpData)) then
+      deallocate(changeExpData)
+    end if
+    allocate(changeExpData(nArgs,N_tp,nChangedDists))
+    call calculateExponentialsNonAdd(nChangedDists,N_tp,nArgs,trainData, &
+                                     hyperParams(1),newDists, changeExpData)
+    call updateExpMatrix(moveEnergyData,changeExpData, newExpInt, &
+                         nChangedDists)
 
     ! Find no. of triplets per proc
+    allocate(scounts(clusterSize))
+    allocate(displs(clusterSize))
     call getNPerProcNonAdd(triPerAt,clusterSize, nTriMax,nTriRe)
     call getVarrays(clusterSize,nTriMax,nTriRe, scounts,displs)
     triPerProc = scounts(processRank+1)
+
+    ! Scatter triplets
     allocate(scatterTrip(3,triPerProc))
     do i = 1, triPerProc
-    !  scatterTrip(:,i) = (/1,2,3/)
        scatterTrip(:,i) = moveEnergyData%triMat(:,i)
     end do
     allocate(newUvec(triPerProc))
     allocate(newUfull(oldPositionData%N_tri))
-
-    ! Update exps on each process
-    do i = 1, nChangedDists
-      moveEnergyData%expMatrix(:,:,i) = i*2d0 + i
-    end do
 
     ! Sum over the triplets
     call toyTripletSum(scatterTrip,triPerProc,moveEnergyData%expMatrix, &
