@@ -542,14 +542,4 @@ contains
   end subroutine getAffectedTripletDistances
 
 
-  subroutine getChangedTripletInfo(move,proposedPosition)
-    integer :: move
-    type (positionData) :: proposedPosition
-
-    call getChangedTriplets(move,proposedPosition%N_a,triPerAt, changedTriplets)
-    call findChangedTriIndex(triPerAt,proposedPosition%N_a,move, tripIndex)
-
-  end subroutine getChangedTripletInfo
-
-
 end module toyMove_Module

@@ -18,6 +18,7 @@ module test_regression
   double precision, allocatable :: posAt(:,:), Xd(:,:)
   double precision, allocatable :: expoData(:,:,:)
   integer, allocatable :: disMat(:,:)
+  integer :: changedTriplets(3,6), tripIndex(6)
   integer :: n_tri, n_at, n_dist, move
 
 contains
@@ -397,17 +398,10 @@ contains
   @test
   subroutine test_getChangedTripletsAndDists()
     implicit none
-    integer :: nAt=5, nPerAt, i
-    integer, allocatable :: triInd(:,:), tInd_Ex(:,:)
-    integer, allocatable :: changeInd (:,:), cInd_Ex(:,:)
-
-    nPerAt = getTriPerAtom(nAt)
-
-    allocate(triInd(3,nPerAt),tInd_Ex(3,nPerAt))
-    allocate(changeInd(2,nPerAt),cInd_Ex(2,nPerAt))
+    integer :: tInd_Ex(3,6), cInd_Ex(6), i
 
     move = 1
-    call getChangedTriplets(move,nAt,nPerAt, triInd)
+    call findChangedTripletMat(move, changedTriplets,tripIndex)
 
     tInd_Ex(:,1) = (/ 1,2,3 /)
     tInd_Ex(:,2) = (/ 1,2,4 /)
@@ -416,85 +410,11 @@ contains
     tInd_Ex(:,5) = (/ 1,3,5 /)
     tInd_Ex(:,6) = (/ 1,4,5 /)
 
-    if( processRank == root) then
-
-      @assertEqual(triInd, tInd_Ex, 'Test changed triplets #1')
-
-    end if
-
-    call findChangedIndPerTrip(nPerAt,triInd,move, changeInd)
-
-    do i = 1, nPerAt
-
-      cInd_Ex(:,i) = (/ 1,2 /)
-
-    end do
+    cInd_Ex = (/ 1,2,3,4,5,6 /)
 
     if( processRank == root) then
-
-      @assertEqual(changeInd, cInd_Ex, 'Test changed dist indices #1')
-
-    end if
-
-    move = 3
-    call getChangedTriplets(move,nAt,nPerAt, triInd)
-
-    tInd_Ex(:,1) = (/ 1,2,3 /)
-    tInd_Ex(:,2) = (/ 1,3,4 /)
-    tInd_Ex(:,3) = (/ 1,3,5 /)
-    tInd_Ex(:,4) = (/ 2,3,4 /)
-    tInd_Ex(:,5) = (/ 2,3,5 /)
-    tInd_Ex(:,6) = (/ 3,4,5 /)
-
-    if( processRank == root) then
-
-      @assertEqual(triInd, tInd_Ex, 'Test changed triplets #2')
-
-    end if
-
-    call findChangedIndPerTrip(nPerAt,triInd,move, changeInd)
-
-    cInd_Ex(:,1) = (/ 2,3 /)
-    cInd_Ex(:,2) = (/ 1,3 /)
-    cInd_Ex(:,3) = (/ 1,3 /)
-    cInd_Ex(:,4) = (/ 1,3 /)
-    cInd_Ex(:,5) = (/ 1,3 /)
-    cInd_Ex(:,6) = (/ 1,2 /)
-
-    if( processRank == root) then
-
-      @assertEqual(changeInd, cInd_Ex, 'Test changed dist indices #2')
-
-    end if
-
-    move = 5
-    call getChangedTriplets(move,nAt,nPerAt, triInd)
-
-    tInd_Ex(:,1) = (/ 1,2,5 /)
-    tInd_Ex(:,2) = (/ 1,3,5 /)
-    tInd_Ex(:,3) = (/ 1,4,5 /)
-    tInd_Ex(:,4) = (/ 2,3,5 /)
-    tInd_Ex(:,5) = (/ 2,4,5 /)
-    tInd_Ex(:,6) = (/ 3,4,5 /)
-
-    if( processRank == root) then
-
-      @assertEqual(triInd, tInd_Ex, 'Test changed triplets #3')
-
-    end if
-
-    call findChangedIndPerTrip(nPerAt,triInd,move, changeInd)
-
-    do i = 1, nPerAt
-
-      cInd_Ex(:,i) = (/ 2,3 /)
-
-    end do
-
-    if( processRank == root) then
-
-      @assertEqual(changeInd, cInd_Ex, 'Test changed dist indices #3')
-
+      @assertEqual(changedTriplets, tInd_Ex, 'Test changed triplets')
+      @assertEqual(tripIndex, cInd_Ex, 'Test changed dist indices')
     end if
 
   end subroutine test_getChangedTripletsAndDists
