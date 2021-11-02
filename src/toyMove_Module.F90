@@ -113,7 +113,7 @@ contains
     implicit none
     type (positionData) :: oldPositionData
     type (energiesData) :: moveEnergyData
-    double precision :: randomNo, uTotPerProc
+    double precision :: randomNo
     double precision, allocatable :: changedDists(:), scatterDists(:)
     double precision, allocatable :: changeExpData(:,:,:), changeExpMat(:,:,:)
     integer :: nChangedDists, distsPerProc, i

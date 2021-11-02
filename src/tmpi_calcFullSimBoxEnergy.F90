@@ -114,6 +114,8 @@ contains
     ! Gather in the triplet energies and sum them to get total non-add energy
     call MPI_gatherv(uVec, nSum, MPI_DOUBLE_PRECISION, currentEnergyData%tripletEnergies, scounts, displs, &
                      MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(currentEnergyData%tripletEnergies,currentPositionData%N_tri,MPI_DOUBLE_PRECISION, &
+                   root, MPI_COMM_WORLD, ierror)
 
 
     ! Find the total non-additive energy for the system

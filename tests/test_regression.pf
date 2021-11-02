@@ -582,19 +582,27 @@ contains
   double precision function getExpectedAtomMoveEnergy(tripDist)
     implicit none
     integer :: triplets(3,10), i
-    double precision :: tripDist(3,10), tripEnergies_Ex(10)
+    double precision :: tripDist(3,10), oldTripDist(3,10), newTripEnergies_Ex(10)
+    double precision :: oldTripEnergies_Ex(10), energy_Ex, oldEnergy_Ex
 
     triplets = makeTripletMatrix(5,10)
 
     call findTripletDistances(proposedPositionData%N_a,proposedPositionData%N_tri,triplets, &
                               proposedEnergyData%interatomicDistances, tripDist)
+    call findTripletDistances(currentPositionData%N_a,currentPositionData%N_tri,triplets, &
+                              currentEnergyData%interatomicDistances, oldTripDist)
 
     ! Re-calculate energy using RSG's code
     do i = 1, proposedPositionData%N_tri
-      tripEnergies_Ex(i) = energyCheckCalc(tripDist(:,i)) ! Energies of each triplet after move
-   end do
+      newTripEnergies_Ex(i) = energyCheckCalc(tripDist(:,i)) ! Energies of each triplet after move
+      oldTripEnergies_Ex(i) = energyCheckCalc(oldTripDist(:,i))
+    end do
 
-   getExpectedAtomMoveEnergy = sum(tripEnergies_Ex)
+    ! Find the difference between the new and old triplet energies
+    energy_Ex = sum(newTripEnergies_Ex)
+    oldEnergy_Ex = sum(oldTripEnergies_Ex)
+
+    getExpectedAtomMoveEnergy = energy_Ex - oldEnergy_Ex
 
   return
   end function getExpectedAtomMoveEnergy

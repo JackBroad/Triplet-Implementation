@@ -17,13 +17,16 @@ module tmpi_calcAtomMoveEnergy_mod
          getTripletScatterData
 
 
-  integer :: N_changed_triplets, nTriMax, nTriRe,triPerProc, j, counter
+  integer :: N_changed_triplets, nTriMax, nTriRe,triPerProc
+  integer :: j, counter
   double precision :: moveTime, expTime, sumTime, setTime
   double precision :: gatherAndSumTime, xTime, tripTime
-  double precision :: extractTime, tripSumTime
+  double precision :: extractTime, tripSumTime, newTripU
+  double precision :: oldTripU, partialDeltaU
   integer, allocatable :: changedTriplets(:,:), tripIndex(:)
   integer, allocatable :: scounts(:), displs(:), newExpInt(:,:)
   integer, allocatable :: scatterTrip(:,:), indexVector(:)
+  integer, allocatable :: scatterTripInd(:)
   logical, allocatable :: mask(:)
   double precision, allocatable :: newDists(:), newUvec(:)
   double precision, allocatable :: newUfull(:)
@@ -136,6 +139,7 @@ contains
     ! Scatter triplets across processes
     scatterTrip = changedTriplets(1:3,1+displs(processRank+1):displs(processRank+1)+&
                                   scounts(processRank+1))
+    scatterTripInd = tripIndex(1+displs(processRank+1):displs(processRank+1)+scounts(processRank+1))
     tripTime = MPI_Wtime() - tripTime
 
     ! Calculate the non-additive energies for the changed triplets
@@ -143,27 +147,40 @@ contains
     call tripletEnergiesNonAdd(scatterTrip,proposedEnergyData%distancesIntMat,triPerProc,N_tp, &
                                proposedPositionData%N_a,N_p,nArgs,Perm,proposedPositionData%N_distances, &
                                proposedEnergyData%expMatrix,alpha,hyperParams(2), newUvec)
+    newTripU = sum(newUvec)
+    oldTripU = findOldTripU()
+    partialDeltaU = newTripU - oldTripU
     tripSumTime = MPI_Wtime() - tripSumTime
 
-    ! Gather the changed triplet energies on the root process for summation
+    ! Gather the change in triplet energies on the root process for summation
     gatherAndSumTime = MPI_Wtime()
-    call MPI_gatherv(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, scounts, &
-                     displs, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+    call MPI_gather(partialDeltaU, 1, MPI_DOUBLE_PRECISION, newUfull, 1, &
+                    MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
 
     ! Find new total non-additive energy after moving an atom
-    proposedEnergyData%Utotal=0d0
+    proposedEnergyData%Utotal = 0d0
     if (processRank .eq. root) then
-       ! Update energies of changed triplets
-       call updateChangedTripletEnergies()
-
-       ! Evaluate total non-add energy after move
-       call totalEnergyNonAdd(proposedEnergyData%tripletEnergies,proposedPositionData%N_tri, &
-                              proposedEnergyData%Utotal)
+      proposedEnergyData%Utotal = sum(newUfull)
     end if
     gatherAndSumTime = MPI_Wtime() - gatherAndSumTime
 
   return
   end subroutine changedTripletEnergyCalc
+
+
+  double precision function findOldTripU()
+    implicit none
+    double precision :: oldUvec(triPerProc)
+
+    counter = 1
+    do j = 1, triPerProc
+      oldUvec(j) = currentEnergyData%tripletEnergies(scatterTripInd(j))
+    end do
+
+    findOldTripU = sum(oldUvec)
+
+  return
+  end function findOldTripU
 
 
   subroutine initialAsserts(N_a,N_tri,N_distances)
@@ -207,7 +224,7 @@ contains
     allocate(newExpInt(proposedPosition%N_a-1,2))
     allocate(newDists(proposedPosition%N_a-1))
     allocate(changedTriplets(3,N_changed_triplets))
-    Allocate(newUfull(N_changed_triplets))
+    allocate(newUfull(clusterSize))
     allocate(scounts(clusterSize))
     allocate(displs(clusterSize))
     if (allocated(proposedEnergy%interatomicDistances)) then
@@ -231,6 +248,7 @@ contains
 
   subroutine allocateTripletScatterArrays()
 
+    allocate(scatterTripInd(triPerProc))
     allocate(scatterTrip(3,triPerProc))
     allocate(newUvec(triPerProc))
     if (allocated(expUpdate)) then
@@ -261,6 +279,7 @@ contains
 
   subroutine deallocateArrays()
 
+    deallocate(scatterTripInd)
     deallocate(scatterTrip)
     deallocate(newUvec)
     deallocate(newExpInt)
@@ -277,8 +296,8 @@ contains
   subroutine finalTextOutput()
 
     if (textOutput) then
-      !print *, moveTime, setTime, expTime, sumTime
-      print *, sumTime, tripTime, tripSumTime, gatherAndSumTime
+      print *, moveTime, setTime, expTime, sumTime
+      !print *, sumTime, tripTime, tripSumTime, gatherAndSumTime
     end if
 
   end subroutine finalTextOutput
