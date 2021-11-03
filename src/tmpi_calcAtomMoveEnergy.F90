@@ -14,7 +14,7 @@ module tmpi_calcAtomMoveEnergy_mod
   private
   public tmpi_calcAtomMoveEnergy, extractChangedExps, getTriPerAtom, &
          updateXdg, getNPerProcNonAdd, getVarrays, getTripletScatterData, &
-         findChangedTripletMat
+         getChangedTriplets
 
 
   integer :: N_changed_triplets, nTriMax, nTriRe,triPerProc
@@ -130,7 +130,7 @@ contains
 
     ! Determine which triplets have changed
     tripTime = MPI_Wtime()
-    call findChangedTripletMat(mover, changedTriplets,tripIndex)
+    call getChangedTriplets(mover, changedTriplets,tripIndex)
 
     ! Prepare trip. data for scattering
     call getTripletScatterData()
@@ -435,29 +435,89 @@ contains
   end subroutine extractChangedExps
 
 
-  subroutine findChangedTripletMat(move, triMat,triIndVec)
+  subroutine getChangedTriplets(atom, changedTriplets,tripIndex)
     implicit none
-    integer :: k, counter
-    integer, intent(in) :: move
-    integer, intent(out) :: triMat(3,N_changed_triplets)
-    integer, intent(out) :: triIndVec(N_changed_triplets)
+    integer, intent(in) :: atom
+    integer, intent(out) :: changedTriplets(3,N_changed_triplets)
+    integer, intent(out) :: tripIndex(N_changed_triplets)
+    integer :: al, be, ga, counter, indCounter
 
+    ! Fill changed triplet array and vector of indices of changed triplets
     counter = 0
-    do j = 1, proposedPositionData%N_tri  
-      do k = 1, 3
-        !if (any(proposedEnergyData%triMat(:,j) .eq. move)) then
-        if (proposedEnergyData%triMat(k,j) .eq. move) then
-          counter = counter + 1
-          triMat(1,counter) = proposedEnergyData%triMat(1,j)
-          triMat(2,counter) = proposedEnergyData%triMat(2,j)
-          triMat(3,counter) = proposedEnergyData%triMat(3,j)
-          triIndVec(counter) = j
-        end if
+    indCounter = 0
+    do al = 1, proposedPositionData%N_a-2
+      do be = al+1, proposedPositionData%N_a-1
+        do ga = be+1, proposedPositionData%N_a
+          indCounter = indCounter + 1
+          if (al .eq. atom) then
+
+            counter = counter + 1
+            changedTriplets(1,counter) = al
+            changedTriplets(2,counter) = be
+            changedTriplets(3,counter) = ga
+            tripIndex(counter) = indCounter
+
+          else if (be .eq. atom) then
+
+            counter = counter + 1
+            changedTriplets(1,counter) = al
+            changedTriplets(2,counter) = be
+            changedTriplets(3,counter) = ga
+            tripIndex(counter) = indCounter
+
+          else if (ga .eq. atom) then
+
+            counter = counter + 1
+            changedTriplets(1,counter) = al
+            changedTriplets(2,counter) = be
+            changedTriplets(3,counter) = ga
+            tripIndex(counter) = indCounter
+
+          end if
+        end do
       end do
     end do
 
   return
-  end subroutine findChangedTripletMat
+  end subroutine getChangedTriplets
+
+
+  subroutine findChangedTriIndex(nPerAt,nAt,atom, triIndex)
+    implicit none
+    integer, intent(in) :: nPerAt, nAt, atom
+    integer, intent(out) :: triIndex(nPerAt)
+    integer :: al, be, ga, i, counter
+
+    counter = 0
+    i = 0
+    do al = 1, nAt-2
+      do be = al+1, nAt-1
+        do ga = be+1, nAt
+
+          i = i + 1
+
+          if (al .eq. atom) then
+
+            counter = counter + 1
+            triIndex(counter) = i
+
+          else if (be .eq. atom) then
+
+            counter = counter + 1
+            triIndex(counter) = i
+
+          else if (ga .eq. atom) then
+
+            counter = counter + 1
+            triIndex(counter) = i
+
+          end if
+        end do
+      end do
+    end do
+
+  return
+  end subroutine findChangedTriIndex
 
 
   subroutine updateXdg(move,N_a,positions, X)

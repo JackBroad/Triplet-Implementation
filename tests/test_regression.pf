@@ -401,7 +401,7 @@ contains
     integer :: tInd_Ex(3,6), cInd_Ex(6), i
 
     move = 1
-    call findChangedTripletMat(move, changedTriplets,tripIndex)
+    call getChangedTriplets(move, changedTriplets,tripIndex)
 
     tInd_Ex(:,1) = (/ 1,2,3 /)
     tInd_Ex(:,2) = (/ 1,2,4 /)
