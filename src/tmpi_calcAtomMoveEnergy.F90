@@ -445,6 +445,7 @@ contains
     ! Fill changed triplet array and vector of indices of changed triplets
     counter = 0
     indCounter = 0
+    do while (counter .lt. N_changed_triplets)
     do al = 1, proposedPositionData%N_a-2
       do be = al+1, proposedPositionData%N_a-1
         do ga = be+1, proposedPositionData%N_a
@@ -476,6 +477,7 @@ contains
           end if
         end do
       end do
+    end do
     end do
 
   return
