@@ -9,8 +9,8 @@ maxProcs = int(sys.argv[1])
 dirString = sys.argv[2]
 nProcs = np.arange(maxProcs)
 nProcs = nProcs+1
-fullBoxMat = np.zeros((maxProcs,4))
-atomMoveMat = np.zeros((maxProcs,4))
+fullBoxMat = np.zeros((maxProcs,6)) # 4
+atomMoveMat = np.zeros((maxProcs,6)) # 4
 
 # Loop over number of processes, extracting all data from appropriate output file
 for i in range (1,maxProcs+1):

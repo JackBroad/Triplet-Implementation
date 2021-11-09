@@ -10,9 +10,9 @@ module energiesData_Module
   type energiesData
      
      double precision:: Utotal
-     integer, allocatable :: distancesIntMat(:,:), triMat(:,:)
+     integer, allocatable :: distancesIntMat(:,:), triMat(:,:), changedTriInd(:)
      double precision, allocatable :: interatomicDistances(:,:), tripletEnergies(:)
-     double precision, allocatable :: expMatrix(:,:,:)
+     double precision, allocatable :: expMatrix(:,:,:), changedTriU(:)
 
   end type energiesData
 

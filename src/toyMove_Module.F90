@@ -72,6 +72,7 @@ contains
                          nChangedDists)
 
     ! Find no. of triplets per proc
+    setTime = MPI_Wtime()
     allocate(scounts(clusterSize))
     allocate(displs(clusterSize))
     call getNPerProcNonAdd(triPerAt,clusterSize, nTriMax,nTriRe)
@@ -85,12 +86,16 @@ contains
     end do
     allocate(newUvec(triPerProc))
     allocate(newUfull(oldPositionData%N_tri))
+    setTime = MPI_Wtime() - setTime
 
     ! Sum over the triplets
+    sumTime = MPI_Wtime()
     call toyTripletSum(scatterTrip,triPerProc,moveEnergyData%expMatrix, &
                        oldPositionData%N_distances,moveEnergyData%distancesIntMat, &
                        oldPositionData%N_a, newUvec)
     uTotPerProc = sum(newUvec)
+    sumTime = MPI_Wtime() - sumTime
+    gatherTripTime = MPI_Wtime()
     allocate(uVector(clusterSize))
     call MPI_gather(uTotPerProc, 1, MPI_DOUBLE_PRECISION, uVector, &
                     1, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, &
@@ -98,9 +103,10 @@ contains
     if (processRank .eq. root) then
       U = sum(uVector)
     end if
+    gatherTripTime = MPI_Wtime() - gatherTripTime
     moveTime = MPI_Wtime() - moveTime
     if (processRank .eq. root) then
-      print *, moveTime, 0, 0, 0
+      print *, moveTime, setTime, sumTime, gatherTripTime
     end if
 
     call deallocateAllArrays(moveEnergyData)

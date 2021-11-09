@@ -22,11 +22,10 @@ module tmpi_calcAtomMoveEnergy_mod
   double precision :: moveTime, expTime, sumTime, setTime
   double precision :: gatherAndSumTime, xTime, tripTime
   double precision :: extractTime, tripSumTime, newTripU
-  double precision :: oldTripU, partialDeltaU
+  double precision :: oldTripU, partialDeltaU, rootSumTime
   integer, allocatable :: changedTriplets(:,:), tripIndex(:)
   integer, allocatable :: scounts(:), displs(:), newExpInt(:,:)
   integer, allocatable :: scatterTrip(:,:), indexVector(:)
-  integer, allocatable :: scatterTripInd(:)
   logical, allocatable :: mask(:)
   double precision, allocatable :: newDists(:), newUvec(:)
   double precision, allocatable :: newUfull(:)
@@ -44,13 +43,13 @@ contains
     moveTime = MPI_Wtime()
     setTime = MPI_Wtime()
     call setUpCalculation(atomToMove)
-    setTime = MPI_Wtime() - setTime
+    setTime = MPI_Wtime() - setTime ! b
 
 
     ! Re-calculate changed exponentials
     expTime = MPI_Wtime()
     call changedExponentialCalculation(atomToMove)
-    expTime = MPI_Wtime() - expTime
+    expTime = MPI_Wtime() - expTime ! c
 
 
     ! Find the new energy after the move by summing over triplet energies
@@ -139,30 +138,36 @@ contains
     ! Scatter triplets across processes
     scatterTrip = changedTriplets(1:3,1+displs(processRank+1):displs(processRank+1)+&
                                   scounts(processRank+1))
-    scatterTripInd = tripIndex(1+displs(processRank+1):displs(processRank+1)+scounts(processRank+1))
-    tripTime = MPI_Wtime() - tripTime
+    !scatterTripInd = tripIndex(1+displs(processRank+1):displs(processRank+1)+scounts(processRank+1))
+    proposedEnergyData%changedTriInd = tripIndex(1+displs(processRank+1):&
+                                       displs(processRank+1)+scounts(processRank+1))
+    tripTime = MPI_Wtime() - tripTime ! d
 
     ! Calculate the non-additive energies for the changed triplets
     tripSumTime = MPI_Wtime()
     call tripletEnergiesNonAdd(scatterTrip,proposedEnergyData%distancesIntMat,triPerProc,N_tp, &
                                proposedPositionData%N_a,N_p,nArgs,Perm,proposedPositionData%N_distances, &
-                               proposedEnergyData%expMatrix,alpha,hyperParams(2), newUvec)
-    newTripU = sum(newUvec)
+                               proposedEnergyData%expMatrix,alpha,hyperParams(2), proposedEnergyData%changedTriU)
+    tripSumTime = MPI_Wtime() - tripSumTime ! e
+
+    ! Find the change in U on each process
+    gatherAndSumTime = MPI_Wtime()
+    newTripU = sum(proposedEnergyData%changedTriU)
     oldTripU = findOldTripU()
     partialDeltaU = newTripU - oldTripU
-    tripSumTime = MPI_Wtime() - tripSumTime
 
     ! Gather the change in triplet energies on the root process for summation
-    gatherAndSumTime = MPI_Wtime()
     call MPI_gather(partialDeltaU, 1, MPI_DOUBLE_PRECISION, newUfull, 1, &
                     MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+    gatherAndSumTime = MPI_Wtime() - gatherAndSumTime ! f
 
     ! Find new total non-additive energy after moving an atom
+    rootSumTime = MPI_Wtime()
     proposedEnergyData%Utotal = 0d0
     if (processRank .eq. root) then
       proposedEnergyData%Utotal = sum(newUfull)
     end if
-    gatherAndSumTime = MPI_Wtime() - gatherAndSumTime
+    rootSumTime = MPI_Wtime() - rootSumTime ! g
 
   return
   end subroutine changedTripletEnergyCalc
@@ -174,7 +179,8 @@ contains
 
     counter = 1
     do j = 1, triPerProc
-      oldUvec(j) = currentEnergyData%tripletEnergies(scatterTripInd(j))
+      oldUvec(j) = currentEnergyData%tripletEnergies(&
+                   proposedEnergyData%changedTriInd(j))
     end do
 
     findOldTripU = sum(oldUvec)
@@ -248,19 +254,25 @@ contains
 
   subroutine allocateTripletScatterArrays()
 
-    allocate(scatterTripInd(triPerProc))
+    !allocate(scatterTripInd(triPerProc))
     allocate(scatterTrip(3,triPerProc))
-    allocate(newUvec(triPerProc))
+    !allocate(newUvec(triPerProc))
     if (allocated(expUpdate)) then
       deallocate(expUpdate)
     end if
-    !allocate(expUpdate(2*triPerProc))
     allocate(expUpdate(proposedPositionData%N_a-1))
     if (allocated(expUpdateInd)) then
       deallocate(expUpdateInd)
     end if
-    !allocate(expUpdateInd(2*triPerProc,2))
     allocate(expUpdateInd(proposedPositionData%N_a-1,2))
+    if (allocated(proposedEnergyData%changedTriU)) then
+      deallocate(proposedEnergyData%changedTriU)
+    end if
+    allocate(proposedEnergyData%changedTriU(triPerProc))
+    if (allocated(proposedEnergyData%changedTriInd)) then
+      deallocate(proposedEnergyData%changedTriInd)
+    end if
+    allocate(proposedEnergyData%changedTriInd(triPerProc))
 
   end subroutine allocateTripletScatterArrays
 
@@ -279,9 +291,9 @@ contains
 
   subroutine deallocateArrays()
 
-    deallocate(scatterTripInd)
+    !deallocate(scatterTripInd)
     deallocate(scatterTrip)
-    deallocate(newUvec)
+    !deallocate(newUvec)
     deallocate(newExpInt)
     deallocate(newDists)
     deallocate(changedTriplets)
@@ -297,7 +309,8 @@ contains
 
     if (textOutput) then
       !print *, moveTime, setTime, expTime, sumTime
-      print *, sumTime, tripTime, tripSumTime, gatherAndSumTime
+      !print *, sumTime, tripTime, tripSumTime, gatherAndSumTime
+      print *, setTime, expTime, tripTime, tripSumTime, gatherAndSumTime, rootSumTime
     end if
 
   end subroutine finalTextOutput
