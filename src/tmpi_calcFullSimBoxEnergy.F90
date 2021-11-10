@@ -130,6 +130,8 @@ contains
     tmpi_calcFullSimBoxEnergy = currentEnergyData%Utotal
     sumTime = MPI_Wtime() - sumTime
     call deallocateLocalArrays()
+    proposedPositionData = currentPositionData
+    proposedEnergyData = currentEnergyData
 
 
     ! Print times taken for each part of subroutine to run

@@ -17,7 +17,7 @@ module tmpi_calcAtomMoveEnergy_mod
          getChangedTriplets
 
 
-  integer :: N_changed_triplets, nTriMax, nTriRe,triPerProc
+  integer :: nTriMax, nTriRe,triPerProc
   integer :: j, counter
   double precision :: moveTime, expTime, sumTime, setTime
   double precision :: gatherAndSumTime, xTime, tripTime
@@ -27,8 +27,7 @@ module tmpi_calcAtomMoveEnergy_mod
   integer, allocatable :: scounts(:), displs(:), newExpInt(:,:)
   integer, allocatable :: scatterTrip(:,:), indexVector(:)
   logical, allocatable :: mask(:)
-  double precision, allocatable :: newDists(:), newUvec(:)
-  double precision, allocatable :: newUfull(:)
+  double precision, allocatable :: newDists(:), newUfull(:)
 
 
 contains
@@ -66,7 +65,7 @@ contains
 
     ! Finalise MPI and print times taken for each step of calculation
     if (processRank .eq. root) then
-       call finalTextOutput()
+       !call finalTextOutput()
     end if
     call finalAsserts(proposedPositionData%N_a)
 
@@ -82,7 +81,7 @@ contains
     ! Initial set-up and asserts
     call initialAsserts(proposedPositionData%N_a,proposedPositionData%N_tri, &
                         proposedPositionData%N_distances)
-    N_changed_triplets = getTriPerAtom(proposedPositionData%N_a)
+    proposedPositionData%N_changed_triplets = getTriPerAtom(proposedPositionData%N_a)
     call allocateArrays(proposedPositionData,proposedEnergyData)
 
     ! Re-calculate interatomicDistances for the new atomic positions
@@ -229,7 +228,7 @@ contains
  
     allocate(newExpInt(proposedPosition%N_a-1,2))
     allocate(newDists(proposedPosition%N_a-1))
-    allocate(changedTriplets(3,N_changed_triplets))
+    allocate(changedTriplets(3,proposedPositionData%N_changed_triplets))
     allocate(newUfull(clusterSize))
     allocate(scounts(clusterSize))
     allocate(displs(clusterSize))
@@ -238,14 +237,14 @@ contains
     end if
     allocate(proposedEnergy%interatomicDistances(proposedPosition%N_a, &
              proposedPosition%N_a))
-    allocate(tripIndex(N_changed_triplets))
+    allocate(tripIndex(proposedPositionData%N_changed_triplets))
 
   end subroutine allocateArrays
 
 
   subroutine getTripletScatterData()
 
-    call getNPerProcNonAdd(N_changed_triplets,clusterSize, nTriMax,nTriRe)
+    call getNPerProcNonAdd(proposedPositionData%N_changed_triplets,clusterSize, nTriMax,nTriRe)
     call getVarrays(clusterSize,nTriMax,nTriRe, scounts,displs)
     triPerProc = scounts(processRank+1)
 
@@ -280,7 +279,7 @@ contains
   subroutine updateChangedTripletEnergies()
 
     proposedEnergyData%tripletEnergies = currentEnergyData%tripletEnergies
-    do j = 1, N_changed_triplets
+    do j = 1, proposedPositionData%N_changed_triplets
 
       proposedEnergyData%tripletEnergies(tripIndex(j)) = newUfull(j)
 
@@ -451,14 +450,14 @@ contains
   subroutine getChangedTriplets(atom, changedTriplets,tripIndex)
     implicit none
     integer, intent(in) :: atom
-    integer, intent(out) :: changedTriplets(3,N_changed_triplets)
-    integer, intent(out) :: tripIndex(N_changed_triplets)
+    integer, intent(out) :: changedTriplets(3,proposedPositionData%N_changed_triplets)
+    integer, intent(out) :: tripIndex(proposedPositionData%N_changed_triplets)
     integer :: al, be, ga, counter, indCounter
 
     ! Fill changed triplet array and vector of indices of changed triplets
     counter = 0
     indCounter = 0
-    do while (counter .lt. N_changed_triplets)
+    do while (counter .lt. proposedPositionData%N_changed_triplets)
     do al = 1, proposedPositionData%N_a-2
       do be = al+1, proposedPositionData%N_a-1
         do ga = be+1, proposedPositionData%N_a

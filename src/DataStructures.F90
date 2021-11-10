@@ -9,7 +9,7 @@ module energiesData_Module
 
   type energiesData
      
-     double precision:: Utotal
+     double precision :: Utotal
      integer, allocatable :: distancesIntMat(:,:), triMat(:,:), changedTriInd(:)
      double precision, allocatable :: interatomicDistances(:,:), tripletEnergies(:)
      double precision, allocatable :: expMatrix(:,:,:), changedTriU(:)
@@ -22,7 +22,7 @@ module positionData_Module
 
   type positionData
 
-    integer :: N_a, N_tri, N_distances
+    integer :: N_a, N_tri, N_distances, N_changed_triplets
     double precision, allocatable :: posArray(:,:)
 
   end type positionData

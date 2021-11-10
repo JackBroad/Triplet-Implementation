@@ -108,8 +108,6 @@ subroutine initialise_Move(dMax,addSeed, mover)
   integer :: icol, irow, seed(8) ! Min. size for seed array
   double precision :: randNumber
 
-  proposedPositionData = currentPositionData
-  proposedEnergyData = currentEnergyData
   if (processRank .eq. root) then
     if (addSeed .eqv. .true.) then
       seed = 168389234

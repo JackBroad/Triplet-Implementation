@@ -17,12 +17,12 @@ program main
 
 
   integer :: movedAtom, i
-  logical :: setSeed=.false., acceptMove=.false., useToyCode=.false.
+  logical :: setSeed=.false., acceptMove=.true., useToyCode=.false.
   double precision :: dist, time, fullEnergy, moveEnergy
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
-  Character(len=300) :: positionFile = 'AtomicPositions5.txt'
+  Character(len=300) :: positionFile = 'AtomicPositions500.txt'
 
   
   call MPI_INIT(ierror)
@@ -47,6 +47,7 @@ program main
 
     ! Atom move
     do i = 1, 150
+      time = MPI_Wtime()
       call initialise_Move(dist,setSeed, movedAtom)
       call MPI_Bcast(movedAtom, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
       call MPI_Bcast(proposedPositionData%posArray(movedAtom,:), 3, MPI_DOUBLE_PRECISION, &
@@ -56,8 +57,15 @@ program main
       moveEnergy = tmpi_calcAtomMoveEnergy(movedAtom)
 
       if (acceptMove .eqv. .true.) then
-        call updateDataAfterMove(proposedEnergyData,proposedPositionData, &
-                                 currentEnergyData,currentPositionData)
+        call updateDataAfterMove()
+        fullEnergy = fullEnergy + moveEnergy
+        acceptMove = .false.
+      else if (acceptMove .eqv. .false.) then
+        acceptMove = .true.
+      end if
+      time = MPI_Wtime() - time
+      if (processRank .eq. root) then
+        print *, time, 0d0, 0d0, 0d0
       end if
     end do
 

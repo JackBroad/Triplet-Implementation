@@ -422,23 +422,32 @@ contains
   @test
   subroutine test_data_update()
     implicit none
+    double precision :: expectedU
 
     ! Update data
-    call updateDataAfterMove(proposedEnergyData,proposedPositionData, &
-                             currentEnergyData,currentPositionData)
+    call updateDataAfterMove()
     
-    ! First, test that the current and proposed exps are the same after update
+    ! Test that the current and proposed triplet energies are the same after the update
     if( processRank == root) then
-      @assertEqual(proposedEnergyData%expMatrix, currentEnergyData%expMatrix, low_tol)
+      @assertEqual(proposedEnergyData%tripletEnergies, currentEnergyData%tripletEnergies, low_tol, 'Test trip energy update')
     end if
 
-    ! Now test if a dummy energy is correctly updated
-    proposedEnergyData%Utotal = 1d0
-    call updateDataAfterMove(proposedEnergyData,proposedPositionData, &
-                             currentEnergyData,currentPositionData)
+    ! Set up an expected post-update energy
+    proposedEnergyData%Utotal = -1d0
+    expectedU = currentEnergyData%Utotal + proposedEnergyData%Utotal
 
+    ! Update data
+    call updateDataAfterMove()
+
+    ! Test the expected energy matches that from the update
     if( processRank == root) then
-      @assertEqual(proposedEnergyData%Utotal, currentEnergyData%Utotal, low_tol)
+      @assertEqual(expectedU, currentEnergyData%Utotal, low_tol, 'Test Utotal update')
+    end if
+
+    ! Test the position data has updated properly
+    if( processRank == root) then
+      @assertEqual(proposedEnergyData%interatomicDistances,currentEnergyData%interatomicDistances, low_tol, 'Test dist update')
+      @assertEqual(proposedPositionData%posArray,currentPositionData%posArray, low_tol, 'Test position update')
     end if
 
   end subroutine test_data_update
