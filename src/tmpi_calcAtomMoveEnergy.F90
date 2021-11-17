@@ -20,9 +20,10 @@ module tmpi_calcAtomMoveEnergy_mod
   integer :: nTriMax, nTriRe,triPerProc
   integer :: j, counter
   double precision :: moveTime, expTime, sumTime, setTime
-  double precision :: gatherAndSumTime, xTime, tripTime
+  double precision :: gatherTime, xTime, tripTime, partialSumTime
   double precision :: extractTime, tripSumTime, newTripU
   double precision :: oldTripU, partialDeltaU, rootSumTime
+  double precision :: timeToGather
   integer, allocatable :: changedTriplets(:,:), tripIndex(:)
   integer, allocatable :: scounts(:), displs(:), newExpInt(:,:)
   integer, allocatable :: scatterTrip(:,:), indexVector(:)
@@ -41,6 +42,7 @@ contains
     ! Set up calculation
     moveTime = MPI_Wtime()
     setTime = MPI_Wtime()
+    timeToGather = MPI_Wtime()
     call setUpCalculation(atomToMove)
     setTime = MPI_Wtime() - setTime ! b
 
@@ -65,7 +67,7 @@ contains
 
     ! Finalise MPI and print times taken for each step of calculation
     if (processRank .eq. root) then
-       !call finalTextOutput()
+       call finalTextOutput()
     end if
     call finalAsserts(proposedPositionData%N_a)
 
@@ -150,15 +152,24 @@ contains
     tripSumTime = MPI_Wtime() - tripSumTime ! e
 
     ! Find the change in U on each process
-    gatherAndSumTime = MPI_Wtime()
+    partialSumTime = MPI_Wtime()
     newTripU = sum(proposedEnergyData%changedTriU)
     oldTripU = findOldTripU()
     partialDeltaU = newTripU - oldTripU
+    partialSumTime = MPI_Wtime() - partialSumTime
 
     ! Gather the change in triplet energies on the root process for summation
+    timeToGather = MPI_Wtime() - timeToGather
+    !do j = 1, clusterSize
+    !  if (j-1 .eq. processRank) then
+    !    print *, processRank, timeToGather
+    !  end if
+    !  call MPI_BARRIER(MPI_COMM_WORLD, barError)
+    !end do
+    gatherTime = MPI_Wtime()
     call MPI_gather(partialDeltaU, 1, MPI_DOUBLE_PRECISION, newUfull, 1, &
                     MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-    gatherAndSumTime = MPI_Wtime() - gatherAndSumTime ! f
+    gatherTime = MPI_Wtime() - gatherTime ! f = gatherTime+partialSumTime
 
     ! Find new total non-additive energy after moving an atom
     rootSumTime = MPI_Wtime()
@@ -307,9 +318,10 @@ contains
   subroutine finalTextOutput()
 
     if (textOutput) then
-      !print *, moveTime, setTime, expTime, sumTime
+      print *, moveTime, setTime, expTime, tripTime, tripSumTime, &
+               partialSumTime, gatherTime, rootSumTime
       !print *, sumTime, tripTime, tripSumTime, gatherAndSumTime
-      print *, setTime, expTime, tripTime, tripSumTime, gatherAndSumTime, rootSumTime
+      !print *, setTime, expTime, tripTime, tripSumTime, gatherAndSumTime, rootSumTime
     end if
 
   end subroutine finalTextOutput

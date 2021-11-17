@@ -17,7 +17,7 @@ program main
 
 
   integer :: movedAtom, i
-  logical :: setSeed=.false., acceptMove=.true., useToyCode=.false.
+  logical :: setSeed=.false., acceptMove=.false., useToyCode=.false.
   double precision :: dist, time, fullEnergy, moveEnergy
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
@@ -59,14 +59,14 @@ program main
       if (acceptMove .eqv. .true.) then
         call updateDataAfterMove()
         fullEnergy = fullEnergy + moveEnergy
-        acceptMove = .false.
-      else if (acceptMove .eqv. .false.) then
-        acceptMove = .true.
+        !acceptMove = .false.
+      !else if (acceptMove .eqv. .false.) then
+      !  acceptMove = .true.
       end if
       time = MPI_Wtime() - time
-      if (processRank .eq. root) then
-        print *, time, 0d0, 0d0, 0d0
-      end if
+      !if (processRank .eq. root) then
+      !  print *, time, 0d0, 0d0, 0d0
+      !end if
     end do
 
     deallocate(alpha)

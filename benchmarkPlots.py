@@ -4,29 +4,58 @@ import matplotlib.pyplot as mp
 import numpy as np
 import sys
 
-# Get max no. of processes used
+# Get max no. of processes and nodes used
 maxProcs = int(sys.argv[1])
-dirString = sys.argv[2]
-nProcs = np.arange(maxProcs)
-nProcs = nProcs+1
-fullBoxMat = np.zeros((maxProcs,4)) # 6
-atomMoveMat = np.zeros((maxProcs,4)) # 6
+maxNodes = int(sys.argv[2])
+dirString = sys.argv[3]
+iMax = int(maxProcs/maxNodes)
+if (maxNodes > 1):
+  nProcs = np.arange(0,iMax+1)
+  nProcs = nProcs*maxNodes
+  nProcs[0] = 1
+else:
+  nProcs = np.arange(0,iMax+1)
+  nProcs = nProcs + 1
+fullBoxMat = np.zeros((iMax+1,8)) # 4
+atomMoveMat = np.zeros((iMax+1,8)) # 4
 
 # Loop over number of processes, extracting all data from appropriate output file
-for i in range (1,maxProcs+1):
-  counter = i-1
+counter = 0
+for i in range (1,iMax+1):
+  #counter = i-1
+  num = i*maxNodes
   string = '-data.txt'
-  data = pa.read_csv(str(i)+string,  delim_whitespace=True, header=None)
-  data = data.values
-  nData = len(data)
-  fullBoxMat[counter,:] = data[0,:]
-  atomMoveData = data[1:nData,:]
-  atomMoveData = np.sum(atomMoveData,axis=0)
-  atomMoveMat[counter,:] = atomMoveData
+  if (i == 1):
+    data = pa.read_csv(str(i)+string,  delim_whitespace=True, header=None)
+    data = data.values
+    nData = len(data)
+    fullBoxMat[counter,:] = data[0,:]
+    atomMoveData = data[1:nData,:]
+    atomMoveData = np.sum(atomMoveData,axis=0)
+    atomMoveMat[counter,:] = atomMoveData
+    counter = counter + 1
+    if (maxNodes > 1):
+      data = pa.read_csv(str(num)+string,  delim_whitespace=True, header=None)
+      data = data.values
+      nData = len(data)
+      fullBoxMat[counter,:] = data[0,:]
+      atomMoveData = data[1:nData,:]
+      atomMoveData = np.sum(atomMoveData,axis=0)
+      atomMoveMat[counter,:] = atomMoveData
+      counter = counter + 1
+  else:
+    data = pa.read_csv(str(num)+string,  delim_whitespace=True, header=None)
+    data = data.values
+    nData = len(data)
+    fullBoxMat[counter,:] = data[0,:]
+    atomMoveData = data[1:nData,:]
+    atomMoveData = np.sum(atomMoveData,axis=0)
+    atomMoveMat[counter,:] = atomMoveData
+    counter = counter + 1
 
 fullT0 = fullBoxMat[0,0]
 moveT0 = atomMoveMat[0,0]
-for j in range (0,maxProcs):
+for j in range (0,iMax+1):
   fullBoxMat[j,0]=fullT0/fullBoxMat[j,0]
   atomMoveMat[j,0]=moveT0/atomMoveMat[j,0]
 

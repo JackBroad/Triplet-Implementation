@@ -307,7 +307,7 @@ contains
        !print *, '========================'
        !print *, ' '
        !print *, ' '
-       print *, totTime, setUpTime, expTime, sumTime, 0d0, 0d0
+       print *, totTime, setUpTime, expTime, sumTime, 0d0, 0d0, 0d0, 0d0
 
     end if
 
