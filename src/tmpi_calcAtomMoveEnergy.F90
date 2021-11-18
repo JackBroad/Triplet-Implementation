@@ -139,7 +139,6 @@ contains
     ! Scatter triplets across processes
     scatterTrip = changedTriplets(1:3,1+displs(processRank+1):displs(processRank+1)+&
                                   scounts(processRank+1))
-    !scatterTripInd = tripIndex(1+displs(processRank+1):displs(processRank+1)+scounts(processRank+1))
     proposedEnergyData%changedTriInd = tripIndex(1+displs(processRank+1):&
                                        displs(processRank+1)+scounts(processRank+1))
     tripTime = MPI_Wtime() - tripTime ! d
