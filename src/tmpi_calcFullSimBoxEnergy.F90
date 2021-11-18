@@ -66,8 +66,9 @@ contains
 
 
     ! Scatter the interatomic distances in U_dg to all processes
-    call MPI_scatterv(UD_dg, scounts, displs, MPI_DOUBLE_PRECISION, scatterData, dataSize, &
-                      MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+    !call MPI_scatterv(UD_dg, scounts, displs, MPI_DOUBLE_PRECISION, scatterData, dataSize, &
+    !                  MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
+    scatterData = UD_dg(1+displs(processRank+1):displs(processRank+1)+scounts(processRank+1))
 
 
     ! Calculate the exponentials for each distance on each process
@@ -101,8 +102,10 @@ contains
 
 
     ! Scatter the triplet matrix
-    call MPI_scatterv(currentEnergyData%triMat, scounts*3, displs*3, MPI_INT, triScatter, nSum*3, MPI_INT, &
-                      root, MPI_COMM_WORLD, ierror)
+    !call MPI_scatterv(currentEnergyData%triMat, scounts*3, displs*3, MPI_INT, triScatter, nSum*3, MPI_INT, &
+    !                  root, MPI_COMM_WORLD, ierror)
+    triScatter = currentEnergyData%triMat(1:3,1+displs(processRank+1):displs(processRank+1)+&
+                                          scounts(processRank+1))
 
 
     ! Find the energies of the triplets assigned to each process
