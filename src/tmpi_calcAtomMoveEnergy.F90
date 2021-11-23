@@ -112,7 +112,7 @@ contains
     if (allocated(changeExpData)) then
       deallocate(changeExpData)
     end if
-    allocate(changeExpData(nArgs,N_tp,proposedPositionData%N_a-1))
+    allocate(changeExpData(N_tp,nArgs,proposedPositionData%N_a-1))
     call calculateExponentialsNonAdd(proposedPositionData%N_a-1,N_tp,nArgs,trainData, &
                                      hyperParams(1),newDists, changeExpData)
 

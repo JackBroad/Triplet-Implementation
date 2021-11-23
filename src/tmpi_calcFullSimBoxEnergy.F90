@@ -18,6 +18,7 @@ module tmpi_calcFullSimBoxEnergy_mod
 
   integer :: dataSize, nSum
   double precision :: totTime, setUpTime, expTime, sumTime
+  double precision :: shareTime, rootTime, dataTime
   integer, allocatable :: scounts(:), displs(:)
   integer, allocatable :: triScatter(:,:)
   double precision, allocatable :: UD_dg(:), scatterData(:)
@@ -30,7 +31,7 @@ contains
   double precision function tmpi_calcFullSimBoxEnergy()
 
     ! Local variables
-    integer :: maxDataSize, maxnSum, reDataSize, reNsum
+    integer :: maxDataSize, maxnSum, reDataSize, reNsum, N_dists_per_proc
 
 
     call initialAsserts(currentPositionData%N_a,currentPositionData%N_tri, &
@@ -56,6 +57,7 @@ contains
     ! Determine max no. of elements of UD_dg to send to each process for exp
     ! calculations
     call getNPerProcNonAdd(currentPositionData%N_distances,clusterSize, maxDataSize,reDataSize)
+    !N_dists_per_proc = getNdistsPerProc()
     setUpTime = MPI_Wtime() - setUpTime
 
 
@@ -75,7 +77,7 @@ contains
 
 
     ! Allocate an array to hold all exps
-    allocate(currentEnergyData%expMatrix(nArgs,N_tp,currentPositionData%N_distances))
+    allocate(currentEnergyData%expMatrix(N_tp,nArgs,currentPositionData%N_distances))
 
 
     ! Gather expData arrays from the other processes and add them to expMatrix on
@@ -83,7 +85,6 @@ contains
     call MPI_gatherv(expData, N_tp*nArgs*dataSize, MPI_DOUBLE_PRECISION, currentEnergyData%expMatrix, &
                      N_tp*nArgs*scounts, N_tp*nArgs*displs, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, &
                      ierror)
-    expTime = MPI_Wtime() - expTime
 
 
     ! Broadcast expMatrix to all processes so that sum can be parallelised
@@ -108,16 +109,20 @@ contains
     call tripletEnergiesNonAdd(triScatter,currentEnergyData%distancesIntMat,nSum,N_tp,currentPositionData%N_a, &
                                N_p,nArgs,Perm,currentPositionData%N_distances,currentEnergyData%expMatrix,alpha, &
                                hyperParams(2), uVec)
+    sumTime = MPI_Wtime() - sumTime
 
 
     ! Gather in the triplet energies and sum them to get total non-add energy
+    shareTime = MPI_Wtime()
     call MPI_gatherv(uVec, nSum, MPI_DOUBLE_PRECISION, currentEnergyData%tripletEnergies, scounts, displs, &
                      MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
     call MPI_Bcast(currentEnergyData%tripletEnergies,currentPositionData%N_tri,MPI_DOUBLE_PRECISION, &
                    root, MPI_COMM_WORLD, ierror)
+    shareTime = MPI_Wtime() - shareTime
 
 
     ! Find the total non-additive energy for the system
+    rootTime = MPI_Wtime()
     currentEnergyData%Utotal = 0d0
     if (processRank .eq. root) then
 
@@ -127,10 +132,12 @@ contains
 
     end if
     tmpi_calcFullSimBoxEnergy = currentEnergyData%Utotal
-    sumTime = MPI_Wtime() - sumTime
+    rootTime = MPI_Wtime() - rootTime
     call deallocateLocalArrays()
+    dataTime = MPI_Wtime()
     proposedPositionData = currentPositionData
     proposedEnergyData = currentEnergyData
+    dataTime = MPI_Wtime() - dataTime
 
 
     ! Print times taken for each part of subroutine to run
@@ -249,7 +256,7 @@ contains
 
     dataSize = scounts(processRank+1)
     allocate(scatterData(dataSize))
-    allocate(expData(nArgs,N_tp,dataSize))
+    allocate(expData(N_tp,nArgs,dataSize))
 
   end subroutine getDataSizeAndExpArrays
 
@@ -306,7 +313,7 @@ contains
        !print *, '========================'
        !print *, ' '
        !print *, ' '
-       print *, totTime, setUpTime, expTime, sumTime, 0d0, 0d0, 0d0, 0d0
+       print *, totTime, setUpTime, expTime, sumTime, shareTime, rootTime, dataTime, 0d0
 
     end if
 

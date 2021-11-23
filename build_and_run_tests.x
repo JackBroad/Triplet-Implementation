@@ -3,4 +3,4 @@
 rm tests/test_regression
 
 make -f testsMakefile
-mpirun -np 2 tests/test_regression
+mpirun -np 1 tests/test_regression

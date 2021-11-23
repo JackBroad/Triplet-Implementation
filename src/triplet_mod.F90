@@ -1,12 +1,55 @@
 module triplet_mod
   use GP_variables
   use mpi_variables
+  use dataStructure_variables
   use energiesData_Module, only: energiesData
   use positionData_Module, only: positionData  
   implicit none
+  !include 'mpif.h'
 
 
 contains
+
+
+integer function getNdistsPerProc()
+  implicit none
+  integer :: counter, nLoops, i, j
+  logical :: countBack
+
+  counter = 0
+  i = 1
+  nLoops = 1
+  countBack = .false.
+
+  do while (i .le. currentPositionData%N_distances)
+    do j = 1, clusterSize
+      if (processRank .eq. j-1) then
+        if (countBack .eqv. .false.) then
+          counter = counter + 1
+        else
+          if ((nLoops*clusterSize)-processRank .le. &
+              currentPositionData%N_distances) then
+            counter = counter + 1
+          end if
+        end if
+      end if
+      i = i + 1
+      if (j .eq. clusterSize) then
+        nLoops = nLoops + 1
+        if (countBack .eqv. .false.) then
+          countBack = .true.
+        else
+          countBack = .false.
+        end if
+      end if
+    end do
+  end do
+
+  print *, 'process', processRank, 'has', counter, 'distances'
+  getNdistsPerProc = counter
+
+return
+end function getNdistsPerProc
 
 
 ! Gets distances per process that need exponential calculations for and number
@@ -102,7 +145,7 @@ subroutine calculateExponentialsNonAdd(nJobs,nTP,nArguments,trainingData, &
           denom = 2*denom
 
           expon = num / denom
-          exponentials(k,j,i) = exp(-1*expon)
+          exponentials(j,k,i) = exp(-1*expon)
 
       end do
     end do
@@ -150,7 +193,8 @@ subroutine tripletEnergiesNonAdd(triData,intMat,nJob,nTP,nAt,nPerm,nArg,permMat,
         kP = permMat(s,1:3)
 
         ! Find the product of the relevant exps under this permutation
-        expProd = expMat(kP(1),r,alDis) * expMat(kP(2),r,beDis) * expMat(kP(3),r,gaDis)
+        expProd = expMat(r,kP(1),alDis) * expMat(r,kP(2),beDis) * expMat(r,kP(3),gaDis)
+        !expProd = triInt*kP(1) + r*kP(2) + s*kP(3) + triInt*r*s + kP(1)*kP(2)*kP(3)
 
         ! Add the product to the sum for this training point
         expSum = expSum + expProd
@@ -315,13 +359,13 @@ end function energyCheckCalc
 
   subroutine updateExpMatrix(proposedEnergyData,changeData,expInd,length)
     integer :: indj, length, expInd(length,2), j
-    double precision :: changeData(nArgs,N_tp,length)
+    double precision :: changeData(N_tp,nArgs,length)
     type (energiesData) :: proposedEnergyData
 
     do j = 1, length
 
       indj = proposedEnergyData%distancesIntMat(expInd(j,1), expInd(j,2))
-      proposedEnergyData%expMatrix(1:nArgs,1:N_tp,indj) = changeData(1:nArgs,1:N_tp,j)
+      proposedEnergyData%expMatrix(1:N_tp,1:nArgs,indj) = changeData(1:N_tp,1:nArgs,j)
 
     end do
 

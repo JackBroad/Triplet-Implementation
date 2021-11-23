@@ -180,7 +180,7 @@ contains
     double precision :: expSlice_Ex(nArgs,3)
     double precision :: expSlice(nArgs,3), dists(3)
 
-    allocate(expoData(nArgs,N_tp,3))
+    allocate(expoData(N_tp,nArgs,3))
 
     ! All distances in test triplet are 3 A
     dists = (/ 1d0/3d0,1d0/3d0,1d0/3d0 /)
@@ -195,7 +195,7 @@ contains
                                      dists, expoData)
 
     ! Take slice of expoData which has exps with first TP
-    expSlice = expoData(:,1,:)
+    expSlice = expoData(1,:,:)
 
     if( processRank == root) then
 
