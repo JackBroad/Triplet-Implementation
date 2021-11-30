@@ -17,8 +17,8 @@ program main
 
 
   integer :: movedAtom, i
-  logical :: setSeed=.false., acceptMove=.false., useToyCode=.false.
-  double precision :: dist, time, fullEnergy, moveEnergy
+  logical :: setSeed=.true., acceptMove=.false., useToyCode=.false.
+  double precision :: dist, time, fullEnergy, moveEnergy, check
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
@@ -55,12 +55,20 @@ program main
 
       !***********True move code***********
       moveEnergy = tmpi_calcAtomMoveEnergy(movedAtom)
+      fullEnergy = fullEnergy + moveEnergy
+      if (processRank .eq. root) then
+        check = -79272925.072343603d0
+        call assertEqual_double(fullEnergy, check, 1d0*10d0**(-5d0), 'incorrect energy found')
+      end if
 
       if (acceptMove .eqv. .true.) then
         call updateDataAfterMove()
         fullEnergy = fullEnergy + moveEnergy
         !acceptMove = .false.
-      !else if (acceptMove .eqv. .false.) then
+      else if (acceptMove .eqv. .false.) then
+        proposedEnergyData = currentEnergyData
+        proposedPositionData = currentPositionData
+        fullEnergy = fullEnergy - moveEnergy
       !  acceptMove = .true.
       end if
       time = MPI_Wtime() - time
@@ -99,7 +107,29 @@ program main
 
 
   call MPI_FINALIZE(ierror)
-  
+
+  contains
+
+  double precision function checkSimBoxEnergy()
+    implicit none
+    integer :: i
+    double precision, allocatable :: tripDist(:,:), tripEnergies_Ex(:)
+
+    allocate(tripDist(3,currentPositionData%N_tri))
+    allocate(tripEnergies_Ex(currentPositionData%N_tri))
+
+    call findTripletDistances(currentPositionData%N_a,currentPositionData%N_tri, &
+                              proposedEnergyData%triMat,proposedEnergyData%interatomicDistances, &
+                              tripDist)
+
+    do i = 1, currentPositionData%N_tri
+      tripEnergies_Ex(i) = energyCheckCalc(tripDist(:,i)) ! Energies of each triplet
+    end do
+
+    checkSimBoxEnergy = sum(tripEnergies_Ex)
+
+  return
+  end function checkSimBoxEnergy
 
 end program main
 

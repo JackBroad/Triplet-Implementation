@@ -16,22 +16,20 @@ module tmpi_calcFullSimBoxEnergy_mod
           makeTripletMatrix, makeXdg
 
 
-  integer :: dataSize, nSum
-  double precision :: totTime, setUpTime, expTime, sumTime
+  integer :: nSum, maxTriPerProc, remTriPerProc
+  double precision :: totTime, setUpTime, expTime
   double precision :: shareTime, rootTime, dataTime
+  double precision :: sumTime
   integer, allocatable :: scounts(:), displs(:)
   integer, allocatable :: triScatter(:,:)
-  double precision, allocatable :: UD_dg(:), scatterData(:)
-  double precision, allocatable :: expData(:,:,:), uVec(:)
+  double precision, allocatable :: UD_dg(:), uVec(:)
 
 
 contains
 
 
   double precision function tmpi_calcFullSimBoxEnergy()
-
-    ! Local variables
-    integer :: maxDataSize, maxnSum, reDataSize, reNsum, N_dists_per_proc
+    implicit none
 
 
     call initialAsserts(currentPositionData%N_a,currentPositionData%N_tri, &
@@ -39,80 +37,31 @@ contains
     call declareConstantsAndRowsOfPermutationMatrix()
 
 
-    ! Set up on root
+    ! Set up
     totTime = MPI_Wtime()
     setUpTime = MPI_Wtime()
-    if (processRank .eq. root) then
-       !call initialTextOutput()
-    end if
-
-
-    currentEnergyData = setupCurrentEnergyDataAndArrays(currentPositionData)
-
-
-    ! Broadcasts of data on root
-    call broadcastRootData()
-
-
-    ! Determine max no. of elements of UD_dg to send to each process for exp
-    ! calculations
-    call getNPerProcNonAdd(currentPositionData%N_distances,clusterSize, maxDataSize,reDataSize)
-    !N_dists_per_proc = getNdistsPerProc()
+    call setUpFullBoxCalculation()
     setUpTime = MPI_Wtime() - setUpTime
 
 
-    ! Determine actual no. of elements to send to each process for exp calc.
+    ! Calculate the exponentials for all distances on each process
     expTime = MPI_Wtime()
-    call getVarrays(clusterSize,maxDataSize,reDataSize, scounts,displs)
-    call getDataSizeAndExpArrays()
-
-
-    ! Scatter the interatomic distances in U_dg to all processes
-    scatterData = UD_dg(1+displs(processRank+1):displs(processRank+1)+scounts(processRank+1))
-
-
-    ! Calculate the exponentials for each distance on each process
-    call calculateExponentialsNonAdd(dataSize,N_tp,nArgs,trainData,hyperParams(1), &
-                                     scatterData, expData)
-
-
-    ! Allocate an array to hold all exps
     allocate(currentEnergyData%expMatrix(N_tp,nArgs,currentPositionData%N_distances))
-
-
-    ! Gather expData arrays from the other processes and add them to expMatrix on
-    ! the root process
-    call MPI_gatherv(expData, N_tp*nArgs*dataSize, MPI_DOUBLE_PRECISION, currentEnergyData%expMatrix, &
-                     N_tp*nArgs*scounts, N_tp*nArgs*displs, MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, &
-                     ierror)
-
-
-    ! Broadcast expMatrix to all processes so that sum can be parallelised
-    call MPI_Bcast(currentEnergyData%expMatrix, N_tp*nArgs*currentPositionData%N_distances, MPI_DOUBLE_PRECISION, &
-                   root, MPI_COMM_WORLD, ierror)
+    call calculateExponentialsNonAdd(currentPositionData%N_distances,N_tp,nArgs,trainData,&
+                                     hyperParams(1),UD_dg, currentEnergyData%expMatrix)
     expTime = MPI_Wtime() - expTime
 
-
-    ! Determine actual no. of elements to send to each process for triplet calc.
+    ! Determine no. of triplets to send to each process for triplet calc.
+    ! then find triplet energies
     sumTime = MPI_Wtime()
-    call getNPerProcNonAdd(currentPositionData%N_tri,clusterSize, maxnSum,reNsum)
-    call getVarrays(clusterSize,maxNsum,reNsum, scounts,displs)
-    call getnSumAndTripletArrays()
-
-
-    ! Scatter the triplet matrix
-    triScatter = currentEnergyData%triMat(1:3,1+displs(processRank+1):displs(processRank+1)+&
-                                          scounts(processRank+1))
-
-
-    ! Find the energies of the triplets assigned to each process
+    call setUpTripletSum()
     call tripletEnergiesNonAdd(triScatter,currentEnergyData%distancesIntMat,nSum,N_tp,currentPositionData%N_a, &
                                N_p,nArgs,Perm,currentPositionData%N_distances,currentEnergyData%expMatrix,alpha, &
                                hyperParams(2), uVec)
     sumTime = MPI_Wtime() - sumTime
 
 
-    ! Gather in the triplet energies and sum them to get total non-add energy
+    ! Gather in the triplet energies and broadcast triplet energies
     shareTime = MPI_Wtime()
     call MPI_gatherv(uVec, nSum, MPI_DOUBLE_PRECISION, currentEnergyData%tripletEnergies, scounts, displs, &
                      MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
@@ -121,31 +70,24 @@ contains
     shareTime = MPI_Wtime() - shareTime
 
 
-    ! Find the total non-additive energy for the system
+    ! Find the total non-additive energy for the system by summing triplet
+    ! energies
     rootTime = MPI_Wtime()
-    currentEnergyData%Utotal = 0d0
-    if (processRank .eq. root) then
-
-       call totalEnergyNonAdd(currentEnergyData%tripletEnergies,currentPositionData%N_tri, &
-                              currentEnergyData%Utotal)
-       !call energyTextOutput(currentEnergyData)
-
-    end if
+    call sumEnergiesNonAdd()
     tmpi_calcFullSimBoxEnergy = currentEnergyData%Utotal
     rootTime = MPI_Wtime() - rootTime
     call deallocateLocalArrays()
+
+
     dataTime = MPI_Wtime()
-    proposedPositionData = currentPositionData
-    proposedEnergyData = currentEnergyData
+    call instantiateProposedDataStructs()
     dataTime = MPI_Wtime() - dataTime
 
 
     ! Print times taken for each part of subroutine to run
     totTime = MPI_Wtime() - totTime
     if (processRank .eq. root) then
-
        call finalTextOutput()
-
     end if
     call finalAsserts(currentPositionData%N_a)
     
@@ -199,19 +141,53 @@ contains
   end subroutine finalAsserts
 
 
-  subroutine initialTextOutput()
+  subroutine setUpFullBoxCalculation()
+    implicit none
 
-    if (textOutput) then
+    !call declareConstantsAndRowsOfPermutationMatrix()
+    currentEnergyData = setupCurrentEnergyDataAndArrays(currentPositionData)
+    call broadcastRootData()
 
-       print *, ' '
-       print *, ' '
-       print *, '========================'
-       print *, 'Beginning non-additive calculation for whole sim box'
-       print *, ' '
+    return
+  end subroutine setUpFullBoxCalculation
 
+
+  subroutine setUpTripletSum()
+    implicit none
+
+    call getNPerProcNonAdd(currentPositionData%N_tri,clusterSize, maxTriPerProc,remTriPerProc)
+    call getVarrays(clusterSize,maxTriPerProc,remTriPerProc, scounts,displs)
+    call getnSumAndTripletArrays()
+
+
+    ! Scatter the triplet matrix
+    triScatter = currentEnergyData%triMat(1:3,1+displs(processRank+1):displs(processRank+1)+&
+                                          scounts(processRank+1))
+
+    return
+  end subroutine setUpTripletSum
+
+
+  subroutine sumEnergiesNonAdd()
+    implicit none
+
+    currentEnergyData%Utotal = 0d0
+    if (processRank .eq. root) then
+      call totalEnergyNonAdd(currentEnergyData%tripletEnergies,currentPositionData%N_tri, &
+                             currentEnergyData%Utotal)
     end if
 
-  end subroutine initialTextOutput
+    return
+  end subroutine sumEnergiesNonAdd
+
+
+  subroutine instantiateProposedDataStructs()
+    implicit none
+
+    proposedPositionData = currentPositionData
+    proposedEnergyData = currentEnergyData
+
+  end subroutine instantiateProposedDataStructs
 
 
   function setupCurrentEnergyDataAndArrays(currentPosition) result(currentEnergy)
@@ -252,15 +228,6 @@ contains
 
 
 
-  subroutine getDataSizeAndExpArrays()
-
-    dataSize = scounts(processRank+1)
-    allocate(scatterData(dataSize))
-    allocate(expData(N_tp,nArgs,dataSize))
-
-  end subroutine getDataSizeAndExpArrays
-
-
   subroutine getnSumAndTripletArrays()
 
     nSum = scounts(processRank+1)
@@ -270,32 +237,13 @@ contains
   end subroutine getnSumAndTripletArrays
 
 
-  subroutine energyTextOutput()
-
-    if (textOutput) then
-
-       print *, "The total non-additive energy is", currentEnergyData%Utotal
-       print *, "              "
-
-    end if
-
-  end subroutine energyTextOutput
-
-
   subroutine deallocateLocalArrays()
 
-    deallocate(scatterData)
-    deallocate(expData)
     deallocate(uVec)
     deallocate(triScatter)
     deallocate(scounts)
     deallocate(displs)
-
-    if (processRank .eq. root) then
-
-       deallocate(UD_dg)
-
-    end if
+    deallocate(UD_dg)
 
   end subroutine deallocateLocalArrays
 

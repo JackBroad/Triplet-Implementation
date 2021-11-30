@@ -398,7 +398,7 @@ contains
   @test
   subroutine test_getChangedTripletsAndDists()
     implicit none
-    integer :: tInd_Ex(3,6), cInd_Ex(6), i
+    integer :: tInd_Ex(3,6), cInd_Ex(6)
 
     move = 1
     call getChangedTriplets(move, changedTriplets,tripIndex)

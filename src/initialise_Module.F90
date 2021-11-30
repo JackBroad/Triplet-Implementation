@@ -123,6 +123,8 @@ subroutine initialise_Move(dMax,addSeed, mover)
         call random_number(randNumber)
         proposedPositionData%posArray(irow,icol) = proposedPositionData%posArray(irow,icol) &
                                                    + (2.0*randNumber-1) * dMax
+        !proposedPositionData%posArray(irow,icol) = proposedPositionData%posArray(irow,icol) &
+        !                                           + 1.0
       end do
     end if
   end do
