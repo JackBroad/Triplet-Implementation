@@ -17,7 +17,7 @@ program main
 
 
   integer :: movedAtom, i
-  logical :: setSeed=.true., acceptMove=.false., useToyCode=.false.
+  logical :: setSeed=.false., acceptMove=.false., useToyCode=.false.
   double precision :: dist, time, fullEnergy, moveEnergy, check
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
@@ -56,19 +56,19 @@ program main
       !***********True move code***********
       moveEnergy = tmpi_calcAtomMoveEnergy(movedAtom)
       fullEnergy = fullEnergy + moveEnergy
-      if (processRank .eq. root) then
-        check = -79272925.072343603d0
-        call assertEqual_double(fullEnergy, check, 1d0*10d0**(-5d0), 'incorrect energy found')
-      end if
+      !if (processRank .eq. root) then
+      !  check = -79272925.072343603d0
+      !  call assertEqual_double(fullEnergy, check, 1d0*10d0**(-5d0), 'incorrect energy found')
+      !end if
 
       if (acceptMove .eqv. .true.) then
         call updateDataAfterMove()
         fullEnergy = fullEnergy + moveEnergy
         !acceptMove = .false.
       else if (acceptMove .eqv. .false.) then
-        proposedEnergyData = currentEnergyData
-        proposedPositionData = currentPositionData
-        fullEnergy = fullEnergy - moveEnergy
+        !proposedEnergyData = currentEnergyData
+        !proposedPositionData = currentPositionData
+        !fullEnergy = fullEnergy - moveEnergy
       !  acceptMove = .true.
       end if
       time = MPI_Wtime() - time
