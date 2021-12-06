@@ -25,7 +25,10 @@ integer function getNdistsPerProc()
     do j = 1, clusterSize
       if (processRank .eq. j-1) then
         if (countBack .eqv. .false.) then
-          counter = counter + 1
+          if (((nLoops-1)*clusterSize)+processRank+1 .le. &
+              currentPositionData%N_distances) then
+            counter = counter + 1
+          end if
         else
           if ((nLoops*clusterSize)-processRank .le. &
               currentPositionData%N_distances) then
@@ -45,12 +48,56 @@ integer function getNdistsPerProc()
     end do
   end do
 
-  print *, 'process', processRank, 'has', counter, 'distances'
   getNdistsPerProc = counter
 
 return
 end function getNdistsPerProc
 
+
+function distributeDistances(nDists,allDists) result(procDists)
+  implicit none
+  integer :: counter, nLoops, i, j, nDists
+  logical :: countBack
+  double precision :: allDists(currentPositionData%N_distances)
+  double precision :: procDists(nDists)
+
+  counter = 0
+  i = 1
+  nLoops = 1
+  countBack = .false.
+
+  do while (i .le. currentPositionData%N_distances)
+    do j = 1, clusterSize
+      if (processRank .eq. j-1) then
+        if (countBack .eqv. .false.) then
+          if (((nLoops-1)*clusterSize)+processRank+1 .le. &
+              currentPositionData%N_distances) then
+            counter = counter + 1
+            procDists(counter) = allDists(i)
+          end if
+        else
+          if ((nLoops*clusterSize)-processRank .le. &
+              currentPositionData%N_distances) then
+            counter = counter + 1
+            procDists(counter) = allDists((nLoops*clusterSize)-&
+                                       processRank)
+          end if
+        end if
+      end if
+      i = i + 1
+      if (j .eq. clusterSize) then
+        nLoops = nLoops + 1
+        if (countBack .eqv. .false.) then
+          countBack = .true.
+        else
+          countBack = .false.
+        end if
+      end if
+    end do
+  end do
+
+return
+end function distributeDistances
 
 ! Gets distances per process that need exponential calculations for and number
 ! of triplets needed per node for non-additve energy calculation
@@ -104,19 +151,12 @@ subroutine getVarrays(nProc,maxSize,reSize, counts,stride)
   integer :: i
 
   do i = 1, nProc
-
     if (i .lt. nProc) then
-
       counts(i) = maxSize
-
     else
-
       counts(i) = reSize
-
     end if
-
     stride(i) = (i-1) * maxSize
-
   end do
 
 return

@@ -205,6 +205,7 @@ contains
 
   end subroutine test_exp_calc
 
+
   @test
   subroutine test_triplet_energies()
     implicit none
@@ -218,12 +219,11 @@ contains
                                n_dist,expoData,alpha,hyperParams(2), U)
 
     if( processRank == root) then
-
       @assertEqual(U, U_Ex, low_tol, 'Test non-add energy single')
-
     end if
 
   end subroutine test_triplet_energies
+
 
   @test
   subroutine test_cluster_energies_and_move()
@@ -451,6 +451,133 @@ contains
     end if
 
   end subroutine test_data_update
+
+  @test
+  subroutine test_getNdistsPerProc
+    integer :: nDistVec(clusterSize), nDistVecEx(clusterSize), nDists
+
+    nDists = getNdistsPerProc()
+    if (clusterSize == 1) then
+      nDistVec = (/ nDists /)
+    else
+      call MPI_gather(nDists, 1, MPI_INT, nDistVec, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
+    end if 
+
+    if (clusterSize == 1) then
+      nDistVecEx = (/ 10 /)
+    else if (clusterSize == 2) then
+      nDistVecEx = (/ 5, 5 /)
+    else if (clusterSize == 3) then
+      nDistVecEx = (/ 3, 3, 4 /)
+    else if (clusterSize == 4) then
+      nDistVecEx = (/ 3, 3, 2, 2 /)
+    else if (clusterSize == 5) then
+      nDistVecEx = (/ 2, 2, 2, 2, 2 /)
+    else if (clusterSize == 6) then
+      nDistVecEx = (/ 1, 1, 2, 2, 2, 2 /)
+    else if (clusterSize == 7) then
+      nDistVecEx = (/ 1, 1, 1, 1, 2, 2, 2/)
+    else if (clusterSize == 8) then
+      nDistVecEx = (/ 1, 1, 1, 1, 1, 1, 2, 2/)
+    end if
+
+    if( processRank == root) then
+      @assertEqual(nDistVec, nDistVecEx, 'Test no. of dists per proc')
+    end if
+  end subroutine test_getNdistsPerProc
+
+  @test
+  subroutine test_distributeDistances
+    implicit none
+    integer :: nDists, nDistVec(clusterSize), displace(clusterSize), i
+    double precision :: dummy
+    double precision, allocatable :: distVec(:), distVecEx(:)
+    double precision, allocatable :: partDistVec(:), allDist(:)
+    Character(len=300) :: positionFile = 'AtomicPositions5.txt'
+
+    ! Set up simulation box
+    currentPositionData = initialise_positionDataStruct(positionFile)
+    dummy = tmpi_calcFullSimBoxEnergy()
+    allocate(distVec(currentPositionData%N_distances))
+    allocate(distVecEx(currentPositionData%N_distances))
+
+    ! Find no. of dists per proc and build vector showing this value for each proc
+    nDists = getNdistsPerProc()
+    if (clusterSize == 1) then
+      nDistVec = (/ nDists /)
+    else
+      call MPI_gather(nDists, 1, MPI_INT, nDistVec, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
+    end if
+
+    ! Build displacement vector for later gatherv call
+    displace(1) = 0
+    do i = 2, clusterSize, 1
+      displace(i) = sum(nDistVec(1:i-1))
+    end do
+
+    ! Build a vector of all interatomic dists
+    call makeUDdgNonAdd(currentPositionData%N_a,currentPositionData%N_distances, &
+                        currentEnergyData%interatomicDistances, allDist)
+
+    ! Find the dists assigned to each proc
+    allocate(partDistVec(nDists))
+    partDistVec = distributeDistances(nDists,allDist)
+
+    ! Collect all of these distances into a single vector, in which the dists are ordered
+    ! by the procs to which they are assigned
+    call MPI_gatherv(partDistVec,nDists,MPI_DOUBLE_PRECISION,distVec,nDistVec,displace,&
+                     MPI_DOUBLE_PRECISION,root,MPI_COMM_WORLD,ierror)
+    distVec = distVec*100d0
+
+    ! Select an expected vector based on the total number of procs used (up to 8)
+    if (clusterSize == 1) then
+      distVecEx = (/ 3.4422177507278662,1.6055998818136800,1.7927078594003672, &
+                     3.5766357199513960,2.5746685176997772,3.6057911075566551, &
+                     12.675240005791111,4.9530743964810102,2.1838616589923775, &
+                     3.0229538987517568 /)
+    else if (clusterSize == 2) then
+      distVecEx = (/ 3.4422177507278662,3.5766357199513960,2.5746685176997772, &
+                     4.9530743964810102,2.1838616589923775,1.6055998818136800, &
+                     1.7927078594003672,3.6057911075566551,12.675240005791111, &
+                     3.0229538987517568 /)
+    else if (clusterSize == 3) then
+      distVecEx = (/ 3.4422177507278662,3.6057911075566551,12.675240005791111, &
+                     1.6055998818136800,2.5746685176997772,4.9530743964810102, &
+                     1.7927078594003672,3.5766357199513960,2.1838616589923775, &
+                     3.0229538987517568/)
+    else if (clusterSize == 4) then
+      distVecEx = (/ 3.4422177507278662,4.9530743964810102,2.1838616589923775, &
+                     1.6055998818136800,12.675240005791111,3.0229538987517568, &
+                     1.7927078594003672,3.6057911075566551,3.5766357199513960, &
+                     2.5746685176997772 /)
+    else if (clusterSize == 5) then
+      distVecEx = (/ 3.4422177507278662,3.0229538987517568,1.6055998818136800, &
+                     2.1838616589923775,1.7927078594003672,4.9530743964810102, &
+                     3.5766357199513960,12.675240005791111,2.5746685176997772, &
+                     3.6057911075566551 /)
+    else if (clusterSize == 6) then
+      distVecEx = (/ 3.4422177507278662,1.6055998818136800,1.7927078594003672, &
+                     3.0229538987517568,3.5766357199513960,2.1838616589923775, &
+                     2.5746685176997772,4.9530743964810102,3.6057911075566551, &
+                     12.675240005791111 /)
+    else if (clusterSize == 7) then
+      distVecEx = (/ 3.4422177507278662,1.6055998818136800,1.7927078594003672, &
+                     3.5766357199513960,2.5746685176997772,3.0229538987517568, &
+                     3.6057911075566551,2.1838616589923775,12.675240005791111, &
+                     4.9530743964810102 /)
+    else if (clusterSize == 8) then
+      distVecEx = (/ 3.4422177507278662,1.6055998818136800,1.7927078594003672, &
+                     3.5766357199513960,2.5746685176997772,3.6057911075566551, &
+                     12.675240005791111,3.0229538987517568,4.9530743964810102, &
+                     2.1838616589923775 /)
+    end if
+
+    if (processRank == root) then
+      @assertEqual(distVec,distVecEx,low_tol, 'Test distribution of distances')
+    end if
+    deallocate(distVec,distVecEx,allDist,partDistVec)
+  end subroutine test_distributeDistances
+
   !===========================================================================================
   @test
   subroutine test_finalize()

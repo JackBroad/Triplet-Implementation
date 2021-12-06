@@ -66,7 +66,7 @@ contains
 
     ! Finalise MPI and print times taken for each step of calculation
     if (processRank .eq. root) then
-       call finalTextOutput()
+       !call finalTextOutput()
     end if
     call finalAsserts(proposedPositionData%N_a)
 

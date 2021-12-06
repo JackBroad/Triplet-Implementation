@@ -17,6 +17,7 @@ module tmpi_calcFullSimBoxEnergy_mod
 
 
   integer :: nSum, maxTriPerProc, remTriPerProc
+  integer :: N_dists_per_proc
   double precision :: totTime, setUpTime, expTime
   double precision :: shareTime, rootTime, dataTime
   double precision :: sumTime
@@ -44,9 +45,9 @@ contains
     setUpTime = MPI_Wtime() - setUpTime
 
 
-    ! Calculate the exponentials for all distances on each process
+    ! Calculate exponentials and assign distances to each proc
     expTime = MPI_Wtime()
-    allocate(currentEnergyData%expMatrix(N_tp,nArgs,currentPositionData%N_distances))
+    call setUpExpCalculation()
     call calculateExponentialsNonAdd(currentPositionData%N_distances,N_tp,nArgs,trainData,&
                                      hyperParams(1),UD_dg, currentEnergyData%expMatrix)
     expTime = MPI_Wtime() - expTime
@@ -87,7 +88,7 @@ contains
     ! Print times taken for each part of subroutine to run
     totTime = MPI_Wtime() - totTime
     if (processRank .eq. root) then
-       call finalTextOutput()
+       !call finalTextOutput()
     end if
     call finalAsserts(currentPositionData%N_a)
     
@@ -139,6 +140,18 @@ contains
     end if
 
   end subroutine finalAsserts
+
+
+  subroutine setUpExpCalculation()
+    implicit none
+
+    N_dists_per_proc = getNdistsPerProc() ! Get no. of dists on each proc
+    allocate(currentEnergyData%processDists(N_dists_per_proc))
+    allocate(currentEnergyData%expMatrix(N_tp,nArgs,currentPositionData%N_distances))
+    currentEnergyData%processDists = distributeDistances(N_dists_per_proc,UD_dg)
+
+    return
+  end subroutine setUpExpCalculation
 
 
   subroutine setUpFullBoxCalculation()

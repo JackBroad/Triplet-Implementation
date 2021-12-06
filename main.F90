@@ -22,7 +22,7 @@ program main
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
-  Character(len=300) :: positionFile = 'AtomicPositions500.txt'
+  Character(len=300) :: positionFile = 'AtomicPositions5.txt'
 
   
   call MPI_INIT(ierror)
@@ -46,7 +46,7 @@ program main
 
 
     ! Atom move
-    do i = 1, 150
+    do i = 1, 5
       time = MPI_Wtime()
       call initialise_Move(dist,setSeed, movedAtom)
       call MPI_Bcast(movedAtom, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
@@ -81,9 +81,8 @@ program main
     deallocate(trainData)
     deallocate(expUpdate)
     deallocate(expUpdateInd)
-    !deallocate(expUpdateNoRepeat)
-    !deallocate(expUpdateIndNoRepeat)
     deallocate(changeExpData)
+
 
   else
 
