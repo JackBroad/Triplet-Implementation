@@ -1,6 +1,6 @@
 VPATH = ./ src/
 # Find all source files, create a list of corresponding object files
-SRCS=  assert.F90 DataStructures.F90 MPI_Variables.F90 GP_Variables.F90 triplet_mod.F90 initialise_Module.F90 updateDataModule.F90 tmpi_calcFullSimBoxEnergy.F90 tmpi_calcAtomMoveEnergy.F90  toyMove_Module.F90 main.F90
+SRCS=  assert.F90 DataStructures.F90 MPI_Variables.F90 GP_Variables.F90 fullBoxModule.F90 triplet_mod.F90 initialise_Module.F90 updateDataModule.F90 tmpi_calcFullSimBoxEnergy.F90 tmpi_calcAtomMoveEnergy.F90  toyMove_Module.F90 main.F90
 OBJS=$(patsubst %.F90,%.o,$(SRCS))
 
 # Ditto for mods (They will be in both lists)

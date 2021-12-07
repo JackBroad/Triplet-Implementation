@@ -11,6 +11,7 @@ module test_regression
   use updateData
   use initialise_Module
   use funit
+  use fullBoxModule
   implicit none
   include 'mpif.h'
 
@@ -456,7 +457,7 @@ contains
   subroutine test_getNdistsPerProc
     integer :: nDistVec(clusterSize), nDistVecEx(clusterSize), nDists
 
-    nDists = getNdistsPerProc()
+    nDists = getNdistsPerProcFullBox()
     if (clusterSize == 1) then
       nDistVec = (/ nDists /)
     else
@@ -502,7 +503,7 @@ contains
     allocate(distVecEx(currentPositionData%N_distances))
 
     ! Find no. of dists per proc and build vector showing this value for each proc
-    nDists = getNdistsPerProc()
+    nDists = getNdistsPerProcFullBox()
     if (clusterSize == 1) then
       nDistVec = (/ nDists /)
     else
