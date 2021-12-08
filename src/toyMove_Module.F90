@@ -9,6 +9,7 @@ module toyMove_Module
   use tmpi_calcAtomMoveEnergy_mod
   use global_Flags, only: textOutput
   use fullBoxModule
+  use atomMoveModule
   use assert_module
   implicit none
   include 'mpif.h'

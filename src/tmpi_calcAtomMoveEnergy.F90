@@ -13,20 +13,14 @@ module tmpi_calcAtomMoveEnergy_mod
   include 'mpif.h'
 
   private
-  public tmpi_calcAtomMoveEnergy, extractChangedExps, getTriPerAtom, &
-         updateXdg, getNPerProcNonAdd, getVarrays, getTripletScatterData, &
-         getChangedTriplets
+  public tmpi_calcAtomMoveEnergy
 
 
-  integer :: nTriMax, nTriRe,triPerProc
-  integer :: j, counter
   double precision :: moveTime, expTime, sumTime, setTime
   double precision :: gatherTime, xTime, tripTime, partialSumTime
   double precision :: extractTime, tripSumTime, newTripU
   double precision :: oldTripU, partialDeltaU, rootSumTime
-  integer, allocatable :: changedTriplets(:,:), tripIndex(:)
-  integer, allocatable :: scounts(:), displs(:), newExpInt(:,:)
-  integer, allocatable :: scatterTrip(:,:)
+  integer, allocatable :: newExpInt(:,:)
   double precision, allocatable :: newDists(:), newUfull(:)
 
 
@@ -39,7 +33,6 @@ contains
 
 
     ! Set up calculation
-    print *, atomToMove
     moveTime = MPI_Wtime()
     setTime = MPI_Wtime()
     call setUpCalculation(atomToMove)
@@ -66,7 +59,7 @@ contains
 
     ! Finalise MPI and print times taken for each step of calculation
     if (processRank .eq. root) then
-       !call finalTextOutput()
+       call finalTextOutput()
     end if
     call finalAsserts(proposedPositionData%N_a)
 
@@ -134,30 +127,15 @@ contains
     N_tri_per_proc = size(proposedEnergyData%tripletEnergies)
     call getTripletEnergiesAtomMove(mover,N_dists_per_proc,N_tri_per_proc, &
                                     proposedEnergyData%tripletEnergies)
-    !call getChangedTriplets(mover, changedTriplets,tripIndex)
-
-    ! Prepare trip. data for scattering
-    !call getTripletScatterData()
-    !call allocateTripletScatterArrays()
-
-    ! Scatter triplets across processes
-    !scatterTrip = changedTriplets(1:3,1+displs(processRank+1):displs(processRank+1)+&
-    !                              scounts(processRank+1))
-    !proposedEnergyData%changedTriInd = tripIndex(1+displs(processRank+1):&
-    !                                   displs(processRank+1)+scounts(processRank+1))
     tripTime = MPI_Wtime() - tripTime ! d
 
     ! Calculate the non-additive energies for the changed triplets
     tripSumTime = MPI_Wtime()
-    !call tripletEnergiesNonAdd(scatterTrip,proposedEnergyData%distancesIntMat,triPerProc,N_tp, &
-    !                           proposedPositionData%N_a,N_p,nArgs,Perm,proposedPositionData%N_distances, &
-    !                           proposedEnergyData%expMatrix,alpha,hyperParams(2), proposedEnergyData%changedTriU)
     tripSumTime = MPI_Wtime() - tripSumTime ! e
 
     ! Find the change in U on each process
     partialSumTime = MPI_Wtime()
     newTripU = sum(proposedEnergyData%tripletEnergies)
-    !oldTripU = findOldTripU()
     oldTripU = sum(currentEnergyData%tripletEnergies)
     partialDeltaU = newTripU - oldTripU
     partialSumTime = MPI_Wtime() - partialSumTime
@@ -178,22 +156,6 @@ contains
 
   return
   end subroutine changedTripletEnergyCalc
-
-
-  double precision function findOldTripU()
-    implicit none
-    double precision :: oldUvec(triPerProc)
-
-    counter = 1
-    do j = 1, triPerProc
-      oldUvec(j) = currentEnergyData%tripletEnergies(&
-                   proposedEnergyData%changedTriInd(j))
-    end do
-
-    findOldTripU = sum(oldUvec)
-
-  return
-  end function findOldTripU
 
 
   subroutine initialAsserts(N_a,N_tri,N_distances)
@@ -234,63 +196,23 @@ contains
     type (positionData) :: proposedPosition
     type (energiesData) :: proposedEnergy
  
-    allocate(newExpInt(proposedPosition%N_a-1,2))
-    allocate(newDists(proposedPosition%N_a-1))
-    allocate(changedTriplets(3,proposedPositionData%N_changed_triplets))
     allocate(newUfull(clusterSize))
-    allocate(scounts(clusterSize))
-    allocate(displs(clusterSize))
+    allocate(newDists(proposedPosition%N_a-1))
+    allocate(newExpInt(proposedPosition%N_a-1,2))
     if (allocated(proposedEnergy%interatomicDistances)) then
       deallocate(proposedEnergy%interatomicDistances)
     end if
     allocate(proposedEnergy%interatomicDistances(proposedPosition%N_a, &
              proposedPosition%N_a))
-    allocate(tripIndex(proposedPositionData%N_changed_triplets))
 
   end subroutine allocateArrays
 
 
-  subroutine getTripletScatterData()
-
-    call getNPerProcNonAdd(proposedPositionData%N_changed_triplets,clusterSize, nTriMax,nTriRe)
-    call getVarrays(clusterSize,nTriMax,nTriRe, scounts,displs)
-    triPerProc = scounts(processRank+1)
-
-  end subroutine getTripletScatterData
-
-
-  subroutine allocateTripletScatterArrays()
-
-    allocate(scatterTrip(3,triPerProc))
-    if (allocated(expUpdate)) then
-      deallocate(expUpdate)
-    end if
-    allocate(expUpdate(proposedPositionData%N_a-1))
-    if (allocated(expUpdateInd)) then
-      deallocate(expUpdateInd)
-    end if
-    allocate(expUpdateInd(proposedPositionData%N_a-1,2))
-    if (allocated(proposedEnergyData%changedTriU)) then
-      deallocate(proposedEnergyData%changedTriU)
-    end if
-    allocate(proposedEnergyData%changedTriU(triPerProc))
-    if (allocated(proposedEnergyData%changedTriInd)) then
-      deallocate(proposedEnergyData%changedTriInd)
-    end if
-    allocate(proposedEnergyData%changedTriInd(triPerProc))
-
-  end subroutine allocateTripletScatterArrays
-
-
   subroutine deallocateArrays()
 
-    deallocate(newExpInt)
-    deallocate(newDists)
-    deallocate(changedTriplets)
     deallocate(newUfull)
-    deallocate(scounts)
-    deallocate(displs)
-    deallocate(tripIndex)
+    deallocate(newDists)
+    deallocate(newExpInt)
 
   end subroutine deallocateArrays
 
@@ -300,154 +222,9 @@ contains
     if (textOutput) then
       print *, moveTime, setTime, expTime, tripTime, tripSumTime, &
                partialSumTime, gatherTime, rootSumTime
-      !print *, sumTime, tripTime, tripSumTime, gatherAndSumTime
-      !print *, setTime, expTime, tripTime, tripSumTime, gatherAndSumTime, rootSumTime
     end if
 
   end subroutine finalTextOutput
-
-
-
-  function getTriPerAtom(nAt) result(nPer)
-    implicit none
-    integer, intent(in) :: nAt
-    integer :: nPer
-    integer :: a, b
-
-    ! Determine the number of triplets each atom is involved in
-    nPer = 0
-    do a = 2, nAt-1
-      do b = a+1, nAt
-        nPer = nPer + 1
-      end do
-    end do
-
-  return
-  end function getTriPerAtom
-
-
-  ! Uses the number of atoms (num) and index of moved atom (atom) to determine
-  ! which exponentials need re-calculating after a move and return a matrix of
-  ! their postions in X_dg
-  subroutine extractChangedExps(num,atInd,Xdg, change,dists)
-    implicit none
-    integer, intent(in) :: num, atInd
-    double precision, intent(in) :: Xdg(num,num)
-    integer, intent(out) :: change(num-1,2)
-    double precision, intent(out) :: dists(num-1)
-    integer :: i, j
-
-    do i = 1, num
-      if (i .lt. atInd) then
-
-        change(i,1) = i
-        change(i,2) = atInd
-
-      else if (i .gt. atInd) then
-
-        change(i-1,1) = atInd
-        change(i-1,2) = i
-
-      end if
-    end do
-
-    do j = 1, num-1
-
-      dists(j) = Xdg(change(j,1),change(j,2))
-
-    end do
-
-  return
-  end subroutine extractChangedExps
-
-
-  subroutine getChangedTriplets(atom, changedTriplets,tripIndex)
-    implicit none
-    integer, intent(in) :: atom
-    integer, intent(out) :: changedTriplets(3,proposedPositionData%N_changed_triplets)
-    integer, intent(out) :: tripIndex(proposedPositionData%N_changed_triplets)
-    integer :: al, be, ga, counter, indCounter
-
-    ! Fill changed triplet array and vector of indices of changed triplets
-    counter = 0
-    indCounter = 0
-    do while (counter .lt. proposedPositionData%N_changed_triplets)
-    do al = 1, proposedPositionData%N_a-2
-      do be = al+1, proposedPositionData%N_a-1
-        do ga = be+1, proposedPositionData%N_a
-          indCounter = indCounter + 1
-          if (al .eq. atom) then
-
-            counter = counter + 1
-            changedTriplets(1,counter) = al
-            changedTriplets(2,counter) = be
-            changedTriplets(3,counter) = ga
-            tripIndex(counter) = indCounter
-
-          else if (be .eq. atom) then
-
-            counter = counter + 1
-            changedTriplets(1,counter) = al
-            changedTriplets(2,counter) = be
-            changedTriplets(3,counter) = ga
-            tripIndex(counter) = indCounter
-
-          else if (ga .eq. atom) then
-
-            counter = counter + 1
-            changedTriplets(1,counter) = al
-            changedTriplets(2,counter) = be
-            changedTriplets(3,counter) = ga
-            tripIndex(counter) = indCounter
-
-          end if
-        end do
-      end do
-    end do
-    end do
-
-  return
-  end subroutine getChangedTriplets
-
-
-  subroutine updateXdg(move,N_a,positions, X)
-    implicit none
-    ! Arguments
-    integer, intent(in) :: move, N_a
-    double precision, intent(in) :: positions(N_a,3)
-    double precision, intent(inout) :: X(N_a,N_a)
-    ! Local variables
-    integer :: i
-    double precision :: changedPosition(3)
-
-    ! Identify the position of the moved atom
-    changedPosition = positions(move,:)
-
-    ! Find the distances between this atom and all others
-    do i = 1, N_a
-      if (i .lt. move) then
-
-        X(i,move) = (positions(i,1) - changedPosition(1))**2 + &
-                    (positions(i,2) - changedPosition(2))**2 + &
-                    (positions(i,3) - changedPosition(3))**2
-        X(i,move) = (X(i,move))**0.5
-        X(i,move) = 1 / X(i,move)
-        X(move,i) = X(i,move)
-
-      else if (i .gt. move) then
-
-        X(move,i) = (positions(i,1) - changedPosition(1))**2 + &
-                    (positions(i,2) - changedPosition(2))**2 + &
-                    (positions(i,3) - changedPosition(3))**2
-        X(move,i) = (X(move,i))**0.5
-        X(move,i) = 1 / X(move,i)
-        X(i,move) = X(move,i)
-
-      end if
-    end do
-
-    return
-  end subroutine updateXdg
 
 
 end module tmpi_calcAtomMoveEnergy_mod

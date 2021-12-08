@@ -22,7 +22,7 @@ program main
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
-  Character(len=300) :: positionFile = 'AtomicPositions5.txt'
+  Character(len=300) :: positionFile = 'AtomicPositions500.txt'
 
   
   call MPI_INIT(ierror)
@@ -46,7 +46,7 @@ program main
 
 
     ! Atom move
-    do i = 1, 2
+    do i = 1, 150
       time = MPI_Wtime()
       call initialise_Move(dist,setSeed, movedAtom)
       call MPI_Bcast(movedAtom, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
@@ -55,7 +55,6 @@ program main
 
       !***********True move code***********
       moveEnergy = tmpi_calcAtomMoveEnergy(movedAtom)
-      fullEnergy = fullEnergy + moveEnergy
       !if (processRank .eq. root) then
       !  check = -79272925.072343603d0
       !  call assertEqual_double(fullEnergy, check, 1d0*10d0**(-5d0), 'incorrect energy found')
@@ -68,7 +67,6 @@ program main
       else if (acceptMove .eqv. .false.) then
         !proposedEnergyData = currentEnergyData
         !proposedPositionData = currentPositionData
-        !fullEnergy = fullEnergy - moveEnergy
       !  acceptMove = .true.
       end if
       time = MPI_Wtime() - time
