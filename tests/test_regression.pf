@@ -12,6 +12,7 @@ module test_regression
   use initialise_Module
   use funit
   use fullBoxModule
+  use atomMoveModule
   implicit none
   include 'mpif.h'
 
@@ -419,39 +420,6 @@ contains
     end if
 
   end subroutine test_getChangedTripletsAndDists
-
-  @test
-  subroutine test_data_update()
-    implicit none
-    double precision :: expectedU
-
-    ! Update data
-    call updateDataAfterMove()
-    
-    ! Test that the current and proposed triplet energies are the same after the update
-    if( processRank == root) then
-      @assertEqual(proposedEnergyData%tripletEnergies, currentEnergyData%tripletEnergies, low_tol, 'Test trip energy update')
-    end if
-
-    ! Set up an expected post-update energy
-    proposedEnergyData%Utotal = -1d0
-    expectedU = currentEnergyData%Utotal + proposedEnergyData%Utotal
-
-    ! Update data
-    call updateDataAfterMove()
-
-    ! Test the expected energy matches that from the update
-    if( processRank == root) then
-      @assertEqual(expectedU, currentEnergyData%Utotal, low_tol, 'Test Utotal update')
-    end if
-
-    ! Test the position data has updated properly
-    if( processRank == root) then
-      @assertEqual(proposedEnergyData%interatomicDistances,currentEnergyData%interatomicDistances, low_tol, 'Test dist update')
-      @assertEqual(proposedPositionData%posArray,currentPositionData%posArray, low_tol, 'Test position update')
-    end if
-
-  end subroutine test_data_update
 
   @test
   subroutine test_getNdistsPerProc

@@ -8,6 +8,7 @@ module tmpi_calcAtomMoveEnergy_mod
   use positionData_Module, only: positionData
   use global_Flags, only: textOutput
   use assert_module
+  use atomMoveModule
   implicit none
   include 'mpif.h'
 
@@ -23,7 +24,6 @@ module tmpi_calcAtomMoveEnergy_mod
   double precision :: gatherTime, xTime, tripTime, partialSumTime
   double precision :: extractTime, tripSumTime, newTripU
   double precision :: oldTripU, partialDeltaU, rootSumTime
-  double precision :: timeToGather
   integer, allocatable :: changedTriplets(:,:), tripIndex(:)
   integer, allocatable :: scounts(:), displs(:), newExpInt(:,:)
   integer, allocatable :: scatterTrip(:,:)
@@ -39,9 +39,9 @@ contains
 
 
     ! Set up calculation
+    print *, atomToMove
     moveTime = MPI_Wtime()
     setTime = MPI_Wtime()
-    timeToGather = MPI_Wtime()
     call setUpCalculation(atomToMove)
     setTime = MPI_Wtime() - setTime ! b
 
@@ -125,45 +125,44 @@ contains
 
   subroutine changedTripletEnergyCalc(mover)
     implicit none
+    integer :: N_dists_per_proc, N_tri_per_proc
     integer, intent(in) :: mover
 
     ! Determine which triplets have changed
     tripTime = MPI_Wtime()
-    call getChangedTriplets(mover, changedTriplets,tripIndex)
+    N_dists_per_proc = size(proposedEnergyData%processDists)
+    N_tri_per_proc = size(proposedEnergyData%tripletEnergies)
+    call getTripletEnergiesAtomMove(mover,N_dists_per_proc,N_tri_per_proc, &
+                                    proposedEnergyData%tripletEnergies)
+    !call getChangedTriplets(mover, changedTriplets,tripIndex)
 
     ! Prepare trip. data for scattering
-    call getTripletScatterData()
-    call allocateTripletScatterArrays()
+    !call getTripletScatterData()
+    !call allocateTripletScatterArrays()
 
     ! Scatter triplets across processes
-    scatterTrip = changedTriplets(1:3,1+displs(processRank+1):displs(processRank+1)+&
-                                  scounts(processRank+1))
-    proposedEnergyData%changedTriInd = tripIndex(1+displs(processRank+1):&
-                                       displs(processRank+1)+scounts(processRank+1))
+    !scatterTrip = changedTriplets(1:3,1+displs(processRank+1):displs(processRank+1)+&
+    !                              scounts(processRank+1))
+    !proposedEnergyData%changedTriInd = tripIndex(1+displs(processRank+1):&
+    !                                   displs(processRank+1)+scounts(processRank+1))
     tripTime = MPI_Wtime() - tripTime ! d
 
     ! Calculate the non-additive energies for the changed triplets
     tripSumTime = MPI_Wtime()
-    call tripletEnergiesNonAdd(scatterTrip,proposedEnergyData%distancesIntMat,triPerProc,N_tp, &
-                               proposedPositionData%N_a,N_p,nArgs,Perm,proposedPositionData%N_distances, &
-                               proposedEnergyData%expMatrix,alpha,hyperParams(2), proposedEnergyData%changedTriU)
+    !call tripletEnergiesNonAdd(scatterTrip,proposedEnergyData%distancesIntMat,triPerProc,N_tp, &
+    !                           proposedPositionData%N_a,N_p,nArgs,Perm,proposedPositionData%N_distances, &
+    !                           proposedEnergyData%expMatrix,alpha,hyperParams(2), proposedEnergyData%changedTriU)
     tripSumTime = MPI_Wtime() - tripSumTime ! e
 
     ! Find the change in U on each process
     partialSumTime = MPI_Wtime()
-    newTripU = sum(proposedEnergyData%changedTriU)
-    oldTripU = findOldTripU()
+    newTripU = sum(proposedEnergyData%tripletEnergies)
+    !oldTripU = findOldTripU()
+    oldTripU = sum(currentEnergyData%tripletEnergies)
     partialDeltaU = newTripU - oldTripU
     partialSumTime = MPI_Wtime() - partialSumTime
 
     ! Gather the change in triplet energies on the root process for summation
-    timeToGather = MPI_Wtime() - timeToGather
-    !do j = 1, clusterSize
-    !  if (j-1 .eq. processRank) then
-    !    print *, processRank, timeToGather
-    !  end if
-    !  call MPI_BARRIER(MPI_COMM_WORLD, barError)
-    !end do
     gatherTime = MPI_Wtime()
     call MPI_gather(partialDeltaU, 1, MPI_DOUBLE_PRECISION, newUfull, 1, &
                     MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
@@ -285,7 +284,6 @@ contains
 
   subroutine deallocateArrays()
 
-    deallocate(scatterTrip)
     deallocate(newExpInt)
     deallocate(newDists)
     deallocate(changedTriplets)

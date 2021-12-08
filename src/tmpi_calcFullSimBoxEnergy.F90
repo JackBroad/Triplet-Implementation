@@ -21,10 +21,11 @@ module tmpi_calcFullSimBoxEnergy_mod
   integer :: N_dists_per_proc, N_tri_per_proc
   double precision :: totTime, setUpTime, expTime
   double precision :: shareTime, rootTime, dataTime
-  double precision :: sumTime
+  double precision :: sumTime, partTime, partialU
   integer, allocatable :: scounts(:), displs(:)
   integer, allocatable :: triScatter(:,:)
-  double precision, allocatable :: UD_dg(:), uVec(:)
+  double precision, allocatable :: UD_dg(:)
+  double precision, allocatable :: allPartEnergies(:)
 
 
 contains
@@ -56,30 +57,32 @@ contains
     ! Determine no. of triplets to send to each process for triplet calc.
     ! then find triplet energies
     sumTime = MPI_Wtime()
-    call setUpTripletSum()
     allocate(currentEnergyData%alphaBetaPairs(N_dists_per_proc,2))
     currentEnergyData%alphaBetaPairs = getAlphaBetaPairs(N_dists_per_proc, &
                                                          currentEnergyData%interatomicDistances)
     N_tri_per_proc = getNtripsPerProcFullBox(N_dists_per_proc)
-    call tripletEnergiesNonAdd(triScatter,currentEnergyData%distancesIntMat,nSum,N_tp,currentPositionData%N_a, &
-                               N_p,nArgs,Perm,currentPositionData%N_distances,currentEnergyData%expMatrix,alpha, &
-                               hyperParams(2), uVec)
+    allocate(currentEnergyData%tripletEnergies(N_tri_per_proc))
+    currentEnergyData%tripletEnergies = getTripletEnergiesFullBox(N_dists_per_proc, &
+                                                                  N_tri_per_proc)
     sumTime = MPI_Wtime() - sumTime
 
 
-    ! Gather in the triplet energies and broadcast triplet energies
+    ! Sum trip energies on each proc and gather the totals on the root
+    partTime = MPI_Wtime()
+    partialU = sum(currentEnergyData%tripletEnergies)
+    partTime = MPI_Wtime() - partTime
     shareTime = MPI_Wtime()
-    call MPI_gatherv(uVec, nSum, MPI_DOUBLE_PRECISION, currentEnergyData%tripletEnergies, scounts, displs, &
-                     MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-    call MPI_Bcast(currentEnergyData%tripletEnergies,currentPositionData%N_tri,MPI_DOUBLE_PRECISION, &
-                   root, MPI_COMM_WORLD, ierror)
+    allocate(allPartEnergies(clusterSize))
+    call MPI_gather(partialU, 1, MPI_DOUBLE_PRECISION, allPartEnergies, 1, &
+                    MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
     shareTime = MPI_Wtime() - shareTime
 
 
-    ! Find the total non-additive energy for the system by summing triplet
-    ! energies
+    ! Sum partial sums on root
     rootTime = MPI_Wtime()
-    call sumEnergiesNonAdd()
+    if (processRank .eq. root) then
+      currentEnergyData%Utotal = sum(allPartEnergies)
+    end if
     tmpi_calcFullSimBoxEnergy = currentEnergyData%Utotal
     rootTime = MPI_Wtime() - rootTime
     call deallocateLocalArrays()
@@ -168,8 +171,7 @@ contains
     ! Output variables
     type (energiesData) :: currentEnergy
 
-    ! Read in all necessary info from files
-    allocate(currentEnergy%tripletEnergies(currentPosition%N_tri))
+    !allocate(currentEnergy%tripletEnergies(currentPosition%N_tri))
     allocate(currentEnergy%interatomicDistances(currentPosition%N_a, &
              currentPosition%N_a))
 
@@ -231,18 +233,17 @@ contains
 
     nSum = scounts(processRank+1)
     allocate(triScatter(3,nSum))
-    allocate(uVec(nSum))
 
   end subroutine getnSumAndTripletArrays
 
 
   subroutine deallocateLocalArrays()
 
-    deallocate(uVec)
-    deallocate(triScatter)
+    !deallocate(triScatter)
     deallocate(scounts)
     deallocate(displs)
     deallocate(UD_dg)
+    deallocate(allPartEnergies)
 
   end subroutine deallocateLocalArrays
 
@@ -260,7 +261,7 @@ contains
        !print *, '========================'
        !print *, ' '
        !print *, ' '
-       print *, totTime, setUpTime, expTime, sumTime, shareTime, rootTime, dataTime, 0d0
+       print *, totTime, setUpTime, expTime, sumTime, partTime, shareTime, rootTime, dataTime
 
     end if
 

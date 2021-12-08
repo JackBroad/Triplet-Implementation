@@ -46,7 +46,7 @@ program main
 
 
     ! Atom move
-    do i = 1, 5
+    do i = 1, 2
       time = MPI_Wtime()
       call initialise_Move(dist,setSeed, movedAtom)
       call MPI_Bcast(movedAtom, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
@@ -79,8 +79,6 @@ program main
 
     deallocate(alpha)
     deallocate(trainData)
-    deallocate(expUpdate)
-    deallocate(expUpdateInd)
     deallocate(changeExpData)
 
 

@@ -4,6 +4,7 @@ module fullBoxModule
   use dataStructure_variables
   use energiesData_Module, only: energiesData
   use positionData_Module, only: positionData
+  use triplet_mod
   implicit none
   !include 'mpif.h'
 
@@ -134,14 +135,14 @@ contains
 integer function getNtripsPerProcFullBox(nDists)
   implicit none
   integer :: nDists, counter, i, j
-  integer :: alpha, beta
+  integer :: al, be
 
   counter = 0
   do i = 1, nDists
-    alpha = currentEnergyData%alphaBetaPairs(i,1)
-    beta = currentEnergyData%alphaBetaPairs(i,2)
+    al = currentEnergyData%alphaBetaPairs(i,1)
+    be = currentEnergyData%alphaBetaPairs(i,2)
     do j = 1, currentPositionData%N_a
-      if (beta .lt. j) then
+      if (be .lt. j) then
         counter = counter + 1
       end if
     end do
@@ -151,6 +152,34 @@ integer function getNtripsPerProcFullBox(nDists)
 
 return
 end function getNtripsPerProcFullBox
+
+
+function getTripletEnergiesFullBox(nDists,nTrips) result(uVec)
+  implicit none
+  integer :: nDists, nTrips, triplet(3)
+  integer :: i, j, al, be, counter
+  double precision :: U(1), uVec(nTrips)
+
+  counter = 0
+  do i = 1, nDists
+    al = currentEnergyData%alphaBetaPairs(i,1)
+    be = currentEnergyData%alphaBetaPairs(i,2)
+    do j = 1, currentPositionData%N_a
+      if (be .lt. j) then
+        counter = counter + 1
+        triplet = (/ al, be, j /)
+        call tripletEnergiesNonAdd(triplet,currentEnergyData%distancesIntMat, &
+                                   1,N_tp,currentPositionData%N_a,N_p,nArgs, &
+                                   Perm,currentPositionData%N_distances, &
+                                   currentEnergyData%expMatrix,alpha, &
+                                   hyperParams(2), U)
+        uVec(counter) = U(1)
+      end if
+    end do
+  end do
+
+return
+end function
 
 
 integer function getNdistsPerProcFullBox()
