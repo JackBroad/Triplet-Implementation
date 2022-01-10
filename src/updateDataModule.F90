@@ -9,34 +9,114 @@ module updateData
   implicit none
   include 'mpif.h'
 
-  private
-  public updateDataAfterMove
+
+private
+public updateCurrentDataStructures, resetProposedDataStructures
+
 
 contains
 
 
-  subroutine updateCurrentDataStructures()
+  subroutine updateCurrentDataStructures(move)
     implicit none
+    integer :: move
+    double precision :: energyTime, xdgTime, tripletTime
+    double precision :: expTime, posTime
 
+    energyTime = MPI_Wtime()
     currentEnergyData%Utotal = currentEnergyData%Utotal + &
                                proposedEnergyData%Utotal
-    currentEnergyData%interatomicDistances = proposedEnergyData%&
-                                             interatomicDistances
-    currentEnergyData%tripletEnergies = proposedEnergyData%&
-                                        tripletEnergies
-    currentEnergyData%expMatrix = proposedEnergyData%expMatrix
-    currentPositionData = proposedPositionData
+    energyTime = MPI_Wtime() - energyTime
+    xdgTime = MPI_Wtime()
+    call updateDistanceData(currentEnergyData,proposedEnergyData,expUpdateIndNoRepeat, &
+                            currentPositionData%N_a-1)
+    xdgTime = MPI_Wtime() - xdgTime
+    tripletTime = MPI_Wtime()
+    call updateTripletEnergies(currentEnergyData,proposedEnergyData)
+    tripletTime = MPI_Wtime() - tripletTime
+    expTime = MPI_Wtime()
+    call updateExpMatrix(currentEnergyData,changeExpData, expUpdateIndNoRepeat, &
+                         currentPositionData%N_a-1)
+    expTime = MPI_Wtime() - expTime
+    posTime = MPI_Wtime()
+    currentPositionData%posArray(move,:) = proposedPositionData%posArray(move,:)
+    posTime = MPI_Wtime() - posTime
+
+    !if (processRank .eq. root) then
+    !  print *, energyTime, xdgTime, tripletTime, expTime, posTime, 0d0, 0d0, 0d0
+    !end if
 
   return
-  end subroutine
+  end subroutine updateCurrentDataStructures
 
 
-  subroutine updateDataAfterMove()
+  subroutine resetProposedDataStructures(move)
     implicit none
+    integer :: move
+    double precision :: xdgTime, tripletTime
+    double precision :: expTime, posTime
 
-    call updateCurrentDataStructures()
+    xdgTime = MPI_Wtime()
+    call updateDistanceData(proposedEnergyData,currentEnergyData,expUpdateIndNoRepeat, &
+                            proposedPositionData%N_a-1)
+    xdgTime = MPI_Wtime() - xdgTime
+    tripletTime = MPI_Wtime()
+    call updateTripletEnergies(proposedEnergyData,currentEnergyData)
+    tripletTime = MPI_Wtime() - tripletTime
+    expTime = MPI_Wtime()
+    call resetExpMatrix(proposedEnergyData,currentEnergyData, expUpdateIndNoRepeat, &
+                        proposedPositionData%N_a-1)
+    expTime = MPI_Wtime() - expTime
+    posTime = MPI_Wtime()
+    proposedPositionData%posArray(move,:) = currentPositionData%posArray(move,:)
+    posTime = MPI_Wtime() - posTime
+
+    !if (processRank .eq. root) then
+    !  print *, 0d0, xdgTime, tripletTime, expTime, posTime, 0d0, 0d0, 0d0
+    !end if
 
   return
-  end subroutine updateDataAfterMove
-  
+  end subroutine resetProposedDataStructures
+
+
+  subroutine resetExpMatrix(proposedEnergyData,currentEnergyData,expInd,length)
+    integer :: indj, length, expInd(length,2), j
+    type (energiesData) :: currentEnergyData, proposedEnergyData
+
+    do j = 1, length
+      indj = proposedEnergyData%distancesIntMat(expInd(j,1), expInd(j,2))
+      proposedEnergyData%expMatrix(1:N_tp,1:nArgs,indj) = currentEnergyData%&
+      expMatrix(1:N_tp,1:nArgs,indj)
+    end do
+
+  return
+  end subroutine resetExpMatrix
+
+  subroutine updateDistanceData(changedEnData,unchangedEnData,expInd,length)
+    integer :: indj, length, expInd(length,2), j
+    type (energiesData) :: changedEnData, unchangedEnData
+
+    do j = 1, length
+      changedEnData%interatomicDistances(expInd(j,1),expInd(j,2)) = &
+      unchangedEnData%interatomicDistances(expInd(j,1),expInd(j,2))
+    end do
+
+  return
+  end subroutine updateDistanceData
+
+  subroutine updateTripletEnergies(changedEnData,unchangedEnData)
+    integer :: j, nUpdates, enUpdate
+    type (energiesData) :: changedEnData, unchangedEnData
+
+    nUpdates = size(changedTriInd)
+
+    do j = 1, nUpdates
+      enUpdate = changedTriInd(j)
+      changedEnData%tripletEnergies(enUpdate) = &
+      unchangedEnData%tripletEnergies(enUpdate)
+    end do
+
+  return
+  end subroutine updateTripletEnergies
+
 end module updateData

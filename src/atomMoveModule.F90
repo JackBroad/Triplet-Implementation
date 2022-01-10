@@ -1,6 +1,7 @@
 module atomMoveModule
   use GP_variables
   use mpi_variables
+  use expShare_variables
   use dataStructure_variables
   use energiesData_Module, only: energiesData
   use positionData_Module, only: positionData
@@ -15,15 +16,18 @@ contains
   subroutine getTripletEnergiesAtomMove(move,nDists,nTrips, uVec)
     implicit none
     integer :: i, j, counter, al, be, triplet(3)
+    integer :: tmpChangedTri(nTrips), sizeCounter
     double precision :: U(1)
     integer, intent(in) :: move, nDists, nTrips
     double precision, intent(inout) :: uVec(nTrips)
 
     counter = 0
+    sizeCounter = 0
     do i = 1, nDists
       al = proposedEnergyData%alphaBetaPairs(i,1)
       be = proposedEnergyData%alphaBetaPairs(i,2)
       if (be .lt. move) then
+        sizeCounter = sizeCounter + 1
         counter = counter + (move - be)
         triplet = (/ al, be, move /)
         call tripletEnergiesNonAdd(triplet,proposedEnergyData%distancesIntMat, &
@@ -32,10 +36,12 @@ contains
                                    proposedEnergyData%expMatrix,alpha, &
                                    hyperParams(2), U)
         uVec(counter) = U(1)
+        tmpChangedTri(sizeCounter) = counter
         counter = counter + (proposedPositionData%N_a - move)
       else if ( (al .eq. move) .or. (be .eq. move) ) then
         do j = be+1, proposedPositionData%N_a
           counter = counter + 1
+          sizeCounter = sizeCounter + 1
           triplet = (/ al, be, j /)
           call tripletEnergiesNonAdd(triplet,proposedEnergyData%distancesIntMat, &
                                      1,N_tp,proposedPositionData%N_a,N_p,nArgs, &
@@ -43,6 +49,7 @@ contains
                                      proposedEnergyData%expMatrix,alpha, &
                                      hyperParams(2), U)
           uVec(counter) = U(1)
+          tmpChangedTri(sizeCounter) = counter
         end do
       else
         counter = counter + (proposedPositionData%N_a - be) ! Skip all trips
@@ -50,6 +57,12 @@ contains
                                                             ! alpha and beta
       end if
     end do
+
+    if (allocated(changedTriInd)) then
+      deallocate(changedTriInd)
+    end if
+    allocate(changedTriInd(sizeCounter))
+    changedTriInd = tmpChangedTri(1:sizeCounter)
 
   return
   end subroutine getTripletEnergiesAtomMove

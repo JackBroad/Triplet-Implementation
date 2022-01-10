@@ -18,6 +18,7 @@ else:
   nProcs = nProcs + 1
 fullBoxMat = np.zeros((iMax+1,8)) # 4
 atomMoveMat = np.zeros((iMax+1,8)) # 4
+expMat = np.zeros(iMax+1)
 
 # Loop over number of processes, extracting all data from appropriate output file
 counter = 0
@@ -54,14 +55,14 @@ for i in range (1,iMax+1):
     atomMoveMat[counter,:] = atomMoveData
     counter = counter + 1
 
+exMove0 = 0.0004778 + 0.01771 + 0.051646 + 2.6059 + 0.001554 + 5.708*10**(-6)
 fullT0 = fullBoxMat[0,0]
 moveT0 = atomMoveMat[0,0]
 for j in range (0,iMax+1):
   fullBoxMat[j,0]=fullT0/fullBoxMat[j,0]
   atomMoveMat[j,0]=moveT0/atomMoveMat[j,0]
-
-fullT0 = int(fullT0)
-moveT0 = int(moveT0)
+  expTime = 0.0004778 + 0.01771 + 0.051646 + (2.6059/(j+1)) + 0.001554 + (j+1)*5.708*10**(-6)
+  expMat[j] = exMove0/expTime
 
 # Set font sizes for figure
 SMALL_SIZE = 17
@@ -77,16 +78,17 @@ mp.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 # Plot the data
 fig=mp.figure()
 ax1=fig.add_subplot(111)
-ax1.scatter(nProcs,fullBoxMat[:,0],s=75,c="g",marker="o",label=r"t$_1$ = "+str(fullT0)+" s")
+ax1.scatter(nProcs,fullBoxMat[:,0],s=75,c="g",marker="o",label="Full Box")
 mp.grid()
 mp.xlabel(r"$N_{p}}$")
 mp.ylabel(r"t$_1$ / t$_{N_{p}}$")
-mp.legend(loc="upper left")
+#mp.legend(loc="upper left")
 mp.savefig(dirString+'/'+'fullBoxSpeedUp.pdf',bbox_inches = "tight")
 
 figg=mp.figure()
 ax2=figg.add_subplot(111)
-ax2.scatter(nProcs,atomMoveMat[:,0],s=75,c="g",marker="o",label=r"t$_1$ = "+str(moveT0)+" s")
+ax2.scatter(nProcs,atomMoveMat[:,0],s=75,c="g",marker="o",label="Observed")
+ax2.plot(nProcs,expMat,c="r",label="Expected")
 mp.grid()
 mp.xlabel(r"$N_{p}}$")
 mp.ylabel(r"t$_1$ / t$_{N_{p}}$")

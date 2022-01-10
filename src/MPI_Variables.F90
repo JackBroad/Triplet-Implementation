@@ -11,6 +11,7 @@ module expShare_variables
   implicit none
 
   integer, allocatable :: expUpdateInd(:,:),expUpdateIndNoRepeat(:,:)
+  integer, allocatable :: changedTriInd(:)
   double precision, allocatable :: expUpdate(:), expUpdateNoRepeat(:)
   double precision, allocatable :: changeExpData(:,:,:)
 

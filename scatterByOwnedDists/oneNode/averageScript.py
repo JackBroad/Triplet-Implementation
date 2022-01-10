@@ -1,7 +1,7 @@
 import pandas as pa
 import numpy as np
 
-data = pa.read_csv('40-data.txt',  delim_whitespace=True, header=None)
+data = pa.read_csv('2-data.txt',  delim_whitespace=True, header=None)
 data = data.values
 data = data[1:,:]
 

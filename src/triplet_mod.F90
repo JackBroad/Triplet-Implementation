@@ -321,6 +321,7 @@ end function energyCheckCalc
 
     end do
 
+  return
   end subroutine updateExpMatrix
 
 

@@ -17,8 +17,9 @@ program main
 
 
   integer :: movedAtom, i
-  logical :: setSeed=.false., acceptMove=.false., useToyCode=.false.
+  logical :: setSeed=.false., acceptMove=.true., useToyCode=.false.
   double precision :: dist, time, fullEnergy, moveEnergy, check
+  double precision :: moveTime, acceptTime, rejectTime
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
@@ -47,32 +48,39 @@ program main
 
     ! Atom move
     do i = 1, 150
-      time = MPI_Wtime()
       call initialise_Move(dist,setSeed, movedAtom)
+      time = MPI_Wtime()
+      moveTime = MPI_Wtime()
       call MPI_Bcast(movedAtom, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
       call MPI_Bcast(proposedPositionData%posArray(movedAtom,:), 3, MPI_DOUBLE_PRECISION, &
                      root, MPI_COMM_WORLD, ierror)
 
       !***********True move code***********
       moveEnergy = tmpi_calcAtomMoveEnergy(movedAtom)
+      moveTime = MPI_Wtime() - moveTime
       !if (processRank .eq. root) then
       !  check = -79272925.072343603d0
       !  call assertEqual_double(fullEnergy, check, 1d0*10d0**(-5d0), 'incorrect energy found')
       !end if
 
       if (acceptMove .eqv. .true.) then
-        call updateDataAfterMove()
-        fullEnergy = fullEnergy + moveEnergy
-        !acceptMove = .false.
+        acceptTime = MPI_Wtime()
+        !call updateCurrentDataStructures(movedAtom)
+        !fullEnergy = fullEnergy + moveEnergy
+        acceptTime = MPI_Wtime() - acceptTime
+        rejectTime = 0d0
+        acceptMove = .false.
       else if (acceptMove .eqv. .false.) then
-        !proposedEnergyData = currentEnergyData
-        !proposedPositionData = currentPositionData
-      !  acceptMove = .true.
+        rejectTime = MPI_Wtime()
+        !call resetProposedDataStructures(movedAtom)
+        rejectTime = MPI_Wtime() - rejectTime
+        acceptTime = 0d0
+        acceptMove = .true.
       end if
       time = MPI_Wtime() - time
-      !if (processRank .eq. root) then
-      !  print *, time, 0d0, 0d0, 0d0
-      !end if
+      if (processRank .eq. root) then
+        print *, time, moveTime, acceptTime, rejectTime, 0d0, 0d0, 0d0, 0d0
+      end if
     end do
 
     deallocate(alpha)
@@ -83,7 +91,7 @@ program main
   else
 
     if (processRank .eq. root) then
-      print *, 1, 1, 1, 1 ! Keeps output in format the b/marking script expects
+      print *, 1, 1, 1, 1, 1, 1, 1, 1! Keeps output in format the b/marking script expects
     end if
 
     do i = 1, 500

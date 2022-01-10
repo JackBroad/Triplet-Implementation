@@ -18,6 +18,7 @@ else:
   nProcs = nProcs + 1
 fullBoxMat = np.zeros((iMax+1,8)) # 4
 atomMoveMat = np.zeros((iMax+1,8)) # 4
+expVec = np.zeros(iMax+1)
 
 # Loop over number of processes, extracting all data from appropriate output file
 counter = 0
@@ -54,11 +55,19 @@ for i in range (1,iMax+1):
     atomMoveMat[counter,:] = atomMoveData
     counter = counter + 1
 
+expT0 = 6.967*10**(-4) + 2.712*10**(-2) + 3.932 + 9.270*10**(-2) + 0.
 fullT0 = fullBoxMat[0,0]
 moveT0 = atomMoveMat[0,0]
 for j in range (0,iMax+1):
   fullBoxMat[j,0]=fullT0/fullBoxMat[j,0]
   atomMoveMat[j,0]=moveT0/atomMoveMat[j,0]
+  if (j==0):
+    expVec[j] = 1.
+  else:
+    processes = (j+1)*maxNodes
+    scatProcs = (processes+1) / 2 # divide scatter time by this as first meaningful scatter time is for two procs, therefore expect a 1.5 times speed-up on three procs
+    expJ = 6.967*10**(-4) + 2.712*10**(-2) + (3.932/processes) + (9.270*10**(-2)/processes) + 2.853*10**(-3)
+    expVec[j] = expT0/expJ
 
 fullT0 = int(fullT0)
 moveT0 = int(moveT0)
@@ -86,9 +95,10 @@ mp.savefig(dirString+'/'+'fullBoxSpeedUp.pdf',bbox_inches = "tight")
 
 figg=mp.figure()
 ax2=figg.add_subplot(111)
-ax2.scatter(nProcs,atomMoveMat[:,0],s=75,c="g",marker="o",label=r"t$_1$ = "+str(moveT0)+" s")
+ax2.scatter(nProcs,atomMoveMat[:,0],s=75,c="g",marker="o",label="Observed")#r"t$_1$ = "+str(moveT0)+" s")
+ax2.plot(nProcs,expVec,c="r",label="Expected")
 mp.grid()
 mp.xlabel(r"$N_{p}}$")
 mp.ylabel(r"t$_1$ / t$_{N_{p}}$")
 mp.legend(loc="upper left")
-mp.savefig(dirString+'/'+'atomMoveSpeedUp.pdf',bbox_inches = "tight")
+mp.savefig(dirString+'/'+'expectedAtomMoveSpeedUp.pdf',bbox_inches = "tight")

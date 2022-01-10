@@ -191,7 +191,6 @@ integer function getNdistsPerProcFullBox()
   i = 1
   nLoops = 1
   countBack = .false.
-
   do while (i .le. currentPositionData%N_distances)
     do j = 1, clusterSize
       if (processRank .eq. j-1) then
@@ -218,7 +217,6 @@ integer function getNdistsPerProcFullBox()
       end if
     end do
   end do
-
   getNdistsPerProcFullBox = counter
 
 return
