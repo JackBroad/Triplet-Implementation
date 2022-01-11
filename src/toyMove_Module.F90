@@ -47,7 +47,7 @@ contains
     do i = 1, oldPositionData%N_distances
       call random_number(randomNo)
       randomNo = 10*randomNo
-      moveEnergyData%expMatrix(:,:,i) = randomNo
+      expArray(:,:,i) = randomNo
     end do
     moveEnergyData%triMat = makeTripletMatrix(oldPositionData%N_a,oldPositionData%N_tri)
     moveTime = MPI_Wtime()
@@ -70,8 +70,7 @@ contains
     allocate(changeExpData(nArgs,N_tp,nChangedDists))
     call calculateExponentialsNonAdd(nChangedDists,N_tp,nArgs,trainData, &
                                      hyperParams(1),newDists, changeExpData)
-    call updateExpMatrix(moveEnergyData,changeExpData, newExpInt, &
-                         nChangedDists)
+    call updateExpMatrix(changeExpData,newExpInt,nChangedDists)
 
     ! Find no. of triplets per proc
     setTime = MPI_Wtime()
@@ -92,7 +91,7 @@ contains
 
     ! Sum over the triplets
     sumTime = MPI_Wtime()
-    call toyTripletSum(scatterTrip,triPerProc,moveEnergyData%expMatrix, &
+    call toyTripletSum(scatterTrip,triPerProc,expArray, &
                        oldPositionData%N_distances,moveEnergyData%distancesIntMat, &
                        oldPositionData%N_a, newUvec)
     uTotPerProc = sum(newUvec)
@@ -133,10 +132,10 @@ contains
     do i = 1, oldPositionData%N_distances
       call random_number(randomNo)
       randomNo = 10*randomNo
-      moveEnergyData%expMatrix(:,:,i) = randomNo
+      expArray(:,:,i) = randomNo
     end do
     moveTime = MPI_Wtime()
-    !moveEnergyData%expMatrix = randomNo
+    !expArray = randomNo
     triPerAt = getTriPerAtom(oldPositionData%N_a)
     nChangedDists = oldPositionData%N_a-1
 
@@ -171,7 +170,7 @@ contains
                    MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
 
     ! Update expMatrix
-    moveEnergyData%expMatrix(nArgs,N_tp,1:nChangedDists) = &
+    expArray(nArgs,N_tp,1:nChangedDists) = &
     changeExpMat(nArgs,N_tp,:)
 
     call getNPerProcNonAdd(triPerAt,clusterSize, nTriMax,nTriRe)
@@ -186,7 +185,7 @@ contains
                   displs(processRank+1)+scounts(processRank+1))
 
     ! Sum over the triplets
-    call toyTripletSum(scatterTrip,triPerProc,moveEnergyData%expMatrix, &
+    call toyTripletSum(scatterTrip,triPerProc,expArray, &
                        oldPositionData%N_distances,moveEnergyData%distancesIntMat, &
                        oldPositionData%N_a, newUvec)
     call MPI_gatherv(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, &
@@ -228,12 +227,12 @@ contains
     ! triplet matrix and alter N_a-1 sets of exponentials in
     ! expMat
     moveTime = MPI_Wtime()
-    moveEnergyData%expMatrix = randomNo
+    expArray = randomNo
     triPerAt = getTriPerAtom(oldPositionData%N_a)
     nChangedDists = oldPositionData%N_a-1
 
     do i = 1, nChangedDists
-      moveEnergyData%expMatrix(:,:,i) = i*2d0 + i
+      expArray(:,:,i) = i*2d0 + i
     end do
 
     ! Set up arrays for scatter
@@ -251,7 +250,7 @@ contains
                   displs(processRank+1)+scounts(processRank+1))
 
     ! Sum over the triplets
-    call toyTripletSum(scatterTrip,triPerProc,moveEnergyData%expMatrix, &
+    call toyTripletSum(scatterTrip,triPerProc,expArray, &
                        oldPositionData%N_distances,moveEnergyData%distancesIntMat, &
                        oldPositionData%N_a, newUvec)
     call MPI_gatherv(newUvec, triPerProc, MPI_DOUBLE_PRECISION, newUfull, &
@@ -284,7 +283,7 @@ contains
     deallocate(toyEnergyData%triMat,moveEnergyData%triMat)
     deallocate(toyEnergyData%interatomicDistances,moveEnergyData%interatomicDistances)
     deallocate(toyEnergyData%tripletEnergies,moveEnergyData%tripletEnergies)
-    deallocate(toyEnergyData%expMatrix,moveEnergyData%expMatrix)
+    deallocate(expArray)
 
   end subroutine deallocateAllArrays
 
@@ -354,7 +353,7 @@ contains
     toyEnergyData%triMat = makeTripletMatrix(oldPositionData%N_a,oldPositionData%N_tri)
     toyEnergyData%interatomicDistances = 1d0
     toyEnergyData%tripletEnergies = 1d0
-    toyEnergyData%expMatrix = 1d0
+    expArray = 1d0
     moveEnergyData = toyEnergyData
 
   return
@@ -374,8 +373,7 @@ contains
     allocate(moveEnergyData%interatomicDistances(oldPositionData%N_a,oldPositionData%N_a))
     allocate(toyEnergyData%tripletEnergies(oldPositionData%N_tri))
     allocate(moveEnergyData%tripletEnergies(oldPositionData%N_tri))
-    allocate(toyEnergyData%expMatrix(nArgs,N_tp,oldPositionData%N_distances))
-    allocate(moveEnergyData%expMatrix(nArgs,N_tp,oldPositionData%N_distances))
+    allocate(expArray(nArgs,N_tp,oldPositionData%N_distances))
 
   return
   end subroutine

@@ -171,8 +171,7 @@ function getTripletEnergiesFullBox(nDists,nTrips) result(uVec)
         call tripletEnergiesNonAdd(triplet,currentEnergyData%distancesIntMat, &
                                    1,N_tp,currentPositionData%N_a,N_p,nArgs, &
                                    Perm,currentPositionData%N_distances, &
-                                   currentEnergyData%expMatrix,alpha, &
-                                   hyperParams(2), U)
+                                   expArray,alpha, hyperParams(2), U)
         uVec(counter) = U(1)
       end if
     end do

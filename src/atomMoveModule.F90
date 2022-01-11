@@ -33,8 +33,7 @@ contains
         call tripletEnergiesNonAdd(triplet,proposedEnergyData%distancesIntMat, &
                                    1,N_tp,proposedPositionData%N_a,N_p,nArgs, &
                                    Perm,proposedPositionData%N_distances, &
-                                   proposedEnergyData%expMatrix,alpha, &
-                                   hyperParams(2), U)
+                                   expArray,alpha,hyperParams(2), U)
         uVec(counter) = U(1)
         tmpChangedTri(sizeCounter) = counter
         counter = counter + (proposedPositionData%N_a - move)
@@ -46,8 +45,7 @@ contains
           call tripletEnergiesNonAdd(triplet,proposedEnergyData%distancesIntMat, &
                                      1,N_tp,proposedPositionData%N_a,N_p,nArgs, &
                                      Perm,proposedPositionData%N_distances, &
-                                     proposedEnergyData%expMatrix,alpha, &
-                                     hyperParams(2), U)
+                                     expArray,alpha,hyperParams(2), U)
           uVec(counter) = U(1)
           tmpChangedTri(sizeCounter) = counter
         end do
@@ -208,6 +206,20 @@ contains
 
   return
   end subroutine getChangedTriplets
+
+
+  subroutine saveOldExponentials()
+    implicit none
+    integer :: i, j
+
+    do i = 1,proposedPositionData%N_a-1
+      j = proposedEnergyData%distancesIntMat(expUpdateIndNoRepeat(i,1), &
+                                             expUpdateIndNoRepeat(i,2))
+      oldExpData(1:N_tp,1:nArgs,i) = expArray(1:N_tp,1:nArgs,j)
+    end do
+
+  return
+  end subroutine saveOldExponentials
 
 
 end module atomMoveModule

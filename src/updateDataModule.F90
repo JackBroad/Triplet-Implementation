@@ -35,8 +35,7 @@ contains
     call updateTripletEnergies(currentEnergyData,proposedEnergyData)
     tripletTime = MPI_Wtime() - tripletTime
     expTime = MPI_Wtime()
-    call updateExpMatrix(currentEnergyData,changeExpData, expUpdateIndNoRepeat, &
-                         currentPositionData%N_a-1)
+    !call updateExpMatrix(changeExpData,expUpdateIndNoRepeat,currentPositionData%N_a-1)
     expTime = MPI_Wtime() - expTime
     posTime = MPI_Wtime()
     currentPositionData%posArray(move,:) = proposedPositionData%posArray(move,:)
@@ -64,8 +63,7 @@ contains
     call updateTripletEnergies(proposedEnergyData,currentEnergyData)
     tripletTime = MPI_Wtime() - tripletTime
     expTime = MPI_Wtime()
-    call resetExpMatrix(proposedEnergyData,currentEnergyData, expUpdateIndNoRepeat, &
-                        proposedPositionData%N_a-1)
+    call resetExpMatrix(proposedEnergyData,expUpdateIndNoRepeat,proposedPositionData%N_a-1)
     expTime = MPI_Wtime() - expTime
     posTime = MPI_Wtime()
     proposedPositionData%posArray(move,:) = currentPositionData%posArray(move,:)
@@ -79,21 +77,20 @@ contains
   end subroutine resetProposedDataStructures
 
 
-  subroutine resetExpMatrix(proposedEnergyData,currentEnergyData,expInd,length)
+  subroutine resetExpMatrix(proposedEnergyData,expInd,length)
     integer :: indj, length, expInd(length,2), j
-    type (energiesData) :: currentEnergyData, proposedEnergyData
+    type (energiesData) :: proposedEnergyData
 
     do j = 1, length
       indj = proposedEnergyData%distancesIntMat(expInd(j,1), expInd(j,2))
-      proposedEnergyData%expMatrix(1:N_tp,1:nArgs,indj) = currentEnergyData%&
-      expMatrix(1:N_tp,1:nArgs,indj)
+      expArray(1:N_tp,1:nArgs,indj) = oldExpData(1:N_tp,1:nArgs,j)
     end do
 
   return
   end subroutine resetExpMatrix
 
   subroutine updateDistanceData(changedEnData,unchangedEnData,expInd,length)
-    integer :: indj, length, expInd(length,2), j
+    integer :: length, expInd(length,2), j
     type (energiesData) :: changedEnData, unchangedEnData
 
     do j = 1, length

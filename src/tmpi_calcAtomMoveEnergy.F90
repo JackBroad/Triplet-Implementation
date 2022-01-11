@@ -107,12 +107,16 @@ contains
       deallocate(changeExpData)
     end if
     allocate(changeExpData(N_tp,nArgs,proposedPositionData%N_a-1))
+    if (allocated(oldExpData)) then
+      deallocate(oldExpData)
+    end if
+    allocate(oldExpData(N_tp,nArgs,proposedPositionData%N_a-1))
     call calculateExponentialsNonAdd(proposedPositionData%N_a-1,N_tp,nArgs,trainData, &
                                      hyperParams(1),newDists, changeExpData)
 
     ! Update exp array
-    call updateExpMatrix(proposedEnergyData,changeExpData, newExpInt, &
-                         proposedPositionData%N_a-1)
+    call saveOldExponentials()
+    call updateExpMatrix(changeExpData,newExpInt,proposedPositionData%N_a-1)
 
   return
   end subroutine changedExponentialCalculation

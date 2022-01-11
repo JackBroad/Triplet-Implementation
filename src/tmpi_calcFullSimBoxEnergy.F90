@@ -45,7 +45,7 @@ contains
     expTime = MPI_Wtime()
     call setUpExpCalculation()
     call calculateExponentialsNonAdd(currentPositionData%N_distances,N_tp,nArgs,trainData,&
-                                     hyperParams(1),UD_dg, currentEnergyData%expMatrix)
+                                     hyperParams(1),UD_dg, expArray)
     expTime = MPI_Wtime() - expTime
 
     call findTripletEnergies()
@@ -112,7 +112,10 @@ contains
 
     N_dists_per_proc = getNdistsPerProcFullBox() ! Get no. of dists on each proc
     allocate(currentEnergyData%processDists(N_dists_per_proc))
-    allocate(currentEnergyData%expMatrix(N_tp,nArgs,currentPositionData%N_distances))
+    if (allocated(expArray)) then
+      deallocate(expArray)
+    end if
+    allocate(expArray(N_tp,nArgs,currentPositionData%N_distances))
     currentEnergyData%processDists = distributeDistances(N_dists_per_proc,UD_dg)
 
     return

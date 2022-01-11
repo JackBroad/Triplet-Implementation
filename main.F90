@@ -65,14 +65,14 @@ program main
 
       if (acceptMove .eqv. .true.) then
         acceptTime = MPI_Wtime()
-        !call updateCurrentDataStructures(movedAtom)
-        !fullEnergy = fullEnergy + moveEnergy
+        call updateCurrentDataStructures(movedAtom)
+        fullEnergy = fullEnergy + moveEnergy
         acceptTime = MPI_Wtime() - acceptTime
         rejectTime = 0d0
         acceptMove = .false.
       else if (acceptMove .eqv. .false.) then
         rejectTime = MPI_Wtime()
-        !call resetProposedDataStructures(movedAtom)
+        call resetProposedDataStructures(movedAtom)
         rejectTime = MPI_Wtime() - rejectTime
         acceptTime = 0d0
         acceptMove = .true.
@@ -81,12 +81,12 @@ program main
       if (processRank .eq. root) then
         print *, time, moveTime, acceptTime, rejectTime, 0d0, 0d0, 0d0, 0d0
       end if
+      deallocate(changeExpData)
+      deallocate(oldExpData)
     end do
 
     deallocate(alpha)
     deallocate(trainData)
-    deallocate(changeExpData)
-
 
   else
 

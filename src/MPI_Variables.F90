@@ -13,7 +13,8 @@ module expShare_variables
   integer, allocatable :: expUpdateInd(:,:),expUpdateIndNoRepeat(:,:)
   integer, allocatable :: changedTriInd(:)
   double precision, allocatable :: expUpdate(:), expUpdateNoRepeat(:)
-  double precision, allocatable :: changeExpData(:,:,:)
+  double precision, allocatable :: changeExpData(:,:,:), expArray(:,:,:)
+  double precision, allocatable :: oldExpData(:,:,:)
 
 end module expShare_variables
 

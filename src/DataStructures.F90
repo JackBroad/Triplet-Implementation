@@ -13,8 +13,7 @@ module energiesData_Module
      integer, allocatable :: distancesIntMat(:,:), triMat(:,:), changedTriInd(:)
      integer, allocatable :: alphaBetaPairs(:,:)
      double precision, allocatable :: interatomicDistances(:,:), tripletEnergies(:)
-     double precision, allocatable :: expMatrix(:,:,:), changedTriU(:)
-     double precision, allocatable :: processDists(:)
+     double precision, allocatable :: changedTriU(:), processDists(:)
 
   end type energiesData
 

@@ -2,6 +2,7 @@ module triplet_mod
   use GP_variables
   use mpi_variables
   use dataStructure_variables
+  use expShare_variables
   use energiesData_Module, only: energiesData
   use positionData_Module, only: positionData  
   implicit none
@@ -309,16 +310,13 @@ function energyCheckCalc(xStar) result(PES_GP)
 end function energyCheckCalc
 
 
-  subroutine updateExpMatrix(proposedEnergyData,changeData,expInd,length)
+  subroutine updateExpMatrix(changeData,expInd,length)
     integer :: indj, length, expInd(length,2), j
     double precision :: changeData(N_tp,nArgs,length)
-    type (energiesData) :: proposedEnergyData
 
     do j = 1, length
-
       indj = proposedEnergyData%distancesIntMat(expInd(j,1), expInd(j,2))
-      proposedEnergyData%expMatrix(1:N_tp,1:nArgs,indj) = changeData(1:N_tp,1:nArgs,j)
-
+      expArray(1:N_tp,1:nArgs,indj) = changeData(1:N_tp,1:nArgs,j)
     end do
 
   return
