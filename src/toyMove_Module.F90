@@ -1,4 +1,5 @@
 module toyMove_Module
+  use mpi
   use mpi_variables
   use expShare_variables
   use triplet_mod
@@ -12,7 +13,6 @@ module toyMove_Module
   use atomMoveModule
   use assert_module
   implicit none
-  include 'mpif.h'
 
   integer :: triPerAt, nTriMax, nTriRe,triPerProc, j, counter
   double precision :: totTime, moveTime, expTime, sumTime, setTime

@@ -1,4 +1,5 @@
 module tmpi_calcAtomMoveEnergy_mod
+  use mpi
   use mpi_variables
   use expShare_variables
   use dataStructure_variables
@@ -10,7 +11,7 @@ module tmpi_calcAtomMoveEnergy_mod
   use assert_module
   use atomMoveModule
   implicit none
-  include 'mpif.h'
+
 
   private
   public tmpi_calcAtomMoveEnergy

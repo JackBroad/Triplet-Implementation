@@ -1,4 +1,5 @@
 module updateData
+  use mpi
   use mpi_variables
   use expShare_variables
   use dataStructure_variables
@@ -7,7 +8,6 @@ module updateData
   use energiesData_Module, only: energiesData
   use positionData_Module, only: positionData
   implicit none
-  include 'mpif.h'
 
 
 private

@@ -1,4 +1,5 @@
 module triplet_mod
+  !use mpi
   use GP_variables
   use mpi_variables
   use dataStructure_variables
@@ -6,7 +7,9 @@ module triplet_mod
   use energiesData_Module, only: energiesData
   use positionData_Module, only: positionData  
   implicit none
-  !include 'mpif.h'
+
+
+  public
 
 
 contains

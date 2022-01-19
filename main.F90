@@ -1,4 +1,5 @@
 program main
+  use mpi
   use mpi_variables
   use expShare_variables
   use dataStructure_variables
@@ -13,7 +14,7 @@ program main
   use assert_module
   use initialise_Module
   implicit none
-  include 'mpif.h'
+  !include 'mpif.h'
 
 
   integer :: movedAtom, i
@@ -25,10 +26,17 @@ program main
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
   Character(len=300) :: positionFile = 'AtomicPositions500.txt'
 
-  
+  ! Set up MPI 
   call MPI_INIT(ierror)
   call MPI_COMM_SIZE(MPI_COMM_WORLD, clusterSize, ierror)
   call MPI_COMM_RANK(MPI_COMM_WORLD, processRank, ierror)
+
+
+  ! Set up shared memory
+  call MPI_COMM_SPLIT_TYPE(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, &
+                           0, MPI_INFO_NULL, hostComm, ierror)
+  call MPI_COMM_SIZE(hostComm, sharedSize, ierror)
+  call MPI_COMM_RANK(hostComm, hostRank, ierror)
 
 
   ! Set-up calls for full calc
@@ -108,7 +116,7 @@ program main
 
   end if
 
-
+  call MPI_WIN_FREE(win,ierror)
   call MPI_FINALIZE(ierror)
 
   contains

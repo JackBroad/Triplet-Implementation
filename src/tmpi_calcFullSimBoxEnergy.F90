@@ -1,4 +1,6 @@
 module tmpi_calcFullSimBoxEnergy_mod
+  use, intrinsic :: ISO_C_BINDING, only : C_F_POINTER
+  use mpi
   use mpi_variables
   use dataStructure_variables
   use triplet_mod
@@ -9,7 +11,6 @@ module tmpi_calcFullSimBoxEnergy_mod
   use assert_module
   use fullBoxModule
   implicit none
-  include 'mpif.h'
 
 
   private
@@ -117,6 +118,20 @@ contains
     end if
     allocate(expArray(N_tp,nArgs,currentPositionData%N_distances))
     currentEnergyData%processDists = distributeDistances(N_dists_per_proc,UD_dg)
+
+    ! Set up shared memory window for exp calc
+    if (hostrank .eq. 0) then
+      windowsize = int(2*10**6,MPI_ADDRESS_KIND)*8_MPI_ADDRESS_KIND
+    else
+      windowsize = 0_MPI_ADDRESS_KIND
+    end if
+    disp_unit = 1
+    CALL MPI_WIN_ALLOCATE_SHARED(windowsize, disp_unit, MPI_INFO_NULL, hostComm, &
+                                 baseptr, win, ierror)
+    if (hostrank .ne. 0) then
+       CALL MPI_WIN_SHARED_QUERY(win, 0, windowsize, disp_unit, baseptr, ierror)
+    end if
+    CALL C_F_POINTER(baseptr, dummy, shapeArray)
 
     return
   end subroutine setUpExpCalculation

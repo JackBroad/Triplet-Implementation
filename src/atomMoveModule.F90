@@ -1,4 +1,5 @@
 module atomMoveModule
+  !use mpi
   use GP_variables
   use mpi_variables
   use expShare_variables
@@ -7,7 +8,6 @@ module atomMoveModule
   use positionData_Module, only: positionData
   use triplet_mod
   implicit none
-  !include 'mpif.h'
 
 
 contains

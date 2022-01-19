@@ -1,4 +1,5 @@
 module initialise_Module
+  !use mpi
   use mpi_variables
   use dataStructure_variables
   use triplet_mod
@@ -6,7 +7,6 @@ module initialise_Module
   use positionData_Module, only: positionData
   use energiesData_Module, only: energiesData
   implicit none
-  !include 'mpif.h'
 
 
 contains

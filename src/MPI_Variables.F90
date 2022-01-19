@@ -1,8 +1,18 @@
 module mpi_variables
+  use, intrinsic :: ISO_C_BINDING, only : C_PTR
+  use mpi
   implicit none
 
+  ! MPI variables
   integer :: processRank, clusterSize, ierror
   integer :: root=0, barError
+
+  ! Shared mem variables
+  integer :: hostComm, sharedSize, hostRank
+  integer :: win, disp_unit, shapeArray(3)
+  type(C_PTR) :: baseptr
+  integer, pointer :: dummy(:,:,:)
+  integer(KIND=MPI_ADDRESS_KIND) :: windowsize
 
 end module mpi_variables
 

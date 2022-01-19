@@ -1,4 +1,5 @@
 module fullBoxModule
+  !use mpi
   use GP_variables
   use mpi_variables
   use dataStructure_variables
@@ -6,7 +7,6 @@ module fullBoxModule
   use positionData_Module, only: positionData
   use triplet_mod
   implicit none
-  !include 'mpif.h'
 
 
 contains
