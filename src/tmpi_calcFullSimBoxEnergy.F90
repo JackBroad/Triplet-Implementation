@@ -45,8 +45,10 @@ contains
     ! Calculate exponentials and assign distances to each proc
     expTime = MPI_Wtime()
     call setUpExpCalculation()
-    call calculateExponentialsNonAdd(currentPositionData%N_distances,N_tp,nArgs,trainData,&
-                                     hyperParams(1),UD_dg, expArray)
+    !call calculateExponentialsNonAdd(currentPositionData%N_distances,N_tp,nArgs,trainData,&
+    !                                 hyperParams(1),UD_dg, expArray)
+    call calcAllExposNonAddSharedMem(N_tp,nArgs,trainData,hyperParams(1))
+    call MPI_WIN_FENCE(0,win,ierror)
     expTime = MPI_Wtime() - expTime
 
     call findTripletEnergies()
@@ -118,6 +120,9 @@ contains
     !end if
     !allocate(expArray(N_tp,nArgs,currentPositionData%N_distances))
     currentEnergyData%processDists = distributeDistances(N_dists_per_proc,UD_dg)
+    allocate(currentEnergyData%alphaBetaPairs(N_dists_per_proc,2))
+    currentEnergyData%alphaBetaPairs = getAlphaBetaPairs(N_dists_per_proc, &
+                                                         currentEnergyData%interatomicDistances)
 
     ! Set up shared memory window for exp calc
     shapeArray = (/ N_tp,nArgs,currentPositionData%N_distances /) 
@@ -254,9 +259,6 @@ contains
     ! Determine no. of triplets to send to each process for triplet calc.
     ! then find triplet energies
     sumTime = MPI_Wtime()
-    allocate(currentEnergyData%alphaBetaPairs(N_dists_per_proc,2))
-    currentEnergyData%alphaBetaPairs = getAlphaBetaPairs(N_dists_per_proc, &
-                                                         currentEnergyData%interatomicDistances)
     N_tri_per_proc = getNtripsPerProcFullBox(N_dists_per_proc)
     allocate(currentEnergyData%tripletEnergies(N_tri_per_proc))
     currentEnergyData%tripletEnergies = getTripletEnergiesFullBox(N_dists_per_proc, &

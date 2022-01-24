@@ -18,6 +18,7 @@ program main
 
   integer :: movedAtom, i
   logical :: setSeed=.false., acceptMove=.true., useToyCode=.false.
+  logical :: moveFlag=.true.
   double precision :: dist, time, fullEnergy, moveEnergy, check
   double precision :: moveTime, acceptTime, rejectTime
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
@@ -54,6 +55,7 @@ program main
 
 
     ! Atom move
+    if (moveFlag .eqv. .true.) then
     do i = 1, 15
       call initialise_Move(dist,setSeed, movedAtom)
       time = MPI_Wtime()
@@ -91,6 +93,7 @@ program main
       deallocate(changeExpData)
       deallocate(oldExpData)
     end do
+    end if
 
     deallocate(alpha)
     deallocate(trainData)

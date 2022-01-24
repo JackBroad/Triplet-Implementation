@@ -112,6 +112,40 @@ return
 end subroutine calculateExponentialsNonAdd
 
 
+subroutine calcAllExposNonAddSharedMem(nTP,nArguments,trainingData,lengthscale)
+  implicit none
+  integer, intent(in) :: nTP, nArguments
+  double precision, intent(in) :: trainingData(nTP,nArguments)
+  double precision, intent(in) :: lengthscale
+  integer :: i, j, k, nJobs, atOne, atTwo, distIndex
+  double precision :: expon, num, denom, dist
+
+  nJobs = size(currentEnergyData%processDists)
+  do i = 1, nJobs
+    dist = currentEnergyData%processDists(i)
+    atOne = currentEnergyData%alphaBetaPairs(i,1)
+    atTwo = currentEnergyData%alphaBetaPairs(i,2)
+    distIndex = currentEnergyData%distancesIntMat(atOne,atTwo)
+      do j = 1, nTP
+        do k = 1, nArguments
+
+          num = dist - trainingData(j,k)
+          num = num**2
+
+          denom = lengthscale**2
+          denom = 2*denom
+
+          expon = num / denom
+          expArray(j,k,distIndex) = exp(-1*expon)
+
+      end do
+    end do
+  end do
+
+return
+end subroutine calcAllExposNonAddSharedMem
+
+
 ! Calculates the non-additive energy for each triplet in the cluster
 subroutine tripletEnergiesNonAdd(triData,intMat,nJob,nTP,nAt,nPerm,nArg,permMat, &
                                  expCols,expMat,alphaVec,sigVar, uVector)

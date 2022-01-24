@@ -39,6 +39,12 @@ contains
     call MPI_COMM_RANK(MPI_COMM_WORLD, processRank, ierror)
     call initialise_GP_NonAdd( hyperParametersFile, alphaFile, trainingSetFile )
 
+    ! Set up shared memory
+    call MPI_COMM_SPLIT_TYPE(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, &
+                             0, MPI_INFO_NULL, hostComm, ierror)
+    call MPI_COMM_SIZE(hostComm, sharedSize, ierror)
+    call MPI_COMM_RANK(hostComm, hostRank, ierror)
+
     @assertEqual(root, 0 ,'Initialisation')
   end subroutine initialise_my_mpi
   !===========================================================================================
@@ -550,6 +556,7 @@ contains
   !===========================================================================================
   @test
   subroutine test_finalize()
+    call MPI_WIN_FREE(win,ierror)
     call MPI_FINALIZE(ierror)
   end subroutine test_finalize
 
