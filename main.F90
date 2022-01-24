@@ -14,7 +14,6 @@ program main
   use assert_module
   use initialise_Module
   implicit none
-  !include 'mpif.h'
 
 
   integer :: movedAtom, i
@@ -55,7 +54,7 @@ program main
 
 
     ! Atom move
-    do i = 1, 150
+    do i = 1, 15
       call initialise_Move(dist,setSeed, movedAtom)
       time = MPI_Wtime()
       moveTime = MPI_Wtime()
@@ -86,9 +85,9 @@ program main
         acceptMove = .true.
       end if
       time = MPI_Wtime() - time
-      if (processRank .eq. root) then
-        print *, time, moveTime, acceptTime, rejectTime, 0d0, 0d0, 0d0, 0d0
-      end if
+      !if (processRank .eq. root) then
+      !  print *, time, moveTime, acceptTime, rejectTime, 0d0, 0d0, 0d0, 0d0
+      !end if
       deallocate(changeExpData)
       deallocate(oldExpData)
     end do

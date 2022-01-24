@@ -12,6 +12,7 @@ module mpi_variables
   integer :: win, disp_unit, shapeArray(3)
   type(C_PTR) :: baseptr
   integer, pointer :: dummy(:,:,:)
+  double precision, pointer :: expArray(:,:,:)
   integer(KIND=MPI_ADDRESS_KIND) :: windowsize
 
 end module mpi_variables
@@ -23,7 +24,7 @@ module expShare_variables
   integer, allocatable :: expUpdateInd(:,:),expUpdateIndNoRepeat(:,:)
   integer, allocatable :: changedTriInd(:)
   double precision, allocatable :: expUpdate(:), expUpdateNoRepeat(:)
-  double precision, allocatable :: changeExpData(:,:,:), expArray(:,:,:)
+  double precision, allocatable :: changeExpData(:,:,:)
   double precision, allocatable :: oldExpData(:,:,:)
 
 end module expShare_variables

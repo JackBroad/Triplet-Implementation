@@ -113,15 +113,16 @@ contains
 
     N_dists_per_proc = getNdistsPerProcFullBox() ! Get no. of dists on each proc
     allocate(currentEnergyData%processDists(N_dists_per_proc))
-    if (allocated(expArray)) then
-      deallocate(expArray)
-    end if
-    allocate(expArray(N_tp,nArgs,currentPositionData%N_distances))
+    !if (allocated(expArray)) then
+    !  deallocate(expArray)
+    !end if
+    !allocate(expArray(N_tp,nArgs,currentPositionData%N_distances))
     currentEnergyData%processDists = distributeDistances(N_dists_per_proc,UD_dg)
 
     ! Set up shared memory window for exp calc
+    shapeArray = (/ N_tp,nArgs,currentPositionData%N_distances /) 
     if (hostrank .eq. 0) then
-      windowsize = int(2*10**6,MPI_ADDRESS_KIND)*8_MPI_ADDRESS_KIND
+      windowsize = int(1*10**9,MPI_ADDRESS_KIND)*8_MPI_ADDRESS_KIND
     else
       windowsize = 0_MPI_ADDRESS_KIND
     end if
@@ -131,7 +132,7 @@ contains
     if (hostrank .ne. 0) then
        CALL MPI_WIN_SHARED_QUERY(win, 0, windowsize, disp_unit, baseptr, ierror)
     end if
-    CALL C_F_POINTER(baseptr, dummy, shapeArray)
+    CALL C_F_POINTER(baseptr, expArray, shapeArray)
 
     return
   end subroutine setUpExpCalculation

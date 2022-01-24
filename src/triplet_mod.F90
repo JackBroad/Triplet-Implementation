@@ -1,5 +1,6 @@
 module triplet_mod
   !use mpi
+  use, intrinsic :: ISO_C_BINDING, only : C_PTR
   use GP_variables
   use mpi_variables
   use dataStructure_variables
