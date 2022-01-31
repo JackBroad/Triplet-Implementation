@@ -45,8 +45,6 @@ contains
     ! Calculate exponentials and assign distances to each proc
     expTime = MPI_Wtime()
     call setUpExpCalculation()
-    !call calculateExponentialsNonAdd(currentPositionData%N_distances,N_tp,nArgs,trainData,&
-    !                                 hyperParams(1),UD_dg, expArray)
     call calcAllExposNonAddSharedMem(N_tp,nArgs,trainData,hyperParams(1))
     call MPI_WIN_FENCE(0,win,ierror)
     expTime = MPI_Wtime() - expTime
@@ -115,10 +113,6 @@ contains
 
     N_dists_per_proc = getNdistsPerProcFullBox() ! Get no. of dists on each proc
     allocate(currentEnergyData%processDists(N_dists_per_proc))
-    !if (allocated(expArray)) then
-    !  deallocate(expArray)
-    !end if
-    !allocate(expArray(N_tp,nArgs,currentPositionData%N_distances))
     currentEnergyData%processDists = distributeDistances(N_dists_per_proc,UD_dg)
     allocate(currentEnergyData%alphaBetaPairs(N_dists_per_proc,2))
     currentEnergyData%alphaBetaPairs = getAlphaBetaPairs(N_dists_per_proc, &
@@ -126,7 +120,7 @@ contains
 
     ! Set up shared memory window for exp calc
     shapeArray = (/ N_tp,nArgs,currentPositionData%N_distances /) 
-    if (hostrank .eq. 0) then
+    if (hostRank .eq. 0) then
       windowsize = int(1*10**9,MPI_ADDRESS_KIND)*8_MPI_ADDRESS_KIND
     else
       windowsize = 0_MPI_ADDRESS_KIND
@@ -134,7 +128,7 @@ contains
     disp_unit = 1
     CALL MPI_WIN_ALLOCATE_SHARED(windowsize, disp_unit, MPI_INFO_NULL, hostComm, &
                                  baseptr, win, ierror)
-    if (hostrank .ne. 0) then
+    if (hostRank .ne. 0) then
        CALL MPI_WIN_SHARED_QUERY(win, 0, windowsize, disp_unit, baseptr, ierror)
     end if
     CALL C_F_POINTER(baseptr, expArray, shapeArray)

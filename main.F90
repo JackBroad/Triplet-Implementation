@@ -3,6 +3,7 @@ program main
   use mpi_variables
   use expShare_variables
   use dataStructure_variables
+  use time_variables
   use GP_Variables
   use triplet_mod
   use tmpi_calcFullSimBoxEnergy_mod, only: tmpi_calcFullSimBoxEnergy
@@ -20,11 +21,11 @@ program main
   logical :: setSeed=.false., acceptMove=.true., useToyCode=.false.
   logical :: moveFlag=.true.
   double precision :: dist, time, fullEnergy, moveEnergy, check
-  double precision :: moveTime, acceptTime, rejectTime
+  double precision :: atomMoveTime, acceptTime, rejectTime
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
-  Character(len=300) :: positionFile = 'AtomicPositions500.txt'
+  Character(len=300) :: positionFile = 'AtomicPositions5.txt'
 
   ! Set up MPI 
   call MPI_INIT(ierror)
@@ -56,17 +57,17 @@ program main
 
     ! Atom move
     if (moveFlag .eqv. .true.) then
-    do i = 1, 15
+    do i = 1, 10
       call initialise_Move(dist,setSeed, movedAtom)
       time = MPI_Wtime()
-      moveTime = MPI_Wtime()
+      atomMoveTime = MPI_Wtime()
       call MPI_Bcast(movedAtom, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
       call MPI_Bcast(proposedPositionData%posArray(movedAtom,:), 3, MPI_DOUBLE_PRECISION, &
                      root, MPI_COMM_WORLD, ierror)
 
       !***********True move code***********
       moveEnergy = tmpi_calcAtomMoveEnergy(movedAtom)
-      moveTime = MPI_Wtime() - moveTime
+      atomMoveTime = MPI_Wtime() - atomMoveTime
       !if (processRank .eq. root) then
       !  check = -79272925.072343603d0
       !  call assertEqual_double(fullEnergy, check, 1d0*10d0**(-5d0), 'incorrect energy found')
@@ -87,11 +88,15 @@ program main
         acceptMove = .true.
       end if
       time = MPI_Wtime() - time
-      !if (processRank .eq. root) then
-      !  print *, time, moveTime, acceptTime, rejectTime, 0d0, 0d0, 0d0, 0d0
-      !end if
-      deallocate(changeExpData)
-      deallocate(oldExpData)
+      if (processRank .eq. root) then
+        print *, time, atomMoveTime, setTime, expTime, tripTime, partialSumTime, acceptTime, rejectTime
+      end if
+      call MPI_BARRIER(MPI_COMM_WORLD, barError)
+      !deallocate(changeExpData)
+      !deallocate(oldExpData)
+      deallocate(hostDists)
+      deallocate(hostIndices)
+
     end do
     end if
 

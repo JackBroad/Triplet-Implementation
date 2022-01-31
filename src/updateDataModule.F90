@@ -34,16 +34,9 @@ contains
     tripletTime = MPI_Wtime()
     call updateTripletEnergies(currentEnergyData,proposedEnergyData)
     tripletTime = MPI_Wtime() - tripletTime
-    expTime = MPI_Wtime()
-    !call updateExpMatrix(changeExpData,expUpdateIndNoRepeat,currentPositionData%N_a-1)
-    expTime = MPI_Wtime() - expTime
     posTime = MPI_Wtime()
     currentPositionData%posArray(move,:) = proposedPositionData%posArray(move,:)
     posTime = MPI_Wtime() - posTime
-
-    !if (processRank .eq. root) then
-    !  print *, energyTime, xdgTime, tripletTime, expTime, posTime, 0d0, 0d0, 0d0
-    !end if
 
   return
   end subroutine updateCurrentDataStructures
@@ -63,15 +56,11 @@ contains
     call updateTripletEnergies(proposedEnergyData,currentEnergyData)
     tripletTime = MPI_Wtime() - tripletTime
     expTime = MPI_Wtime()
-    call resetExpMatrix(proposedEnergyData,expUpdateIndNoRepeat,proposedPositionData%N_a-1)
+    call resetExpMatrix(proposedEnergyData,hostIndices,N_changed_exp_per_host)
     expTime = MPI_Wtime() - expTime
     posTime = MPI_Wtime()
     proposedPositionData%posArray(move,:) = currentPositionData%posArray(move,:)
     posTime = MPI_Wtime() - posTime
-
-    !if (processRank .eq. root) then
-    !  print *, 0d0, xdgTime, tripletTime, expTime, posTime, 0d0, 0d0, 0d0
-    !end if
 
   return
   end subroutine resetProposedDataStructures

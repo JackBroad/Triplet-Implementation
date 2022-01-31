@@ -212,9 +212,9 @@ contains
     implicit none
     integer :: i, j
 
-    do i = 1,proposedPositionData%N_a-1
-      j = proposedEnergyData%distancesIntMat(expUpdateIndNoRepeat(i,1), &
-                                             expUpdateIndNoRepeat(i,2))
+    do i = 1,N_changed_exp_per_host 
+      j = proposedEnergyData%distancesIntMat(hostIndices(i,1), &
+                                             hostIndices(i,2))
       oldExpData(1:N_tp,1:nArgs,i) = expArray(1:N_tp,1:nArgs,j)
     end do
 

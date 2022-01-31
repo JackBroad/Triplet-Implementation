@@ -21,13 +21,15 @@ end module mpi_variables
 module expShare_variables
   implicit none
 
+  integer :: N_changed_exp_per_host
   integer, allocatable :: expUpdateInd(:,:),expUpdateIndNoRepeat(:,:)
-  integer, allocatable :: changedTriInd(:)
+  integer, allocatable :: changedTriInd(:), hostIndices(:,:)
   double precision, allocatable :: expUpdate(:), expUpdateNoRepeat(:)
-  double precision, allocatable :: changeExpData(:,:,:)
+  double precision, allocatable :: changeExpData(:,:,:), hostDists(:)
   double precision, allocatable :: oldExpData(:,:,:)
 
 end module expShare_variables
+
 
 module dataStructure_variables
   use energiesData_Module, only: energiesData
@@ -38,3 +40,11 @@ module dataStructure_variables
   type (positionData) :: currentPositionData, proposedPositionData
 
 end module dataStructure_variables
+
+
+module time_variables
+  implicit none
+  double precision :: moveTime, expTime, sumTime, setTime
+  double precision :: gatherTime, xTime, tripTime, partialSumTime
+  double precision :: extractTime, tripSumTime, rootSumTime
+end module time_variables

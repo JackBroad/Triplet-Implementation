@@ -1,8 +1,10 @@
 module tmpi_calcAtomMoveEnergy_mod
+  use, intrinsic :: ISO_C_BINDING, only : C_F_POINTER
   use mpi
   use mpi_variables
   use expShare_variables
   use dataStructure_variables
+  use time_variables
   use triplet_mod
   use GP_variables, only: hyperParams,alpha,Perm,trainData,N_tp,nArgs,N_p
   use energiesData_Module, only: energiesData
@@ -17,10 +19,7 @@ module tmpi_calcAtomMoveEnergy_mod
   public tmpi_calcAtomMoveEnergy
 
 
-  double precision :: moveTime, expTime, sumTime, setTime
-  double precision :: gatherTime, xTime, tripTime, partialSumTime
-  double precision :: extractTime, tripSumTime, newTripU
-  double precision :: oldTripU, partialDeltaU, rootSumTime
+  double precision :: oldTripU, partialDeltaU, newTripU
   integer, allocatable :: newExpInt(:,:)
   double precision, allocatable :: newDists(:), newUfull(:)
 
@@ -60,12 +59,9 @@ contains
 
     ! Finalise MPI and print times taken for each step of calculation
     if (processRank .eq. root) then
-       call finalTextOutput()
+       !call finalTextOutput()
     end if
-    !print *, processRank, moveTime, size(proposedEnergyData%tripletEnergies), &
-    !         size(changedTriInd)
     call finalAsserts(proposedPositionData%N_a)
-
 
   return
   end function tmpi_calcAtomMoveEnergy
@@ -101,23 +97,27 @@ contains
                             newExpInt,newDists)
     expUpdateNoRepeat = newDists
     expUpdateIndNoRepeat = newExpInt
+    call distributeDistsSharedMem()
     extractTime = MPI_Wtime() - extractTime
 
     ! Calculate new values of changed exps
     if (allocated(changeExpData)) then
       deallocate(changeExpData)
     end if
-    allocate(changeExpData(N_tp,nArgs,proposedPositionData%N_a-1))
+    allocate(changeExpData(N_tp,nArgs,N_changed_exp_per_host))
     if (allocated(oldExpData)) then
       deallocate(oldExpData)
     end if
-    allocate(oldExpData(N_tp,nArgs,proposedPositionData%N_a-1))
-    call calculateExponentialsNonAdd(proposedPositionData%N_a-1,N_tp,nArgs,trainData, &
-                                     hyperParams(1),newDists, changeExpData)
+    allocate(oldExpData(N_tp,nArgs,N_changed_exp_per_host))
+    call calculateExponentialsNonAdd(N_changed_exp_per_host,N_tp,nArgs,trainData, &
+                                     hyperParams(1),hostDists, changeExpData)
+    call MPI_WIN_FENCE(0,win,ierror)
 
-    ! Update exp array
+    ! Update exp array separately on each host using the exps they calculated
     call saveOldExponentials()
-    call updateExpMatrix(changeExpData,newExpInt,proposedPositionData%N_a-1)
+    call MPI_WIN_FENCE(0,win,ierror)
+    call updateExpMatrix(changeExpData,hostIndices,N_changed_exp_per_host)
+    call MPI_WIN_FENCE(0,win,ierror)
 
   return
   end subroutine changedExponentialCalculation
@@ -135,10 +135,6 @@ contains
     call getTripletEnergiesAtomMove(mover,N_dists_per_proc,N_tri_per_proc, &
                                     proposedEnergyData%tripletEnergies)
     tripTime = MPI_Wtime() - tripTime ! d
-
-    ! Calculate the non-additive energies for the changed triplets
-    tripSumTime = MPI_Wtime()
-    tripSumTime = MPI_Wtime() - tripSumTime ! e
 
     ! Find the change in U on each process
     partialSumTime = MPI_Wtime()
@@ -227,11 +223,42 @@ contains
   subroutine finalTextOutput()
 
     if (textOutput) then
-      print *, moveTime, setTime, expTime, tripTime, tripSumTime, &
+      print *, moveTime, setTime, expTime, tripTime, 0d0, &
                partialSumTime, gatherTime, rootSumTime
     end if
 
   end subroutine finalTextOutput
+
+subroutine distributeDistsSharedMem()
+  implicit none
+  integer :: N_dists, N_even, N_spare, start, stopp
+  integer :: countVec(sharedSize), dispVec(sharedSize)
+  integer :: disp
+
+  ! Get the number of changed distances and build an array to hold the number
+  ! assigned to each host
+  N_dists = proposedPositionData%N_a - 1
+  call getNPerProcNonAdd(N_dists,sharedSize, N_even,N_spare)
+  call getVarrays(sharedSize,N_even,N_spare, countVec,dispVec)
+
+  ! Have each host read the number of dists it is assigned and allocate vec to
+  ! hold them
+  N_changed_exp_per_host = countVec(hostRank+1)
+  disp = dispVec(hostRank+1)
+  allocate(hostDists(N_changed_exp_per_host))
+  allocate(hostIndices(N_changed_exp_per_host,2))
+
+  ! Fill the host arrays from the full arrays of interatomic distances and
+  ! indices
+  start = disp+1
+  stopp = start+N_changed_exp_per_host-1
+  hostDists = expUpdateNoRepeat(start:stopp)
+  hostIndices = expUpdateIndNoRepeat(start:stopp,:)
+
+  call MPI_BARRIER(MPI_COMM_WORLD, barError)
+
+return
+end subroutine distributeDistsSharedMem
 
 
 end module tmpi_calcAtomMoveEnergy_mod

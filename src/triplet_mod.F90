@@ -128,7 +128,6 @@ subroutine calcAllExposNonAddSharedMem(nTP,nArguments,trainingData,lengthscale)
     distIndex = currentEnergyData%distancesIntMat(atOne,atTwo)
       do j = 1, nTP
         do k = 1, nArguments
-
           num = dist - trainingData(j,k)
           num = num**2
 
@@ -137,7 +136,6 @@ subroutine calcAllExposNonAddSharedMem(nTP,nArguments,trainingData,lengthscale)
 
           expon = num / denom
           expArray(j,k,distIndex) = exp(-1*expon)
-
       end do
     end do
   end do
