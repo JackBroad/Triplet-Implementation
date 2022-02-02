@@ -57,7 +57,7 @@ program main
 
     ! Atom move
     if (moveFlag .eqv. .true.) then
-    do i = 1, 10
+    do i = 1, 150
       call initialise_Move(dist,setSeed, movedAtom)
       time = MPI_Wtime()
       atomMoveTime = MPI_Wtime()
@@ -92,8 +92,8 @@ program main
         print *, time, atomMoveTime, setTime, expTime, tripTime, partialSumTime, acceptTime, rejectTime
       end if
       call MPI_BARRIER(MPI_COMM_WORLD, barError)
-      !deallocate(changeExpData)
-      !deallocate(oldExpData)
+      deallocate(changeExpData)
+      deallocate(oldExpData)
       deallocate(hostDists)
       deallocate(hostIndices)
 

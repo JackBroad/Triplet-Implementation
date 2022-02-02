@@ -23,6 +23,7 @@ module tmpi_calcFullSimBoxEnergy_mod
   double precision :: shareTime, rootTime, dataTime
   double precision :: sumTime, partTime, partialU
   integer, allocatable :: scounts(:), displs(:)
+  integer, allocatable :: UD_inds(:,:)
   double precision, allocatable :: UD_dg(:)
   double precision, allocatable :: allPartEnergies(:)
 
@@ -110,13 +111,22 @@ contains
 
   subroutine setUpExpCalculation()
     implicit none
+    integer :: N_even, N_spare, start, stopp
+    integer :: countVec(sharedSize), dispVec(sharedSize)
+    integer :: disp
 
+    ! Allocate atom pairs to each process, ignoring shared mem
     N_dists_per_proc = getNdistsPerProcFullBox() ! Get no. of dists on each proc
     allocate(currentEnergyData%processDists(N_dists_per_proc))
     currentEnergyData%processDists = distributeDistances(N_dists_per_proc,UD_dg)
     allocate(currentEnergyData%alphaBetaPairs(N_dists_per_proc,2))
     currentEnergyData%alphaBetaPairs = getAlphaBetaPairs(N_dists_per_proc, &
                                                          currentEnergyData%interatomicDistances)
+
+
+    ! Allocate pairs to hosts such that each node will have a full exp array
+    ! shared between its hosts
+    call distributeDistsFullBoxSharedMem()
 
     ! Set up shared memory window for exp calc
     shapeArray = (/ N_tp,nArgs,currentPositionData%N_distances /) 
@@ -167,7 +177,7 @@ contains
                  currentEnergy%interatomicDistances)
     call makeDisIntMatNonAdd(currentPosition%N_a, currentEnergy%distancesIntMat)
     call makeUDdgNonAdd(currentPosition%N_a,currentPosition%N_distances, &
-                        currentEnergy%interatomicDistances, UD_dg)
+                        currentEnergy%interatomicDistances, UD_dg,UD_inds)
 
     ! Set up array of all possible triplets
     allocate(currentEnergy%triMat(3,currentPosition%N_tri))
@@ -193,6 +203,8 @@ contains
     deallocate(displs)
     deallocate(UD_dg)
     deallocate(allPartEnergies)
+    deallocate(fullHostInds)
+    deallocate(fullHostDists)
 
   end subroutine deallocateLocalArrays
 
@@ -262,5 +274,33 @@ contains
   return
   end subroutine findTripletEnergies
 
+
+subroutine distributeDistsFullBoxSharedMem()
+    implicit none
+    integer :: N_even, N_spare, start, stopp
+    integer :: countVec(sharedSize), dispVec(sharedSize)
+    integer :: disp
+
+    ! Determine number of dists to send to each host
+    call getNPerProcNonAdd(currentPositionData%N_distances,sharedSize, &
+                           N_even,N_spare)
+    call getVarrays(sharedSize,N_even,N_spare, countVec,dispVec)
+    N_exp_per_host = countVec(hostRank+1)
+    disp = dispVec(hostRank+1)
+
+    ! Allocate arrays to hold assigned dists and their indices
+    allocate(fullHostDists(N_exp_per_host))
+    allocate(fullHostInds(N_exp_per_host,2))
+
+    ! Read dists and indices into appropriate arrays
+    start = disp+1
+    stopp = start + N_exp_per_host - 1
+    fullHostDists = UD_dg(start:stopp)
+    fullHostInds = UD_inds(start:stopp,:)
+
+    call MPI_BARRIER(MPI_COMM_WORLD, barError)
+
+return
+end subroutine distributeDistsFullBoxSharedMem
   
 end module tmpi_calcFullSimBoxEnergy_mod

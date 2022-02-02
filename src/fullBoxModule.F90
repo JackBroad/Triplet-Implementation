@@ -2,6 +2,7 @@ module fullBoxModule
   !use mpi
   use GP_variables
   use mpi_variables
+  use expShare_variables
   use dataStructure_variables
   use energiesData_Module, only: energiesData
   use positionData_Module, only: positionData
@@ -49,20 +50,24 @@ contains
 
 
   ! Extracts UD of X_dg
-  subroutine makeUDdgNonAdd(nAt,udSize,X_dg, UD_dg)
+  subroutine makeUDdgNonAdd(nAt,udSize,X_dg, UD_dg,distInds)
     implicit none
     integer, intent(in) :: nAt, udSize
     double precision, intent(in) :: X_dg(nAt,nAt)
+    integer, allocatable, intent(out) :: distInds(:,:)
     double precision, allocatable, intent(out) :: UD_dg(:)
     integer :: nMinus, ele, m, n
 
     allocate(UD_dg(udSize))
+    allocate(distInds(udSize,2))
     nMinus = nAt - 1
     ele = 0
     do m = 1, nMinus
       do n = m+1, nAt
         ele = ele + 1
         UD_dg(ele) = X_dg(m,n)
+        distInds(ele,1) = m
+        distInds(ele,2) = n
       end do
     end do
 

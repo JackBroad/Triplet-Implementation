@@ -115,11 +115,12 @@ contains
   @test
   subroutine test_Xdg()
     implicit none
+    integer, allocatable :: dummy(:,:)
     double precision :: Xdg(n_at,n_at), Xdg_Ex(n_at,n_at), ud_Ex(3)
     double precision, allocatable :: upperDiag(:)
 
     call makeXdg(n_at,posAt, Xdg)
-    call makeUDdgNonAdd(n_at,n_dist,Xdg, upperDiag)
+    call makeUDdgNonAdd(n_at,n_dist,Xdg, upperDiag,dummy)
     deallocate(posAt)
 
     if( processRank == root ) then
@@ -466,6 +467,7 @@ contains
     implicit none
     integer :: nDists, nDistVec(clusterSize), displace(clusterSize), i
     double precision :: dummy
+    integer, allocatable :: allInds(:,:)
     double precision, allocatable :: distVec(:), distVecEx(:)
     double precision, allocatable :: partDistVec(:), allDist(:)
     Character(len=300) :: positionFile = 'AtomicPositions5.txt'
@@ -492,7 +494,7 @@ contains
 
     ! Build a vector of all interatomic dists
     call makeUDdgNonAdd(currentPositionData%N_a,currentPositionData%N_distances, &
-                        currentEnergyData%interatomicDistances, allDist)
+                        currentEnergyData%interatomicDistances, allDist,allInds)
 
     ! Find the dists assigned to each proc
     allocate(partDistVec(nDists))

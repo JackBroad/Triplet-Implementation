@@ -21,12 +21,13 @@ end module mpi_variables
 module expShare_variables
   implicit none
 
-  integer :: N_changed_exp_per_host
+  integer :: N_changed_exp_per_host, N_exp_per_host
   integer, allocatable :: expUpdateInd(:,:),expUpdateIndNoRepeat(:,:)
   integer, allocatable :: changedTriInd(:), hostIndices(:,:)
+  integer, allocatable :: fullHostInds(:,:)
   double precision, allocatable :: expUpdate(:), expUpdateNoRepeat(:)
   double precision, allocatable :: changeExpData(:,:,:), hostDists(:)
-  double precision, allocatable :: oldExpData(:,:,:)
+  double precision, allocatable :: oldExpData(:,:,:), fullHostDists(:)
 
 end module expShare_variables
 
@@ -44,7 +45,9 @@ end module dataStructure_variables
 
 module time_variables
   implicit none
+
   double precision :: moveTime, expTime, sumTime, setTime
   double precision :: gatherTime, xTime, tripTime, partialSumTime
   double precision :: extractTime, tripSumTime, rootSumTime
+
 end module time_variables

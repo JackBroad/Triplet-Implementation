@@ -120,11 +120,11 @@ subroutine calcAllExposNonAddSharedMem(nTP,nArguments,trainingData,lengthscale)
   integer :: i, j, k, nJobs, atOne, atTwo, distIndex
   double precision :: expon, num, denom, dist
 
-  nJobs = size(currentEnergyData%processDists)
+  nJobs = N_exp_per_host 
   do i = 1, nJobs
-    dist = currentEnergyData%processDists(i)
-    atOne = currentEnergyData%alphaBetaPairs(i,1)
-    atTwo = currentEnergyData%alphaBetaPairs(i,2)
+    dist = fullHostDists(i)
+    atOne = fullHostInds(i,1)
+    atTwo = fullHostInds(i,2)
     distIndex = currentEnergyData%distancesIntMat(atOne,atTwo)
       do j = 1, nTP
         do k = 1, nArguments
