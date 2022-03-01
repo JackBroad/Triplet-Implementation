@@ -21,7 +21,7 @@ contains
     implicit none
     integer :: move
     double precision :: energyTime, xdgTime, tripletTime
-    double precision :: expTime, posTime
+    double precision :: posTime
 
     energyTime = MPI_Wtime()
     currentEnergyData%Utotal = currentEnergyData%Utotal + &

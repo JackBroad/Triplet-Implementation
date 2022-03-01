@@ -111,9 +111,6 @@ contains
 
   subroutine setUpExpCalculation()
     implicit none
-    integer :: N_even, N_spare, start, stopp
-    integer :: countVec(sharedSize), dispVec(sharedSize)
-    integer :: disp
 
     ! Allocate atom pairs to each process, ignoring shared mem
     N_dists_per_proc = getNdistsPerProcFullBox() ! Get no. of dists on each proc
