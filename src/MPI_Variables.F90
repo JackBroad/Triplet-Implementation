@@ -22,6 +22,7 @@ module expShare_variables
   implicit none
 
   integer :: N_changed_exp_per_host, N_exp_per_host
+  double precision :: sideLength
   integer, allocatable :: expUpdateInd(:,:),expUpdateIndNoRepeat(:,:)
   integer, allocatable :: changedTriInd(:), hostIndices(:,:)
   integer, allocatable :: fullHostInds(:,:)

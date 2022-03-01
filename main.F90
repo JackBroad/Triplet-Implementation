@@ -45,6 +45,7 @@ program main
   currentPositionData = initialise_positionDataStruct(positionFile)
 
 
+  ! Variables for atom move calc
   dist = 1.5d0
 
 

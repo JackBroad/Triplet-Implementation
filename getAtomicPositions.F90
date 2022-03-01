@@ -1,18 +1,19 @@
 program getAtomicPositions
   implicit none
-  integer :: nAt = 500, i, j
-  double precision :: random
+  integer :: nAt = 5, i, j
+  double precision :: random, L = 100d0
   double precision, allocatable :: positions(:,:)
 
   allocate(positions(nAt,3))
 
-  open(1, file='AtomicPositions500.txt', status='new')
+  open(1, file='AtomicPositions5SL.txt', status='new')
   write(1,*) nAt
+  write(1,*) L
 
   do i = 1, nAt
     do j = 1, 3
       call random_number(random)
-      positions(i,j) = random*100d0
+      positions(i,j) = random*L
     end do
     write(1,*) positions(i,:)
   end do

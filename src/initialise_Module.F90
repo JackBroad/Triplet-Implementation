@@ -63,9 +63,10 @@ subroutine initialise_Positions(fileName, posAt,N_a)
   integer, intent(out) :: N_a
   integer :: m, n
 
-  ! Read in the number of atoms
+  ! Read in the number of atoms and side length
   open(1, file=fileName, status='old')
   read(1,*) N_a
+  read(1,*) sideLength
 
   ! Get the atomic positions
   allocate(posAt(N_a,nArgs))
