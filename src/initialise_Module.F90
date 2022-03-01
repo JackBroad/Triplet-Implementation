@@ -124,15 +124,19 @@ subroutine initialise_Move(dMax,addSeed, mover)
         call random_number(randNumber)
         proposedPositionData%posArray(irow,icol) = proposedPositionData%posArray(irow,icol) &
                                                    + (2.0*randNumber-1) * dMax
-        !proposedPositionData%posArray(irow,icol) = proposedPositionData%posArray(irow,icol) &
-        !                                           + 1.0
+        ! PBCs: if atom leaves through any face of its sim box, 'replace' w/ atom
+        ! entering through opposite face
+        if (proposedPositionData%posArray(irow,icol) .gt. sideLength) then
+          proposedPositionData%posArray(irow,icol) = proposedPositionData%posArray(irow,icol) &
+                                                     - sideLength
+        else if (proposedPositionData%posArray(irow,icol) .lt. 0) then
+          proposedPositionData%posArray(irow,icol) = proposedPositionData%posArray(irow,icol) &
+                                                     + sideLength
+        end if
       end do
     end if
   end do
   end if
-  !call MPI_Bcast(mover, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
-  !call MPI_Bcast(proposedPositionData%posArray(mover,:), 3, MPI_DOUBLE_PRECISION, &
-  !               root, MPI_COMM_WORLD, ierror)
   
 return
 end subroutine initialise_Move

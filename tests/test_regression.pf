@@ -270,8 +270,37 @@ contains
       @assertEqual( move, expectedMove, 'Test which atom has moved')
       @assertEqual( proposedPositionData%posArray(move,:), expectedPosition, low_tol, 'Test where atom has moved to')
     end if
+    print *, ' '
+    print *, ' '
 
   end subroutine test_cluster_energies_and_move
+
+  @test
+  subroutine test_pbc_move()
+    implicit none
+    double precision :: expectedPosition(3)
+    logical :: seed=.true.
+    integer :: expectedMover=2, actualMover
+
+    ! Set-up move by varying actual positionas needed and making expected pos the same initially
+    proposedPositionData%posArray(expectedMover,2) = 1d0 ! Make small so goes -ve when moved
+    expectedPosition = proposedPositionData%posArray(expectedMover,:)
+    
+    ! Do move to change actual pos in proposedPositionData%posArray
+    call initialise_move(50d0,seed, actualMover)
+
+    ! Mimic move in expectedPosition vector (move is reproducible as seed is set)
+    expectedPosition(1) = expectedPosition(1) + 20.157690488974723 - sideLength
+    expectedPosition(2) = expectedPosition(2) - 2.5078632743263385 + sideLength
+    expectedPosition(3) = expectedPosition(3) + 8.7637927150533308
+
+    ! Test that the correct atom is moved to the correct place
+    if( processRank == root) then
+      @assertEqual( actualMover,expectedMover, 'Test which atom has moved')
+      @assertEqual( proposedPositionData%posArray(actualMover,:), expectedPosition, low_tol, 'Test where atom has moved to')
+    end if
+
+  end subroutine test_pbc_move
 
   @test
   subroutine test_v_setup()

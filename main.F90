@@ -25,7 +25,7 @@ program main
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
-  Character(len=300) :: positionFile = 'AtomicPositions500.txt'
+  Character(len=300) :: positionFile = 'AtomicPositions5.txt'
 
   ! Set up MPI 
   call MPI_INIT(ierror)
@@ -46,7 +46,7 @@ program main
 
 
   ! Variables for atom move calc
-  dist = 1.5d0
+  dist = 20d0
 
 
   if (useToyCode .eqv. .false.) then
@@ -58,7 +58,7 @@ program main
 
     ! Atom move
     if (moveFlag .eqv. .true.) then
-    do i = 1, 150
+    do i = 1, 15
       call initialise_Move(dist,setSeed, movedAtom)
       time = MPI_Wtime()
       atomMoveTime = MPI_Wtime()
