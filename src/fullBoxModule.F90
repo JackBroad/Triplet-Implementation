@@ -108,20 +108,40 @@ contains
     integer, intent(in) :: nAt
     double precision, intent(in) :: posArray(nAt,3)
     double precision, intent(out) :: X_dg(nAt,nAt)
-    integer :: i, j
+    integer :: i, j, k
+    double precision :: halfLength, delK, delX, delY, delZ
+
+    halfLength = sideLength/2d0
 
     ! Find X_dg for the atomic positions in posArray
     do i = 1, nAt
       do j = 1, nAt
         if (i .eq. j) then
-
           X_dg(i,j) = 0
-
         else if (i .lt. j) then
+          do k = 1, 3 ! Loop over x,y,z components
+            delK = posArray(i,k) - posArray(j,k)
+            if (delK .gt. halfLength) then
+              delK = delK - sideLength ! If diff between kth coords is more
+                                       ! than +ve L/2 then use image of atom
+                                       ! j that is shifted DOWN along kth axis
+                                       ! by L
+            else if (delK .lt. -1d0*halfLength) then
+              delK = delK + sideLength ! If diff between kth coords is less
+                                       ! than -ve L/2 then use image of atom
+                                       ! j that is shifted UP along kth axis
+                                       ! by L
+            end if
+            if (k .eq. 1) then
+              delX = delK
+            else if (k .eq. 2) then
+              delY = delK
+            else if (k .eq. 3) then
+              delZ = delK
+            end if
+          end do
 
-          X_dg(i,j) = (posArray(i,1)-posArray(j,1))**2 + &
-                      (posArray(i,2)-posArray(j,2))**2 + &
-                      (posArray(i,3)-posArray(j,3))**2
+          X_dg(i,j) = delX**2 + delY**2 + delZ**2
           X_dg(i,j) = (X_dg(i,j))**0.5
           X_dg(i,j) = 1 / X_dg(i,j) ! Convert to inverse distance
 

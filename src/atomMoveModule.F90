@@ -126,8 +126,11 @@ contains
     double precision, intent(in) :: positions(N_a,3)
     double precision, intent(inout) :: X(N_a,N_a)
     ! Local variables
-    integer :: i
-    double precision :: changedPosition(3)
+    integer :: i, j
+    double precision :: changedPosition(3), halfLength
+    double precision :: delJ, delX, delY, delZ
+
+    halfLength = sideLength/2d0
 
     ! Identify the position of the moved atom
     changedPosition = positions(move,:)
@@ -135,19 +138,45 @@ contains
     ! Find the distances between this atom and all others
     do i = 1, N_a
       if (i .lt. move) then
+        do j = 1, 3 ! Loop over x,y,z coordinates
+          delJ = changedPosition(j) - positions(i,j)
+          if (delJ .gt. halfLength) then
+            delJ = delJ - sideLength
+          else if (delJ .lt. -1d0*halfLength) then
+            delJ = delJ + sideLength
+          end if
+          if (j .eq. 1) then
+            delX = delJ
+          else if (j .eq. 2) then
+            delY = delJ
+          else if (j .eq. 3) then
+            delZ = delJ
+          end if
+        end do
 
-        X(i,move) = (positions(i,1) - changedPosition(1))**2 + &
-                    (positions(i,2) - changedPosition(2))**2 + &
-                    (positions(i,3) - changedPosition(3))**2
+        X(i,move) = delX**2 + delY**2 + delZ**2
         X(i,move) = (X(i,move))**0.5
         X(i,move) = 1 / X(i,move)
         X(move,i) = X(i,move)
 
       else if (i .gt. move) then
+        do j = 1, 3 ! Loop over x,y,z coordinates
+          delJ = changedPosition(j) - positions(i,j)
+          if (delJ .gt. halfLength) then
+            delJ = delJ - sideLength
+          else if (delJ .lt. -1d0*halfLength) then
+            delJ = delJ + sideLength
+          end if
+          if (j .eq. 1) then
+            delX = delJ
+          else if (j .eq. 2) then
+            delY = delJ
+          else if (j .eq. 3) then
+            delZ = delJ
+          end if
+        end do
 
-        X(move,i) = (positions(i,1) - changedPosition(1))**2 + &
-                    (positions(i,2) - changedPosition(2))**2 + &
-                    (positions(i,3) - changedPosition(3))**2
+        X(move,i) = delX**2 + delY**2 + delZ**2
         X(move,i) = (X(move,i))**0.5
         X(move,i) = 1 / X(move,i)
         X(i,move) = X(move,i)
