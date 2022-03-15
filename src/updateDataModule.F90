@@ -2,6 +2,7 @@ module updateData
   use mpi
   use mpi_variables
   use expShare_variables
+  use pbcAndMic_variables
   use dataStructure_variables
   use triplet_mod
   use GP_variables, only: hyperParams,alpha,Perm,trainData,N_tp,nArgs,N_p

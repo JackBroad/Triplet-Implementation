@@ -1,5 +1,6 @@
 module test_regression
   use mpi
+  use pbcAndMic_variables
   use mpi_variables
   use dataStructure_variables
   use triplet_mod
@@ -17,6 +18,7 @@ module test_regression
   implicit none
 
   double precision :: regression_tolerance=1e-9, low_tol=5e-6
+  double precision :: E_tol=3e-5
   double precision, allocatable :: posAt(:,:), Xd(:,:)
   double precision, allocatable :: expoData(:,:,:)
   integer, allocatable :: disMat(:,:)
@@ -220,12 +222,35 @@ contains
     implicit none
     integer :: trip(3,1), N_p=6
     double precision :: U_Ex(1), U(1)
+    type (positionData) :: posDataStruct
+    type (energiesData) :: enDataStruct
+
+    ! Allocate necessary arrays in data structures
+    allocate(enDataStruct%interatomicDistances(3,3),enDataStruct%distancesIntMat(3,3))
+    allocate(posDataStruct%posArray(3,3))
+
+    ! Fill the arrays of distances and corresponding integer labels of the distances
+    enDataStruct%interatomicDistances(1,1:3) = 1d0/3d0
+    enDataStruct%interatomicDistances(2,1:3) = 1d0/3d0
+    enDataStruct%interatomicDistances(3,1:3) = 1d0/3d0
+    enDataStruct%distancesIntMat(1,2) = 1
+    enDataStruct%distancesIntMat(1,3) = 2
+    enDataStruct%distancesIntMat(2,3) = 3
+
+    ! Fill the array of positions
+    posDataStruct%posArray(1,:) = (/ 1d0,1d0,0d0 /)
+    posDataStruct%posArray(2,:) = (/ 4d0,1d0,0d0 /)
+    posDataStruct%posArray(3,:) = (/ 2.5d0,3.598d0,0d0 /)
+    posDataStruct%N_distances = 3
+
+    Rcut = 0.25
 
     U_Ex(1) = 68.776748653803210
     trip(:,1) = (/ 1,2,3 /)
 
-    call tripletEnergiesNonAdd(trip,disMat,1,N_tp,n_at,N_p,nArgs,Perm, &
-                               n_dist,expoData,alpha,hyperParams(2), U)
+    call tripletEnergiesNonAdd(trip,1,N_tp,N_p,nArgs,Perm, &
+                               posDataStruct,expoData,alpha, &
+                               hyperParams(2),enDataStruct, U)
 
     if( processRank == root) then
       @assertEqual(U, U_Ex, low_tol, 'Test non-add energy single')
@@ -235,22 +260,73 @@ contains
 
 
   @test
+  subroutine test_checkTripletDistsMIC()
+    implicit none
+    integer :: alpha=1, beta=2, gamma=3
+    logical :: actualRes
+    double precision :: dists(3)
+    type (positionData) :: posDataStruct
+
+    ! Set positions
+    allocate(posDataStruct%posArray(3,3))
+    posDataStruct%posArray(1,:) = (/ 1d0,1d0,0d0 /)
+    posDataStruct%posArray(2,:) = (/ 4d0,1d0,0d0 /)
+    posDataStruct%posArray(3,:) = (/ 2.5d0,3.598d0,0d0 /)
+
+    ! Set dists, cut-off value and expected result of check
+    dists = (/ 1d0/3d0,1d0/3d0,1d0/3d0 /)
+    sideLength = 8d0
+    Rcut = 1d0/4d0
+
+    ! Call function; should return true this time
+    actualRes = checkTripletDistsUnderMIC(dists,posDataStruct,alpha,beta,gamma)
+    if( processRank .eq. root) then
+      @assertTrue((actualRes .eqv. .true.),'Check energy is calculated when all dists below R_cut')
+    end if
+
+    ! Set new positions and dists
+    posDataStruct%posArray(1,:) = (/ 1d0,1d0,0d0 /)
+    posDataStruct%posArray(2,:) = (/ 5.1d0,1d0,0d0 /)
+    posDataStruct%posArray(3,:) = (/ 2.5d0,3.598d0,0d0 /)
+    dists = (/ 1d0/4.1d0,1d0/3.676d0,1d0/3d0 /)
+
+    ! Call function; should return false as r_12>r_cut
+    actualRes = checkTripletDistsUnderMIC(dists,posDataStruct,alpha,beta,gamma)
+    if( processRank .eq. root) then
+      @assertFalse((actualRes .eqv. .true.),'Check energy is not calculated when one dist above R_cut')
+    end if
+
+    ! Set new positions and dists
+    posDataStruct%posArray(1,:) = (/ 2d0,1d0,0d0 /)
+    posDataStruct%posArray(2,:) = (/ 3.9d0,1d0,0d0 /)
+    posDataStruct%posArray(3,:) = (/ 6.1d0,1d0,0d0 /) ! -1.9
+    dists = (/ 1/1.9d0,1/3.9d0,1/2.2d0 /)
+
+    ! Call function; should return false as r_13>r_cut only under specific MIC position
+    actualRes = checkTripletDistsUnderMIC(dists,posDataStruct,alpha,beta,gamma)
+    if( processRank .eq. root) then
+      @assertFalse((actualRes .eqv. .true.),'Check energy is not calculated when one dist above R_cut out of MIC')
+    end if
+
+  end subroutine test_checkTripletDistsMIC
+
+
+  @test
   subroutine test_cluster_energies_and_move()
     implicit none
-    character(len=40) :: name='AtomicPositions5.txt'
+    character(len=40) :: name='AtomicPositions5Test.txt'
     double precision :: fullEnergy, fullEnergy_Ex, tripDist(3,10)
     double precision :: moveEnergy, moveEnergy_Ex
     double precision :: expectedPosition(3)
     logical :: seed=.true.
     integer :: expectedMove
 
-
     !****** Create a simulation box and test that total energy is correct**********
     fullEnergy = getSimBoxEnergy(name)
     fullEnergy_Ex = getExpectedSimBoxEnergy(tripDist)
     
     if( processRank == root) then
-        @assertEqual( fullEnergy, fullEnergy_Ex, low_tol, 'Test full non-add energy')
+        @assertEqual( fullEnergy, fullEnergy_Ex, E_tol, 'Test full non-add energy')
     end if
 
 
@@ -266,12 +342,10 @@ contains
     !Test that 'move' has the expected value
     !Test that proposed configuration of moved atom is as expected
     if( processRank == root) then
-      @assertEqual( moveEnergy, moveEnergy_Ex, low_tol, 'Test atom move energy')
+      @assertEqual( moveEnergy, moveEnergy_Ex, E_tol, 'Test atom move energy')
       @assertEqual( move, expectedMove, 'Test which atom has moved')
       @assertEqual( proposedPositionData%posArray(move,:), expectedPosition, low_tol, 'Test where atom has moved to')
     end if
-    print *, ' '
-    print *, ' '
 
   end subroutine test_cluster_energies_and_move
 
@@ -439,6 +513,7 @@ contains
     integer :: tInd_Ex(3,6), cInd_Ex(6)
 
     move = 1
+    proposedPositionData%N_changed_triplets = 6
     call getChangedTriplets(move, changedTriplets,tripIndex)
 
     tInd_Ex(:,1) = (/ 1,2,3 /)
@@ -564,6 +639,65 @@ contains
     deallocate(distVec,distVecEx,allDist,partDistVec)
   end subroutine test_distributeDistances
 
+
+  ! NOTE THAT ALL EXPECTED ENERGIES IN THE FOLLOWING TEST WERE OBTAINED FROM
+  ! THE MAIN CODE WITH THE 'SMALL' FILES FOR ALPHA AND THE TPS USED TO INIT-
+  ! IALISE THE GP
+  @test
+  subroutine test_energy_at_varied_Rcut()
+    implicit none
+    character(len=40) :: name='AtomicPositions100SL=18.txt'
+    integer, parameter :: dp = SELECTED_REAL_KIND(15)
+    real(dp) :: expEnergy
+    double precision :: calcEnergy
+
+    ! Get energy of sim. box with Rcut = L/2
+    currentPositionData = initialise_positionDataStruct(name)
+    calcEnergy = tmpi_calcFullSimBoxEnergy()
+    expEnergy = -2731545.8830658090_dp
+    print *, calcEnergy, expEnergy
+
+    if( processRank == root) then
+        @assertEqual( calcEnergy, expEnergy, E_tol, 'reg. test for Rcut=L/2')
+    end if
+
+    ! Get energy of sim. box with Rcut = L/3
+    expEnergy = 164016.06888115572_dp
+    currentPositionData = initialise_positionDataStruct(name)
+    Rcut = sideLength/3d0
+    Rcut = 1d0/Rcut
+    calcEnergy = tmpi_calcFullSimBoxEnergy()
+
+    ! Run test
+    if( processRank == root) then
+        @assertEqual( calcEnergy, expEnergy, E_tol, 'reg. test for Rcut=L/3')
+    end if
+
+    ! Get energy of sim. box with Rcut = L/4
+    expEnergy = 22111.252512911848_dp
+    currentPositionData = initialise_positionDataStruct(name)
+    Rcut = sideLength/4d0
+    Rcut = 1d0/Rcut
+    calcEnergy = tmpi_calcFullSimBoxEnergy()
+
+    ! Run test
+    if( processRank == root) then
+        @assertEqual( calcEnergy, expEnergy, E_tol, 'reg. test for Rcut=L/4')
+    end if
+
+    ! Get energy of sim. box with Rcut = L/5
+    expEnergy = 962.20097527586915_dp
+    currentPositionData = initialise_positionDataStruct(name)
+    Rcut = sideLength/5d0
+    Rcut = 1d0/Rcut
+    calcEnergy = tmpi_calcFullSimBoxEnergy()
+
+    ! Run test
+    if( processRank == root) then
+        @assertEqual( calcEnergy, expEnergy, E_tol, 'reg. test for Rcut=L/5')
+    end if
+  end subroutine test_energy_at_varied_Rcut
+
   !===========================================================================================
   @test
   subroutine test_finalize()
@@ -593,7 +727,11 @@ contains
                               currentEnergyData%interatomicDistances, tripDist)
 
     do i = 1, currentPositionData%N_tri
+      calculate = checkTripletDistsUnderMIC(tripDist(:,i),currentPositionData,triplets(1,i),triplets(2,i),triplets(3,i))
       tripEnergies_Ex(i) = energyCheckCalc(tripDist(:,i)) ! Energies of each triplet
+      if (calculate .eqv. .false.) then
+        tripEnergies_Ex(i) = 0d0
+      end if
     end do
 
     getExpectedSimBoxEnergy = sum(tripEnergies_Ex)
@@ -637,8 +775,16 @@ contains
 
     ! Re-calculate energy using RSG's code
     do i = 1, proposedPositionData%N_tri
+      calculate = checkTripletDistsUnderMIC(tripDist(:,i),proposedPositionData,triplets(1,i),triplets(2,i),triplets(3,i))
       newTripEnergies_Ex(i) = energyCheckCalc(tripDist(:,i)) ! Energies of each triplet after move
+      if (calculate .eqv. .false.) then
+        newTripEnergies_Ex(i) = 0d0
+      end if
+      calculate = checkTripletDistsUnderMIC(oldTripDist(:,i),currentPositionData,triplets(1,i),triplets(2,i),triplets(3,i))
       oldTripEnergies_Ex(i) = energyCheckCalc(oldTripDist(:,i))
+      if (calculate .eqv. .false.) then
+        oldTripEnergies_Ex(i) = 0d0
+      end if
     end do
 
     ! Find the difference between the new and old triplet energies

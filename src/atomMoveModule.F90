@@ -3,6 +3,7 @@ module atomMoveModule
   use GP_variables
   use mpi_variables
   use expShare_variables
+  use pbcAndMic_variables
   use dataStructure_variables
   use energiesData_Module, only: energiesData
   use positionData_Module, only: positionData
@@ -30,10 +31,10 @@ contains
         sizeCounter = sizeCounter + 1
         counter = counter + (move - be)
         triplet = (/ al, be, move /)
-        call tripletEnergiesNonAdd(triplet,proposedEnergyData%distancesIntMat, &
-                                   1,N_tp,proposedPositionData%N_a,N_p,nArgs, &
-                                   Perm,proposedPositionData%N_distances, &
-                                   expArray,alpha,hyperParams(2), U)
+        call tripletEnergiesNonAdd(triplet,1,N_tp,N_p,nArgs,Perm, &
+                                   proposedPositionData, &
+                                   expArray,alpha,hyperParams(2), &
+                                   proposedEnergyData, U)
         uVec(counter) = U(1)
         tmpChangedTri(sizeCounter) = counter
         counter = counter + (proposedPositionData%N_a - move)
@@ -42,10 +43,10 @@ contains
           counter = counter + 1
           sizeCounter = sizeCounter + 1
           triplet = (/ al, be, j /)
-          call tripletEnergiesNonAdd(triplet,proposedEnergyData%distancesIntMat, &
-                                     1,N_tp,proposedPositionData%N_a,N_p,nArgs, &
-                                     Perm,proposedPositionData%N_distances, &
-                                     expArray,alpha,hyperParams(2), U)
+          call tripletEnergiesNonAdd(triplet,1,N_tp,N_p,nArgs,Perm, &
+                                     proposedPositionData, &
+                                     expArray,alpha,hyperParams(2), &
+                                     proposedEnergyData, U)
           uVec(counter) = U(1)
           tmpChangedTri(sizeCounter) = counter
         end do

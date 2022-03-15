@@ -5,6 +5,7 @@ module triplet_mod
   use mpi_variables
   use dataStructure_variables
   use expShare_variables
+  use pbcAndMic_variables
   use energiesData_Module, only: energiesData
   use positionData_Module, only: positionData  
   implicit none
@@ -145,15 +146,19 @@ end subroutine calcAllExposNonAddSharedMem
 
 
 ! Calculates the non-additive energy for each triplet in the cluster
-subroutine tripletEnergiesNonAdd(triData,intMat,nJob,nTP,nAt,nPerm,nArg,permMat, &
-                                 expCols,expMat,alphaVec,sigVar, uVector)
+subroutine tripletEnergiesNonAdd(triData,nJob,nTP,nPerm,nArg,permMat,posData, &
+                                 expMat,alphaVec,sigVar,dataStruct, uVector)
   implicit none
-  integer, intent(in) :: nJob, nTP, nAt, nPerm, nArg, expCols
-  integer, intent(in) :: triData(3,nJob), intMat(nAt,nAt), permMat(nPerm,nArg)
-  double precision, intent(in) :: expMat(nArg,nTP,expCols), alphaVec(nTP), sigVar
+  integer, intent(in) :: nJob, nTP, nPerm, nArg
+  integer, intent(in) :: triData(3,nJob), permMat(nPerm,nArg)
+  double precision, intent(in) :: alphaVec(nTP), sigVar
+  type (positionData), intent(in) :: posData
+  type (energiesData), intent(in) :: dataStruct
+  double precision, intent(inout) :: expMat(nArg,nTP,posData%N_distances)
   double precision, intent(out) :: uVector(nJob)
-  integer :: triInt, alp, bet, gam, alDis, beDis, gaDis, r, s, kP(nArg)
-  double precision :: alphaSum, expSum, expProd
+  integer :: triInt, alp, bet, gam, alDis, beDis, gaDis
+  integer :: r, s, kP(nArg)
+  double precision :: RinVec(3), alphaSum, expProd, expSum
 
   do triInt = 1, nJob
 
@@ -163,41 +168,55 @@ subroutine tripletEnergiesNonAdd(triData,intMat,nJob,nTP,nAt,nPerm,nArg,permMat,
     gam = triData(3,triInt)
 
     ! Convert these into the indices of the IA distances that describe the triplet
-    alDis = intMat(alp,bet)
-    beDis = intMat(alp,gam)
-    gaDis = intMat(bet,gam)
+    alDis = dataStruct%distancesIntMat(alp,bet)
+    beDis = dataStruct%distancesIntMat(alp,gam)
+    gaDis = dataStruct%distancesIntMat(bet,gam)
 
-    ! Need to add to alpha sum for each TP so set to zero out of TP loop
-    alphaSum = 0
+    ! Find the MIC inv distances for the triplet
+    RinVec(1) = dataStruct%interatomicDistances(alp,bet)
+    RinVec(2) = dataStruct%interatomicDistances(alp,gam)
+    RinVec(3) = dataStruct%interatomicDistances(bet,gam)
 
-    do r = 1, nTP
+    ! Check whether to explicitly calculate the energy for this triplet
+    calculate = checkTripletDistsUnderMIC(RinVec,posData,alp,bet,gam)
+    !print *, ' '
+    !print *, calculate
+    !print *, ' '
 
-      ! The sum of the exp products is different for each TP so reset for
-      ! each
-      expSum = 0
+    if (calculate .eqv. .true.) then
+      nExplicit = nExplicit+1
+      ! Need to add to alpha sum for each TP so set to zero out of TP loop
+      alphaSum = 0
+      do r = 1, nTP
+        ! The sum of the exp products is different for each TP so reset for
+        ! each
+        expSum = 0
+        do s = 1, nPerm
+          ! Take sth row of permutation matrix
+          kP = permMat(s,1:3)
 
-      do s = 1, nPerm
+          ! Find the product of the relevant exps under this permutation
+          expProd = expMat(r,kP(1),alDis) * expMat(r,kP(2),beDis) * expMat(r,kP(3),gaDis)
 
-        ! Take sth row of permutation matrix
-        kP = permMat(s,1:3)
-
-        ! Find the product of the relevant exps under this permutation
-        expProd = expMat(r,kP(1),alDis) * expMat(r,kP(2),beDis) * expMat(r,kP(3),gaDis)
-        !expProd = triInt*kP(1) + r*kP(2) + s*kP(3) + triInt*r*s + kP(1)*kP(2)*kP(3)
-
-        ! Add the product to the sum for this training point
-        expSum = expSum + expProd
-
+          ! Add the product to the sum for this training point
+          expSum = expSum + expProd
+        end do
+        ! Multiply the sum by the relevant alpha value and add the result to all
+        ! previous results
+        alphaSum = alphaSum + (expSum*alphaVec(r))
       end do
-
-      ! Multiply the sum by the relevant alpha value and add the result to all
-      ! previous results
-      alphaSum = alphaSum + (expSum*alphaVec(r))
-
-    end do
-
-    uVector(triInt) = sigVar * alphaSum
-
+      uVector(triInt) = sigVar * alphaSum
+      !print *, 'calculated U explicitly, restarting'
+      !print *, '============================='
+      !print *, ' '
+      !print *, ' '
+    else
+      !print *, 'setting U=0 and restarting'
+      !print *, '============================='
+      !print *, ' '
+      !print *, ' '
+      uVector(triInt) = 0d0
+    end if
   end do
 
 return
@@ -324,7 +343,7 @@ function energyCheckCalc(xStar) result(PES_GP)
      end do
   end do
   do m = 1, nPerms
-    !print *, xTrainingPerm(:,m,3)
+    !!print *, xTrainingPerm(:,m,3)
   end do
 
   kKernTotal=0
@@ -342,7 +361,7 @@ function energyCheckCalc(xStar) result(PES_GP)
   end do !Training points (i)
 
   PES_GP=kKernTotal * expVar
-!  print *, 'Non-additive E:', PES_GP
+!  !print *, 'Non-additive E:', PES_GP
 end function energyCheckCalc
 
 
@@ -357,6 +376,143 @@ end function energyCheckCalc
 
   return
   end subroutine updateExpMatrix
+
+  function checkTripletDistsUnderMIC(Rvec,posData,alp,bet,gam) result(explicit)
+    logical :: explicit
+    integer :: alp, bet, gam, i, RminLoc, RmaxLoc
+    integer :: RfixInt
+    double precision :: Rvec(3), Rchange(1), alPos(3)
+    double precision :: bePos(3), gaPos(3), delOne
+    double precision :: delTwo, halfLength, delX, delY
+    double precision :: delZ
+    type (positionData) :: posData
+
+    ! Set value for L/2
+    halfLength = sideLength/2d0
+
+    ! Determine largest inv distance (i.e. smallest distance) and its index in R
+    RminLoc = maxloc(Rvec,dim=1)
+    RmaxLoc = minloc(Rvec,dim=1)
+    !print *, 'RminLoc:',RminLoc, ' Rvec:', Rvec
+    !print *, ' '
+    !print *, Rvec(RminLoc), Rcut
+    !print *, ' '
+
+    if (Rvec(RmaxLoc) .lt. Rcut) then
+      !print *, 'RmaxLoc:',RmaxLoc, ' Rvec:', Rvec
+      !print *, Rvec(RmaxLoc), Rcut
+      !print *, 'longest dist in triplet exceeds Rcut'
+      !print *, 'Setting U=0 and restarting'
+      !print *, '================================='
+      !print *, ' '
+      !print *, ' '
+      explicit = .false.
+
+    ! If min distance is below Rcut then work out other dists and triplet energy
+    else if (Rvec(RminLoc) .ge. Rcut) then
+      !print *, Rvec(RminLoc), '>=', Rcut
+      !print *, 'calculating if any other dist has changed'
+      !print *, ' '
+
+      ! Find the atom that isn't going to be moved
+      if (RminLoc .eq. 3) then
+        RfixInt = bet
+      else
+        RfixInt = alp
+      end if
+
+      ! Get non-MIC positions of all atoms in triplet
+      alPos = posData%posArray(alp,:)
+      bePos = posData%posArray(bet,:)
+      gaPos = posData%posArray(gam,:)
+
+      ! Move two atoms to be as close as possible under MIC to atom that isn't
+      ! being moved
+      if (RfixInt .eq. alp) then
+        ! Move atoms beta and gamma to MIC positions rel. to alpha
+        do i = 1,3
+          delOne = alPos(i) - bePos(i)
+          if (delOne .gt. halfLength) then
+            bePos(i) = bePos(i) + sideLength
+          else if (delOne .lt. -1d0*halfLength) then
+            bePos(i) = bePos(i) - sideLength
+          end if
+          delTwo = alPos(i) - gaPos(i)
+          if (delTwo.gt. halfLength) then
+            gaPos(i) = gaPos(i) + sideLength
+          else if (delTwo .lt. -1d0*halfLength) then
+            gaPos(i) = gaPos(i) - sideLength
+          end if
+        end do
+        ! Find new beta-gamma inv. distance
+        delX = bePos(1) - gaPos(1)
+        delY = bePos(2) - gaPos(2)
+        delZ = bePos(3) - gaPos(3)
+        Rchange(1) = delX**2 + delY**2 + delZ**2
+        Rchange(1) = Rchange(1)**0.5
+        Rchange(1) = 1d0/Rchange(1)
+        !if (Rchange(1) .ne. Rvec(3)) then
+        !print *, 'Rchange:',Rchange(1), ' Rcut:',Rcut
+        !print *, ' '
+        if (Rchange(1) .lt. Rcut) then
+          !print *, 'Rchange < Rcut'
+          !print *, 'setting U=0 and re-starting'
+          !print *, '============================='
+          !print *, ' '
+          !print *, ' '
+          explicit = .false.
+        else
+          !print *, 'Rchange >= Rcut'
+          !print *, 'the following values should be the same'
+          !print *, Rchange(1), Rvec(3)
+          !print *, 'calculating U explicitly'
+          !print *, ' '
+          explicit = .true.
+        end if
+      else if (RfixInt .eq. bet) then
+        do i = 1, 3
+          delOne = bePos(i) - alPos(i)
+          if (delOne .gt. halfLength) then
+            alPos(i) = alPos(i) + sideLength
+          else if (delOne .lt. -1d0*halfLength) then
+            alPos(i) = alPos(i) - sideLength
+          end if
+          delTwo = bePos(i) - gaPos(i)
+          if (delTwo .gt. halfLength) then
+            gaPos(i) = gaPos(i) - sideLength
+          else if (delTwo .lt. -1d0*halfLength) then
+            gaPos(i) = gaPos(i) + sideLength
+          end if
+        end do
+        delX = alPos(1) - gaPos(1)
+        delY = alPos(2) - gaPos(2)
+        delZ = alPos(3) - gaPos(3)
+        Rchange(1) = delX**2 + delY**2 + delZ**2
+        Rchange(1) = Rchange(1)**0.5
+        Rchange(1) = 1d0/Rchange(1)
+        !print *, 'Rchange:',Rchange(1), ' Rcut',Rcut
+        !print *, ' '
+        !if (Rchange(1) .ne. Rvec(2)) then
+        if (Rchange(1) .lt. Rcut) then
+          !print *, 'Rchange < Rcut'
+          !print *, 'setting U=0 and re-starting'
+          !print *, '============================='
+          !print *, ' '
+          !print *, ' '
+          explicit = .false.
+        else
+          !print *, 'Rchange >= Rcut'
+          !print *, 'the following values should be the same'
+          !print *, Rchange(1), Rvec(2)
+          !print *, 'calculating U explicitly'
+          !print *, ' '
+          explicit = .true.
+        end if
+      end if
+    end if
+
+  return
+  end function checkTripletDistsUnderMIC
 
 
 end module triplet_mod

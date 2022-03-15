@@ -18,11 +18,20 @@ module mpi_variables
 end module mpi_variables
 
 
+module pbcAndMic_variables
+  implicit none
+
+  integer :: nExplicit = 0
+  logical :: calculate
+  double precision :: sideLength, Rcut
+
+end module pbcAndMic_variables
+
+
 module expShare_variables
   implicit none
 
   integer :: N_changed_exp_per_host, N_exp_per_host
-  double precision :: sideLength
   integer, allocatable :: expUpdateInd(:,:),expUpdateIndNoRepeat(:,:)
   integer, allocatable :: changedTriInd(:), hostIndices(:,:)
   integer, allocatable :: fullHostInds(:,:)

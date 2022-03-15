@@ -25,7 +25,7 @@ program main
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
-  Character(len=300) :: positionFile = 'AtomicPositions5.txt'
+  Character(len=300) :: positionFile = 'AtomicPositions500SL=18.txt'
 
   ! Set up MPI 
   call MPI_INIT(ierror)
@@ -46,19 +46,24 @@ program main
 
 
   ! Variables for atom move calc
-  dist = 20d0
+  dist = 2d0
 
 
   if (useToyCode .eqv. .false.) then
 
     ! Calculate energy for full sim box
     fullEnergy = tmpi_calcFullSimBoxEnergy()
+    !print *, '======================================'
+    !print *, '======================================'
+    !print *, ' '
+    !print *, ' '
+    !print *, ' '
     call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
 
     ! Atom move
     if (moveFlag .eqv. .true.) then
-    do i = 1, 15
+    do i = 1, 150
       call initialise_Move(dist,setSeed, movedAtom)
       time = MPI_Wtime()
       atomMoveTime = MPI_Wtime()
@@ -69,10 +74,6 @@ program main
       !***********True move code***********
       moveEnergy = tmpi_calcAtomMoveEnergy(movedAtom)
       atomMoveTime = MPI_Wtime() - atomMoveTime
-      !if (processRank .eq. root) then
-      !  check = -79272925.072343603d0
-      !  call assertEqual_double(fullEnergy, check, 1d0*10d0**(-5d0), 'incorrect energy found')
-      !end if
 
       if (acceptMove .eqv. .true.) then
         acceptTime = MPI_Wtime()

@@ -3,6 +3,7 @@ module tmpi_calcAtomMoveEnergy_mod
   use mpi
   use mpi_variables
   use expShare_variables
+  use pbcAndMic_variables
   use dataStructure_variables
   use time_variables
   use triplet_mod

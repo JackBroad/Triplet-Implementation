@@ -3,6 +3,7 @@ module fullBoxModule
   use GP_variables
   use mpi_variables
   use expShare_variables
+  use pbcAndMic_variables
   use dataStructure_variables
   use energiesData_Module, only: energiesData
   use positionData_Module, only: positionData
@@ -193,17 +194,17 @@ function getTripletEnergiesFullBox(nDists,nTrips) result(uVec)
       if (be .lt. j) then
         counter = counter + 1
         triplet = (/ al, be, j /)
-        call tripletEnergiesNonAdd(triplet,currentEnergyData%distancesIntMat, &
-                                   1,N_tp,currentPositionData%N_a,N_p,nArgs, &
-                                   Perm,currentPositionData%N_distances, &
-                                   expArray,alpha, hyperParams(2), U)
+        call tripletEnergiesNonAdd(triplet,1,N_tp,N_p,nArgs,Perm, &
+                                   currentPositionData,expArray, &
+                                   alpha,hyperParams(2), &
+                                   currentEnergyData, U)
         uVec(counter) = U(1)
       end if
     end do
   end do
 
 return
-end function
+end function getTripletEnergiesFullBox
 
 
 integer function getNdistsPerProcFullBox()

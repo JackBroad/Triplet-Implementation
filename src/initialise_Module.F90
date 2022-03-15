@@ -1,5 +1,7 @@
 module initialise_Module
   !use mpi
+  use pbcAndMic_variables
+  use expShare_variables
   use mpi_variables
   use dataStructure_variables
   use triplet_mod
@@ -67,6 +69,10 @@ subroutine initialise_Positions(fileName, posAt,N_a)
   open(1, file=fileName, status='old')
   read(1,*) N_a
   read(1,*) sideLength
+
+  ! Get Rcut and convert to inverse distance
+  Rcut = sideLength/2d0
+  Rcut = 1d0/Rcut
 
   ! Get the atomic positions
   allocate(posAt(N_a,nArgs))
