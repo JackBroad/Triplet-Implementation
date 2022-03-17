@@ -1,3 +1,3 @@
 rm triplet.out
 make
-mpirun -np 1 ./triplet.out
+mpirun -np 10 ./triplet.out

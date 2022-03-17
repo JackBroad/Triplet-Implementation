@@ -58,10 +58,7 @@ contains
     moveTime = MPI_Wtime() - moveTime
 
 
-    ! Finalise MPI and print times taken for each step of calculation
-    if (processRank .eq. root) then
-       !call finalTextOutput()
-    end if
+    ! Final asserts
     call finalAsserts(proposedPositionData%N_a)
 
   return
@@ -76,7 +73,7 @@ contains
     call initialAsserts(proposedPositionData%N_a,proposedPositionData%N_tri, &
                         proposedPositionData%N_distances)
     proposedPositionData%N_changed_triplets = getTriPerAtom(proposedPositionData%N_a)
-    call allocateArrays(proposedPositionData,proposedEnergyData)
+    call allocateArrays()
 
     ! Re-calculate interatomicDistances for the new atomic positions
     xTime = MPI_Wtime()
@@ -196,19 +193,13 @@ contains
   end subroutine finalAsserts
 
 
-  subroutine allocateArrays(proposedPosition,proposedEnergy)
-    type (positionData) :: proposedPosition
-    type (energiesData) :: proposedEnergy
+  subroutine allocateArrays()
  
     allocate(newUfull(clusterSize))
-    allocate(newDists(proposedPosition%N_a-1))
-    allocate(newExpInt(proposedPosition%N_a-1,2))
-    if (allocated(proposedEnergy%interatomicDistances)) then
-      deallocate(proposedEnergy%interatomicDistances)
-    end if
-    allocate(proposedEnergy%interatomicDistances(proposedPosition%N_a, &
-             proposedPosition%N_a))
+    allocate(newDists(proposedPositionData%N_a-1))
+    allocate(newExpInt(proposedPositionData%N_a-1,2))
 
+  return
   end subroutine allocateArrays
 
 
@@ -218,17 +209,9 @@ contains
     deallocate(newDists)
     deallocate(newExpInt)
 
+  return
   end subroutine deallocateArrays
 
-
-  subroutine finalTextOutput()
-
-    if (textOutput) then
-      print *, moveTime, setTime, expTime, tripTime, 0d0, &
-               partialSumTime, gatherTime, rootSumTime
-    end if
-
-  end subroutine finalTextOutput
 
 subroutine distributeDistsSharedMem()
   implicit none

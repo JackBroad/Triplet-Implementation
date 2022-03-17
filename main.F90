@@ -18,8 +18,7 @@ program main
 
 
   integer :: movedAtom, i
-  logical :: setSeed=.false., acceptMove=.true., useToyCode=.false.
-  logical :: moveFlag=.true.
+  logical :: setSeed=.false., acceptMove=.true., moveFlag=.true.
   double precision :: dist, time, fullEnergy, moveEnergy, check
   double precision :: atomMoveTime, acceptTime, rejectTime
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
@@ -27,11 +26,11 @@ program main
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
   Character(len=300) :: positionFile = 'AtomicPositions500SL=18.txt'
 
+
   ! Set up MPI 
   call MPI_INIT(ierror)
   call MPI_COMM_SIZE(MPI_COMM_WORLD, clusterSize, ierror)
   call MPI_COMM_RANK(MPI_COMM_WORLD, processRank, ierror)
-
 
   ! Set up shared memory
   call MPI_COMM_SPLIT_TYPE(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, &
@@ -39,117 +38,116 @@ program main
   call MPI_COMM_SIZE(hostComm, sharedSize, ierror)
   call MPI_COMM_RANK(hostComm, hostRank, ierror)
 
-
   ! Set-up calls for full calc
   call initialise_GP_NonAdd(hyperParametersFile, alphaFile, trainingSetFile)
   currentPositionData = initialise_positionDataStruct(positionFile)
 
-
-  ! Variables for atom move calc
+  ! Set step-size for atom-move calc
   dist = 2d0
 
+  ! Calculate energy for full sim box
+  fullEnergy = tmpi_calcFullSimBoxEnergy()
+  call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
-  if (useToyCode .eqv. .false.) then
+  ! Atom move
+  if (moveFlag .eqv. .true.) then
+  do i = 1, 150
 
-    ! Calculate energy for full sim box
-    fullEnergy = tmpi_calcFullSimBoxEnergy()
-    !print *, '======================================'
-    !print *, '======================================'
-    !print *, ' '
-    !print *, ' '
-    !print *, ' '
-    call MPI_BARRIER(MPI_COMM_WORLD, barError)
+    call initialise_Move(dist,setSeed, movedAtom)
+    time = MPI_Wtime()
+    atomMoveTime = MPI_Wtime()
+    call broadcastMoveData()
 
+    moveEnergy = tmpi_calcAtomMoveEnergy(movedAtom)
+    atomMoveTime = MPI_Wtime() - atomMoveTime
 
-    ! Atom move
-    if (moveFlag .eqv. .true.) then
-    do i = 1, 150
-      call initialise_Move(dist,setSeed, movedAtom)
-      time = MPI_Wtime()
-      atomMoveTime = MPI_Wtime()
-      call MPI_Bcast(movedAtom, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
-      call MPI_Bcast(proposedPositionData%posArray(movedAtom,:), 3, MPI_DOUBLE_PRECISION, &
-                     root, MPI_COMM_WORLD, ierror)
-
-      !***********True move code***********
-      moveEnergy = tmpi_calcAtomMoveEnergy(movedAtom)
-      atomMoveTime = MPI_Wtime() - atomMoveTime
-
-      if (acceptMove .eqv. .true.) then
-        acceptTime = MPI_Wtime()
-        call updateCurrentDataStructures(movedAtom)
-        fullEnergy = fullEnergy + moveEnergy
-        acceptTime = MPI_Wtime() - acceptTime
-        rejectTime = 0d0
-        acceptMove = .false.
-      else if (acceptMove .eqv. .false.) then
-        rejectTime = MPI_Wtime()
-        call resetProposedDataStructures(movedAtom)
-        rejectTime = MPI_Wtime() - rejectTime
-        acceptTime = 0d0
-        acceptMove = .true.
-      end if
-      time = MPI_Wtime() - time
-      if (processRank .eq. root) then
-        print *, time, atomMoveTime, setTime, expTime, tripTime, partialSumTime, acceptTime, rejectTime
-      end if
-      call MPI_BARRIER(MPI_COMM_WORLD, barError)
-      deallocate(changeExpData)
-      deallocate(oldExpData)
-      deallocate(hostDists)
-      deallocate(hostIndices)
-
-    end do
+    if (acceptMove .eqv. .true.) then
+      acceptTime = MPI_Wtime()
+      call acceptMoveRoutine()
+      acceptTime = MPI_Wtime() - acceptTime
+      rejectTime = 0d0
+    else if (acceptMove .eqv. .false.) then
+      rejectTime = MPI_Wtime()
+      call rejectMoveRoutine()
+      rejectTime = MPI_Wtime() - rejectTime
+      acceptTime = 0d0
     end if
-
-    deallocate(alpha)
-    deallocate(trainData)
-
-  else
+    time = MPI_Wtime() - time
 
     if (processRank .eq. root) then
-      print *, 1, 1, 1, 1, 1, 1, 1, 1! Keeps output in format the b/marking script expects
+      print *, time, atomMoveTime, setTime, expTime, tripTime, &
+               partialSumTime, acceptTime, rejectTime
     end if
+    call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
-    do i = 1, 500
+    call deallocateMoveArrays()
 
-      !***********Toy move code***********
-      !proposedEnergyData = toyMove(currentPositionData)
-      !proposedEnergyData = toyMoveDistScatter(currentPositionData)
-      proposedEnergyData = toyMoveMinimalScatter(currentPositionData)
-
-    end do
-
-    deallocate(alpha)
-    deallocate(trainData)
-
+  end do
   end if
 
+  call deallocateArraysGP()
+
+  ! Close shared memory window and MPI
   call MPI_WIN_FREE(win,ierror)
   call MPI_FINALIZE(ierror)
 
+
   contains
 
-  double precision function checkSimBoxEnergy()
+
+  subroutine broadcastMoveData()
     implicit none
-    integer :: i
-    double precision, allocatable :: tripDist(:,:), tripEnergies_Ex(:)
 
-    allocate(tripDist(3,currentPositionData%N_tri))
-    allocate(tripEnergies_Ex(currentPositionData%N_tri))
-
-    call findTripletDistances(currentPositionData%N_a,currentPositionData%N_tri, &
-                              proposedEnergyData%triMat,proposedEnergyData%interatomicDistances, &
-                              tripDist)
-
-    do i = 1, currentPositionData%N_tri
-      tripEnergies_Ex(i) = energyCheckCalc(tripDist(:,i)) ! Energies of each triplet
-    end do
-
-    checkSimBoxEnergy = sum(tripEnergies_Ex)
+    call MPI_Bcast(movedAtom, 1, MPI_INT, root, MPI_COMM_WORLD, ierror)
+    call MPI_Bcast(proposedPositionData%posArray(movedAtom,:), 3, &
+                   MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
 
   return
-  end function checkSimBoxEnergy
+  end subroutine broadcastMoveData
+
+
+  subroutine acceptMoveRoutine()
+    implicit none
+
+    call updateCurrentDataStructures(movedAtom)
+    acceptMove = .false.
+    fullEnergy = fullEnergy + moveEnergy
+
+  return
+  end subroutine acceptMoveRoutine
+
+
+  subroutine rejectMoveRoutine()
+    implicit none
+
+    call resetProposedDataStructures(movedAtom)
+    acceptMove = .true.
+
+  return
+  end subroutine rejectMoveRoutine
+
+
+  subroutine deallocateMoveArrays()
+    implicit none
+
+    deallocate(changeExpData)
+    deallocate(oldExpData)
+    deallocate(hostDists)
+    deallocate(hostIndices)
+
+  return
+  end subroutine deallocateMoveArrays
+
+
+  subroutine deallocateArraysGP()
+    implicit none
+
+    deallocate(alpha)
+    deallocate(trainData)
+
+  return
+  end subroutine deallocateArraysGP
+
 
 end program main
 

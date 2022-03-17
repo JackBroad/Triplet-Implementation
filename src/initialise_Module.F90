@@ -143,7 +143,7 @@ subroutine initialise_Move(dMax,addSeed, mover)
     end if
   end do
   end if
-  
+
 return
 end subroutine initialise_Move
 

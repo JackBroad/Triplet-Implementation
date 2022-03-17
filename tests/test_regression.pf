@@ -21,7 +21,7 @@ module test_regression
   double precision :: E_tol=3e-5
   double precision, allocatable :: posAt(:,:), Xd(:,:)
   double precision, allocatable :: expoData(:,:,:)
-  integer, allocatable :: disMat(:,:)
+  integer, allocatable :: disMat(:,:), ij
   integer :: changedTriplets(3,6), tripIndex(6)
   integer :: n_tri, n_at, n_dist, move
 
@@ -324,18 +324,17 @@ contains
     !****** Create a simulation box and test that total energy is correct**********
     fullEnergy = getSimBoxEnergy(name)
     fullEnergy_Ex = getExpectedSimBoxEnergy(tripDist)
-    
+   
+    !================Test==================== 
     if( processRank == root) then
         @assertEqual( fullEnergy, fullEnergy_Ex, E_tol, 'Test full non-add energy')
     end if
-
 
     !*************** Now move an atom and test the revised energy*****************
     moveEnergy = getAtomMoveEnergy(1d0,seed)    
     moveEnergy_Ex = getExpectedAtomMoveEnergy(tripDist)
     expectedPosition = getExpectedPosition(move)
     expectedMove = 2
-
 
     !================Test====================
     ! Compare the two sets of triplet energies
@@ -655,7 +654,6 @@ contains
     currentPositionData = initialise_positionDataStruct(name)
     calcEnergy = tmpi_calcFullSimBoxEnergy()
     expEnergy = -2731545.8830658090_dp
-    print *, calcEnergy, expEnergy
 
     if( processRank == root) then
         @assertEqual( calcEnergy, expEnergy, E_tol, 'reg. test for Rcut=L/2')
@@ -776,7 +774,7 @@ contains
     ! Re-calculate energy using RSG's code
     do i = 1, proposedPositionData%N_tri
       calculate = checkTripletDistsUnderMIC(tripDist(:,i),proposedPositionData,triplets(1,i),triplets(2,i),triplets(3,i))
-      newTripEnergies_Ex(i) = energyCheckCalc(tripDist(:,i)) ! Energies of each triplet after move
+      newTripEnergies_Ex(i) = energyCheckCalc(tripDist(:,i))
       if (calculate .eqv. .false.) then
         newTripEnergies_Ex(i) = 0d0
       end if

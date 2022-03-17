@@ -185,7 +185,7 @@ contains
       end if
     end do
 
-    return
+  return
   end subroutine updateXdg
 
 

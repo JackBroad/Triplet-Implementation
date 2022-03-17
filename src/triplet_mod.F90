@@ -179,9 +179,6 @@ subroutine tripletEnergiesNonAdd(triData,nJob,nTP,nPerm,nArg,permMat,posData, &
 
     ! Check whether to explicitly calculate the energy for this triplet
     calculate = checkTripletDistsUnderMIC(RinVec,posData,alp,bet,gam)
-    !print *, ' '
-    !print *, calculate
-    !print *, ' '
 
     if (calculate .eqv. .true.) then
       nExplicit = nExplicit+1
@@ -206,15 +203,7 @@ subroutine tripletEnergiesNonAdd(triData,nJob,nTP,nPerm,nArg,permMat,posData, &
         alphaSum = alphaSum + (expSum*alphaVec(r))
       end do
       uVector(triInt) = sigVar * alphaSum
-      !print *, 'calculated U explicitly, restarting'
-      !print *, '============================='
-      !print *, ' '
-      !print *, ' '
     else
-      !print *, 'setting U=0 and restarting'
-      !print *, '============================='
-      !print *, ' '
-      !print *, ' '
       uVector(triInt) = 0d0
     end if
   end do
@@ -343,7 +332,7 @@ function energyCheckCalc(xStar) result(PES_GP)
      end do
   end do
   do m = 1, nPerms
-    !!print *, xTrainingPerm(:,m,3)
+    !print *, xTrainingPerm(:,m,3)
   end do
 
   kKernTotal=0
@@ -361,7 +350,7 @@ function energyCheckCalc(xStar) result(PES_GP)
   end do !Training points (i)
 
   PES_GP=kKernTotal * expVar
-!  !print *, 'Non-additive E:', PES_GP
+!  print *, 'Non-additive E:', PES_GP
 end function energyCheckCalc
 
 
@@ -377,8 +366,9 @@ end function energyCheckCalc
   return
   end subroutine updateExpMatrix
 
-  function checkTripletDistsUnderMIC(Rvec,posData,alp,bet,gam) result(explicit)
-    logical :: explicit
+  !function checkTripletDistsUnderMIC(Rvec,posData,alp,bet,gam) result(explicit)
+  logical function checkTripletDistsUnderMIC(Rvec,posData,alp,bet,gam)
+    !logical :: explicit
     integer :: alp, bet, gam, i, RminLoc, RmaxLoc
     integer :: RfixInt
     double precision :: Rvec(3), Rchange(1), alPos(3)
@@ -393,27 +383,13 @@ end function energyCheckCalc
     ! Determine largest inv distance (i.e. smallest distance) and its index in R
     RminLoc = maxloc(Rvec,dim=1)
     RmaxLoc = minloc(Rvec,dim=1)
-    !print *, 'RminLoc:',RminLoc, ' Rvec:', Rvec
-    !print *, ' '
-    !print *, Rvec(RminLoc), Rcut
-    !print *, ' '
 
     if (Rvec(RmaxLoc) .lt. Rcut) then
-      !print *, 'RmaxLoc:',RmaxLoc, ' Rvec:', Rvec
-      !print *, Rvec(RmaxLoc), Rcut
-      !print *, 'longest dist in triplet exceeds Rcut'
-      !print *, 'Setting U=0 and restarting'
-      !print *, '================================='
-      !print *, ' '
-      !print *, ' '
-      explicit = .false.
+      !explicit = .false.
+      checkTripletDistsUnderMIC = .false.
 
     ! If min distance is below Rcut then work out other dists and triplet energy
     else if (Rvec(RminLoc) .ge. Rcut) then
-      !print *, Rvec(RminLoc), '>=', Rcut
-      !print *, 'calculating if any other dist has changed'
-      !print *, ' '
-
       ! Find the atom that isn't going to be moved
       if (RminLoc .eq. 3) then
         RfixInt = bet
@@ -451,23 +427,12 @@ end function energyCheckCalc
         Rchange(1) = delX**2 + delY**2 + delZ**2
         Rchange(1) = Rchange(1)**0.5
         Rchange(1) = 1d0/Rchange(1)
-        !if (Rchange(1) .ne. Rvec(3)) then
-        !print *, 'Rchange:',Rchange(1), ' Rcut:',Rcut
-        !print *, ' '
         if (Rchange(1) .lt. Rcut) then
-          !print *, 'Rchange < Rcut'
-          !print *, 'setting U=0 and re-starting'
-          !print *, '============================='
-          !print *, ' '
-          !print *, ' '
-          explicit = .false.
+          !explicit = .false.
+          checkTripletDistsUnderMIC = .false.
         else
-          !print *, 'Rchange >= Rcut'
-          !print *, 'the following values should be the same'
-          !print *, Rchange(1), Rvec(3)
-          !print *, 'calculating U explicitly'
-          !print *, ' '
-          explicit = .true.
+          checkTripletDistsUnderMIC = .true.
+          !explicit = .true.
         end if
       else if (RfixInt .eq. bet) then
         do i = 1, 3
@@ -490,23 +455,12 @@ end function energyCheckCalc
         Rchange(1) = delX**2 + delY**2 + delZ**2
         Rchange(1) = Rchange(1)**0.5
         Rchange(1) = 1d0/Rchange(1)
-        !print *, 'Rchange:',Rchange(1), ' Rcut',Rcut
-        !print *, ' '
-        !if (Rchange(1) .ne. Rvec(2)) then
         if (Rchange(1) .lt. Rcut) then
-          !print *, 'Rchange < Rcut'
-          !print *, 'setting U=0 and re-starting'
-          !print *, '============================='
-          !print *, ' '
-          !print *, ' '
-          explicit = .false.
+          !explicit = .false.
+          checkTripletDistsUnderMIC = .false.
         else
-          !print *, 'Rchange >= Rcut'
-          !print *, 'the following values should be the same'
-          !print *, Rchange(1), Rvec(2)
-          !print *, 'calculating U explicitly'
-          !print *, ' '
-          explicit = .true.
+          !explicit = .true.
+          checkTripletDistsUnderMIC = .true.
         end if
       end if
     end if
