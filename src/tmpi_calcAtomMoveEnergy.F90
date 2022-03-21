@@ -20,7 +20,7 @@ module tmpi_calcAtomMoveEnergy_mod
   public tmpi_calcAtomMoveEnergy
 
 
-  double precision :: oldTripU, partialDeltaU, newTripU
+  double precision :: partialDeltaU
   integer, allocatable :: newExpInt(:,:)
   double precision, allocatable :: newDists(:), newUfull(:)
 
@@ -126,26 +126,22 @@ contains
     integer :: N_dists_per_proc, N_tri_per_proc
     integer, intent(in) :: mover
 
-    ! Determine which triplets have changed
+    ! Find the energies of the changed trips and the change in U over the trips
+    ! on each proc
     tripTime = MPI_Wtime()
     N_dists_per_proc = size(proposedEnergyData%processDists)
     N_tri_per_proc = size(proposedEnergyData%tripletEnergies)
     call getTripletEnergiesAtomMove(mover,N_dists_per_proc,N_tri_per_proc, &
-                                    proposedEnergyData%tripletEnergies)
-    tripTime = MPI_Wtime() - tripTime ! d
-
-    ! Find the change in U on each process
-    partialSumTime = MPI_Wtime()
-    newTripU = sum(proposedEnergyData%tripletEnergies)
-    oldTripU = sum(currentEnergyData%tripletEnergies)
-    partialDeltaU = newTripU - oldTripU
-    partialSumTime = MPI_Wtime() - partialSumTime
+                                    proposedEnergyData%tripletEnergies,&
+                                    partialDeltaU)
+    tripTime = MPI_Wtime() - tripTime - partialSumTime ! d (partial sum now done
+                                                       ! in triplet energy calc)
 
     ! Gather the change in triplet energies on the root process for summation
     gatherTime = MPI_Wtime()
     call MPI_gather(partialDeltaU, 1, MPI_DOUBLE_PRECISION, newUfull, 1, &
                     MPI_DOUBLE_PRECISION, root, MPI_COMM_WORLD, ierror)
-    gatherTime = MPI_Wtime() - gatherTime ! f = gatherTime+partialSumTime
+    gatherTime = MPI_Wtime() - gatherTime ! f = gatherTime
 
     ! Find new total non-additive energy after moving an atom
     rootSumTime = MPI_Wtime()

@@ -2,6 +2,7 @@ module toyMove_Module
   use mpi
   use mpi_variables
   use expShare_variables
+  use time_variables
   use triplet_mod
   use GP_variables, only: hyperParams,alpha,Perm,trainData,N_tp,nArgs,N_p
   use energiesData_Module, only: energiesData
@@ -15,9 +16,7 @@ module toyMove_Module
   implicit none
 
   integer :: triPerAt, nTriMax, nTriRe,triPerProc, j, counter
-  double precision :: totTime, moveTime, expTime, sumTime, setTime
-  double precision :: gatherTripTime, xTime, shareExpTime, tripTime
-  double precision :: extractTime
+  double precision :: gatherTripTime, shareExpTime
   type (energiesData) :: toyEnergyData
   type (positionData) :: movePositionData
   integer, allocatable :: changedTriplets(:,:), tripIndex(:)

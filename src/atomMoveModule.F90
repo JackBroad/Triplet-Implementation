@@ -2,6 +2,7 @@ module atomMoveModule
   !use mpi
   use GP_variables
   use mpi_variables
+  use time_variables
   use expShare_variables
   use pbcAndMic_variables
   use dataStructure_variables
@@ -14,16 +15,19 @@ module atomMoveModule
 contains
 
 
-  subroutine getTripletEnergiesAtomMove(move,nDists,nTrips, uVec)
+  subroutine getTripletEnergiesAtomMove(move,nDists,nTrips, uVec,deltaU)
     implicit none
     integer :: i, j, counter, al, be, triplet(3)
     integer :: tmpChangedTri(nTrips), sizeCounter
-    double precision :: U(1)
+    double precision :: U(1), dummyTime
     integer, intent(in) :: move, nDists, nTrips
+    double precision, intent(out) :: deltaU
     double precision, intent(inout) :: uVec(nTrips)
 
     counter = 0
     sizeCounter = 0
+    deltaU = 0d0
+    partialSumTime = 0d0
     do i = 1, nDists
       al = proposedEnergyData%alphaBetaPairs(i,1)
       be = proposedEnergyData%alphaBetaPairs(i,2)
@@ -36,6 +40,11 @@ contains
                                    expArray,alpha,hyperParams(2), &
                                    proposedEnergyData, U)
         uVec(counter) = U(1)
+        dummyTime = MPI_Wtime()
+        deltaU = deltaU + (uVec(counter) - currentEnergyData%&
+                 tripletEnergies(counter))
+        dummyTime = MPI_Wtime() - dummyTime
+        partialSumTime = partialSumTime + dummyTime
         tmpChangedTri(sizeCounter) = counter
         counter = counter + (proposedPositionData%N_a - move)
       else if ( (al .eq. move) .or. (be .eq. move) ) then
@@ -48,6 +57,11 @@ contains
                                      expArray,alpha,hyperParams(2), &
                                      proposedEnergyData, U)
           uVec(counter) = U(1)
+          dummyTime = MPI_Wtime()
+          deltaU = deltaU + (uVec(counter) - currentEnergyData%&
+                   tripletEnergies(counter))
+          dummyTime = MPI_Wtime() - dummyTime
+          partialSumTime = partialSumTime + dummyTime
           tmpChangedTri(sizeCounter) = counter
         end do
       else
