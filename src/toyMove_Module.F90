@@ -67,8 +67,8 @@ contains
       deallocate(changeExpData)
     end if
     allocate(changeExpData(nArgs,N_tp,nChangedDists))
-    call calculateExponentialsNonAdd(nChangedDists,N_tp,nArgs,trainData, &
-                                     hyperParams(1),newDists, changeExpData)
+    call calcChangedExposNonAdd(nChangedDists,N_tp,nArgs,trainData, &
+                                hyperParams(1),newDists, changeExpData)
     call updateExpMatrix(changeExpData,newExpInt,nChangedDists)
 
     ! Find no. of triplets per proc

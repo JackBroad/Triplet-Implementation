@@ -48,7 +48,7 @@ contains
     ! Calculate exponentials and assign distances to each proc
     expTime = MPI_Wtime()
     call setUpExpCalculation()
-    call calcAllExposNonAddSharedMem(N_tp,nArgs,trainData,hyperParams(1))
+    call calcAllExposNonAdd(N_tp,nArgs,trainData,hyperParams(1))
     call MPI_WIN_FENCE(0,win,ierror)
     expTime = MPI_Wtime() - expTime
 
@@ -121,7 +121,6 @@ contains
     allocate(currentEnergyData%alphaBetaPairs(N_dists_per_proc,2))
     currentEnergyData%alphaBetaPairs = getAlphaBetaPairs(N_dists_per_proc, &
                                                          currentEnergyData%interatomicDistances)
-
 
     ! Allocate pairs to hosts such that each node will have a full exp array
     ! shared between its hosts
@@ -212,15 +211,6 @@ contains
 
     if (textOutput) then
 
-       !print *, "The time taken for the exponentials was", expTime, "seconds"
-       !print *, "The time taken for the sum was", sumTime, "seconds"
-       !print *, "The time taken to set up was", setUpTime, "seconds"
-       !print *, "The total time for the program to run was", totTime, "seconds"
-       !print *, ' '
-       !print *, 'Non-additive calculation for full sim box complete'
-       !print *, '========================'
-       !print *, ' '
-       !print *, ' '
        print *, totTime, setUpTime, expTime, sumTime, partTime, shareTime, rootTime, dataTime
 
     end if

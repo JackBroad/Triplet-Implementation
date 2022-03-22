@@ -26,6 +26,7 @@ contains
 
     counter = 0
     sizeCounter = 0
+    nExplicit = 0
     deltaU = 0d0
     partialSumTime = 0d0
     do i = 1, nDists

@@ -186,6 +186,7 @@ function getTripletEnergiesFullBox(nDists,nTrips) result(uVec)
   integer :: i, j, al, be, counter
   double precision :: U(1), uVec(nTrips)
 
+  nExplicit = 0
   counter = 0
   do i = 1, nDists
     al = currentEnergyData%alphaBetaPairs(i,1)

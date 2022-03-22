@@ -107,8 +107,8 @@ contains
       deallocate(oldExpData)
     end if
     allocate(oldExpData(N_tp,nArgs,N_changed_exp_per_host))
-    call calculateExponentialsNonAdd(N_changed_exp_per_host,N_tp,nArgs,trainData, &
-                                     hyperParams(1),hostDists, changeExpData)
+    call calcChangedExposNonAdd(N_changed_exp_per_host,N_tp,nArgs,trainData, &
+                                hyperParams(1),hostDists, changeExpData)
     call MPI_WIN_FENCE(0,win,ierror)
 
     ! Update exp array separately on each host using the exps they calculated

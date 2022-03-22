@@ -153,9 +153,7 @@ contains
     call makeDisIntMatNonAdd(n_at, disMat)
 
     if( processRank == root ) then
-
       @assertEqual(disMat, disMat_Ex, 'Test disIntMat')
-
     end if
 
   end subroutine test_disIntMat
@@ -185,7 +183,7 @@ contains
 
 
   @test
-  subroutine test_exp_calc()
+  subroutine test_changed_exp_calc()
     implicit none
     integer :: nDists=3
     double precision :: expSlice_Ex(nArgs,3)
@@ -193,8 +191,28 @@ contains
 
     allocate(expoData(N_tp,nArgs,3))
 
+    ! Set Rcut
+    Rcut = 1d0/2d0
+
     ! All distances in test triplet are 3 A
     dists = (/ 1d0/3d0,1d0/3d0,1d0/3d0 /)
+
+    ! Pre-calculated exponenitals for dists with first TP
+    expSlice_Ex(1,:) = (/ 0d0,0d0,0d0 /)
+    expSlice_Ex(2,:) = (/ 0d0,0d0,0d0 /)
+    expSlice_Ex(3,:) = (/ 0d0,0d0,0d0 /)
+
+    ! Re-calculate exps
+    call calcChangedExposNonAdd(nDists,N_tp,nArgs,trainData,hyperParams(1), &
+                                dists, expoData)
+    expSlice = expoData(1,:,:)
+
+    if( processRank == root) then
+      @assertEqual(expSlice, expSlice_Ex, low_tol, 'Test exponential calc Rcut=0.5')
+    end if
+
+    ! Re-set cut-off distance
+    Rcut = 1d0/4d0
 
     ! Pre-calculated exponenitals for dists with first TP
     expSlice_Ex(1,:) = (/ 0.5039746,0.5039746,0.5039746 /)
@@ -202,19 +220,17 @@ contains
     expSlice_Ex(3,:) = (/ 0.1450487,0.1450487,0.1450487 /)
 
     ! Calculate exponentials w/ appropriate subroutine
-    call calculateExponentialsNonAdd(nDists,N_tp,nArgs,trainData,hyperParams(1), &
-                                     dists, expoData)
+    call calcChangedExposNonAdd(nDists,N_tp,nArgs,trainData,hyperParams(1), &
+                                dists, expoData)
 
     ! Take slice of expoData which has exps with first TP
     expSlice = expoData(1,:,:)
 
     if( processRank == root) then
-
-      @assertEqual(expSlice, expSlice_Ex, low_tol, 'Test exponential calc')
-
+      @assertEqual(expSlice, expSlice_Ex, low_tol, 'Test exponential calc Rcut=0.25')
     end if
 
-  end subroutine test_exp_calc
+  end subroutine test_changed_exp_calc
 
 
   @test

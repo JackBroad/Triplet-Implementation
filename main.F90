@@ -74,6 +74,7 @@ program main
     end if
     time = MPI_Wtime() - time
 
+    call MPI_BARRIER(MPI_COMM_WORLD, barError)
     if (processRank .eq. root) then
       print *, time, atomMoveTime, setTime, expTime, tripTime, &
                partialSumTime, acceptTime, rejectTime

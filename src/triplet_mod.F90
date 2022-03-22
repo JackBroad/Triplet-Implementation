@@ -82,8 +82,8 @@ end subroutine getVarrays
 
 
 ! Calculates the exponentials required to find the non-additive energy
-subroutine calculateExponentialsNonAdd(nJobs,nTP,nArguments,trainingData, &
-                                       lengthscale,dists, exponentials)
+subroutine calcChangedExposNonAdd(nJobs,nTP,nArguments,trainingData, &
+                                  lengthscale,dists, exponentials)
   implicit none
   integer, intent(in) :: nJobs, nTP, nArguments
   double precision, intent(in) :: trainingData(nTP,nArguments)
@@ -93,9 +93,11 @@ subroutine calculateExponentialsNonAdd(nJobs,nTP,nArguments,trainingData, &
   double precision :: expon, num, denom
 
   do i = 1, nJobs
+    if (dists(i) .lt. Rcut) then
+      exponentials(1:nTP,1:nArguments,i) = 0d0
+    else
       do j = 1, nTP
         do k = 1, nArguments
-
           num = dists(i) - trainingData(j,k)
           num = num**2
 
@@ -104,16 +106,16 @@ subroutine calculateExponentialsNonAdd(nJobs,nTP,nArguments,trainingData, &
 
           expon = num / denom
           exponentials(j,k,i) = exp(-1*expon)
-
+        end do
       end do
-    end do
+    end if
   end do
 
 return
-end subroutine calculateExponentialsNonAdd
+end subroutine calcChangedExposNonAdd
 
 
-subroutine calcAllExposNonAddSharedMem(nTP,nArguments,trainingData,lengthscale)
+subroutine calcAllExposNonAdd(nTP,nArguments,trainingData,lengthscale)
   implicit none
   integer, intent(in) :: nTP, nArguments
   double precision, intent(in) :: trainingData(nTP,nArguments)
@@ -127,6 +129,9 @@ subroutine calcAllExposNonAddSharedMem(nTP,nArguments,trainingData,lengthscale)
     atOne = fullHostInds(i,1)
     atTwo = fullHostInds(i,2)
     distIndex = currentEnergyData%distancesIntMat(atOne,atTwo)
+    if (currentEnergyData%interatomicDistances(atOne,atTwo) .lt. Rcut) then
+      expArray(1:nTP,1:nArguments,distIndex) = 0d0
+    else
       do j = 1, nTP
         do k = 1, nArguments
           num = dist - trainingData(j,k)
@@ -137,12 +142,13 @@ subroutine calcAllExposNonAddSharedMem(nTP,nArguments,trainingData,lengthscale)
 
           expon = num / denom
           expArray(j,k,distIndex) = exp(-1*expon)
+        end do
       end do
-    end do
+    end if
   end do
 
 return
-end subroutine calcAllExposNonAddSharedMem
+end subroutine calcAllExposNonAdd
 
 
 ! Calculates the non-additive energy for each triplet in the cluster
@@ -182,6 +188,7 @@ subroutine tripletEnergiesNonAdd(triData,nJob,nTP,nPerm,nArg,permMat,posData, &
 
     if (calculate .eqv. .true.) then
       nExplicit = nExplicit+1
+
       ! Need to add to alpha sum for each TP so set to zero out of TP loop
       alphaSum = 0
       do r = 1, nTP
@@ -385,7 +392,6 @@ end function energyCheckCalc
     RmaxLoc = minloc(Rvec,dim=1)
 
     if (Rvec(RmaxLoc) .lt. Rcut) then
-      !explicit = .false.
       checkTripletDistsUnderMIC = .false.
 
     ! If min distance is below Rcut then work out other dists and triplet energy
@@ -428,11 +434,9 @@ end function energyCheckCalc
         Rchange(1) = Rchange(1)**0.5
         Rchange(1) = 1d0/Rchange(1)
         if (Rchange(1) .lt. Rcut) then
-          !explicit = .false.
           checkTripletDistsUnderMIC = .false.
         else
           checkTripletDistsUnderMIC = .true.
-          !explicit = .true.
         end if
       else if (RfixInt .eq. bet) then
         do i = 1, 3
@@ -456,10 +460,8 @@ end function energyCheckCalc
         Rchange(1) = Rchange(1)**0.5
         Rchange(1) = 1d0/Rchange(1)
         if (Rchange(1) .lt. Rcut) then
-          !explicit = .false.
           checkTripletDistsUnderMIC = .false.
         else
-          !explicit = .true.
           checkTripletDistsUnderMIC = .true.
         end if
       end if

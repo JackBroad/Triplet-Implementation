@@ -21,7 +21,7 @@ end module mpi_variables
 module pbcAndMic_variables
   implicit none
 
-  integer :: nExplicit = 0
+  integer :: nExplicit
   logical :: calculate
   double precision :: sideLength, Rcut
 
