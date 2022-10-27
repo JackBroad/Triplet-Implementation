@@ -669,14 +669,14 @@ contains
     ! Get energy of sim. box with Rcut = L/2
     currentPositionData = initialise_positionDataStruct(name)
     calcEnergy = tmpi_calcFullSimBoxEnergy()
-    expEnergy = -2731545.8830658090_dp
+    expEnergy = -2731545.8830658090_dp-1.4240756497706342E-004 ! Take away pre-calculated 2-body LRC
 
     if( processRank == root) then
         @assertEqual( calcEnergy, expEnergy, E_tol, 'reg. test for Rcut=L/2')
     end if
 
     ! Get energy of sim. box with Rcut = L/3
-    expEnergy = 164016.06888115572_dp
+    expEnergy = 164016.06888115572_dp-4.8062553179758897E-004
     currentPositionData = initialise_positionDataStruct(name)
     Rcut = sideLength/3d0
     Rcut = 1d0/Rcut
@@ -688,7 +688,7 @@ contains
     end if
 
     ! Get energy of sim. box with Rcut = L/4
-    expEnergy = 22111.252512911848_dp
+    expEnergy = 22111.252512911848_dp-1.1392605198165073E-003
     currentPositionData = initialise_positionDataStruct(name)
     Rcut = sideLength/4d0
     Rcut = 1d0/Rcut
@@ -700,7 +700,7 @@ contains
     end if
 
     ! Get energy of sim. box with Rcut = L/5
-    expEnergy = 962.20097527586915_dp
+    expEnergy = 962.20097527586915_dp-2.2251182027666146E-003
     currentPositionData = initialise_positionDataStruct(name)
     Rcut = sideLength/5d0
     Rcut = 1d0/Rcut
@@ -711,6 +711,29 @@ contains
         @assertEqual( calcEnergy, expEnergy, E_tol, 'reg. test for Rcut=L/5')
     end if
   end subroutine test_energy_at_varied_Rcut
+
+  @test
+  subroutine test_twoBody_LRC()
+    implicit none
+    real(dp) :: energy, energy_ex
+
+    ! Set-up parameters
+    Rcut = 1d0/9d0
+    sideLength = 18d0
+    currentPositionData%N_a = 500
+
+    ! Set expected energy
+    energy_ex = -0.00070002297
+
+    ! Calculate energy
+    energy = calculateTwoBodyLRC()
+
+    ! Run test
+    if( processRank == root) then
+        @assertEqual(energy,energy_ex,E_tol,'reg test for two-body LRC')
+    end if
+
+  end subroutine test_twoBody_LRC
 
   !===========================================================================================
   @test

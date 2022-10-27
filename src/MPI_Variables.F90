@@ -24,6 +24,10 @@ module pbcAndMic_variables
   integer :: nExplicit
   logical :: calculate
   double precision :: sideLength, Rcut
+  double precision :: density
+  integer, parameter :: dp = SELECTED_REAL_KIND(15)
+  double precision, allocatable :: typeTwoTable(:,:)
+  double precision, allocatable :: typeThreeTable(:,:)
 
 end module pbcAndMic_variables
 

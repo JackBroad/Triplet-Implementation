@@ -59,7 +59,7 @@ contains
 
 
     ! Final asserts
-    call finalAsserts(proposedPositionData%N_a)
+    !call finalAsserts(proposedPositionData%N_a)
 
   return
   end function tmpi_calcAtomMoveEnergy

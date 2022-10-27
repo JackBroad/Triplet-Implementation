@@ -14,17 +14,19 @@ program main
   use updateData
   use assert_module
   use initialise_Module
+  use threeBody_mod
   implicit none
 
 
-  integer :: movedAtom, i
+  integer :: movedAtom, i, j
   logical :: setSeed=.false., acceptMove=.true., moveFlag=.true.
+  real(dp) :: two_body_LR_correction
   double precision :: dist, time, fullEnergy, moveEnergy, check
   double precision :: atomMoveTime, acceptTime, rejectTime
   Character(len=300) :: hyperParametersFile = 'hyperParam.txt'
   Character(len=300) :: alphaFile = 'alpha.txt'
   Character(len=300) :: trainingSetFile = 'trainingSet.txt'
-  Character(len=300) :: positionFile = 'AtomicPositions500SL=18.txt'
+  Character(len=300) :: positionFile = 'AtomicPositions124SL=18.txt'
 
 
   ! Set up MPI 
@@ -45,8 +47,17 @@ program main
   ! Set step-size for atom-move calc
   dist = 2d0
 
-  ! Calculate energy for full sim box
+  !typeTwoTable = threeBodyLRC_getTypeTwoTable(1000,1000,3,1d0)
+  !if (processRank .eq. root) then
+  !do i = 1, 3000000
+  !  print *, typeTwoTable(i,:)
+  !end do
+  !print *, ' '
+  !end if
+
+  ! Calculate non-additive energy for full sim box
   fullEnergy = tmpi_calcFullSimBoxEnergy()
+  nExplicit = 0
   call MPI_BARRIER(MPI_COMM_WORLD, barError)
 
   ! Atom move
@@ -57,9 +68,9 @@ program main
     time = MPI_Wtime()
     atomMoveTime = MPI_Wtime()
     call broadcastMoveData()
+    atomMoveTime = MPI_Wtime() - atomMoveTime
 
     moveEnergy = tmpi_calcAtomMoveEnergy(movedAtom)
-    atomMoveTime = MPI_Wtime() - atomMoveTime
 
     if (acceptMove .eqv. .true.) then
       acceptTime = MPI_Wtime()
@@ -76,8 +87,9 @@ program main
 
     call MPI_BARRIER(MPI_COMM_WORLD, barError)
     if (processRank .eq. root) then
-      print *, time, atomMoveTime, setTime, expTime, tripTime, &
-               partialSumTime, acceptTime, rejectTime
+      print *, time, setTime, expTime, tripTime, &
+               partialSumTime, gatherTime, atomMoveTime, &
+               acceptTime+rejectTime
     end if
     call MPI_BARRIER(MPI_COMM_WORLD, barError)
 

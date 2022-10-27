@@ -21,9 +21,11 @@ module tmpi_calcFullSimBoxEnergy_mod
 
 
   integer :: N_dists_per_proc, N_tri_per_proc
+  real(dp) :: two_body_LR_correction
   double precision :: totTime, setUpTime, expTime
   double precision :: shareTime, rootTime, dataTime
   double precision :: sumTime, partTime, partialU
+  double precision :: tbTime
   integer, allocatable :: scounts(:), displs(:)
   integer, allocatable :: UD_inds(:,:)
   double precision, allocatable :: UD_dg(:)
@@ -56,7 +58,15 @@ contains
 
     call getPartialSums()
 
-    call getTotalBoxEnergy()
+    call getTotalBoxEnergyNonAdd()
+
+    ! Calculate two-body LR correction and add it to Utotal
+    tbTime = MPI_Wtime()
+    two_body_LR_correction = calculateTwoBodyLRC()
+    currentEnergyData%Utotal = currentEnergyData%Utotal + &
+                               two_body_LR_correction
+    tbTime = MPI_Wtime() - tbTime
+
     tmpi_calcFullSimBoxEnergy = currentEnergyData%Utotal
 
     call deallocateLocalArrays()
@@ -64,11 +74,12 @@ contains
     dataTime = MPI_Wtime()
     call instantiateProposedDataStructs()
     dataTime = MPI_Wtime() - dataTime
+    dataTime = dataTime+tbTime
 
     totTime = MPI_Wtime() - totTime
 
     if (processRank .eq. root) then
-       call finalTextOutput() ! Prints times taken by each segment of code
+       !call finalTextOutput() ! Prints times taken by each segment of code
     end if
 
     call finalAsserts(currentPositionData%N_a)
@@ -229,7 +240,7 @@ contains
   end subroutine getPartialSums
 
 
-  subroutine getTotalBoxEnergy()
+  subroutine getTotalBoxEnergyNonAdd()
     implicit none
 
     shareTime = MPI_Wtime()
@@ -245,7 +256,7 @@ contains
     rootTime = MPI_Wtime() - rootTime
 
   return
-  end subroutine getTotalBoxEnergy
+  end subroutine getTotalBoxEnergyNonAdd
 
 
   subroutine findTripletEnergies()

@@ -18,6 +18,8 @@ else:
   nProcs = nProcs + 1
 fullBoxMat = np.zeros((iMax+1,8)) # 4
 atomMoveMat = np.zeros((iMax+1,8)) # 4
+atomMoveTriplets = np.zeros(iMax+1)
+fullBoxTriplets = np.zeros(iMax+1)
 
 # Loop over number of processes, extracting all data from appropriate output file
 counter = 0
@@ -31,37 +33,49 @@ for i in range (1,iMax+1):
     data = data.values
     nData = len(data)
     fullBoxMat[counter,:] = data[0,:]
+    fullBoxTriplets[counter] = fullBoxMat[counter,3]+fullBoxMat[counter,4]+fullBoxMat[counter,5]
     atomMoveData = data[1:nData,:]
     atomMoveData = np.sum(atomMoveData,axis=0)
     atomMoveMat[counter,:] = atomMoveData
+    atomMoveTriplets[counter] = atomMoveMat[counter,3]+atomMoveMat[counter,4]+atomMoveMat[counter,5]
     counter = counter + 1
     if (maxNodes > 1):
       data = pa.read_csv(str(num)+string,  delim_whitespace=True, header=None)
       data = data.values
       nData = len(data)
       fullBoxMat[counter,:] = data[0,:]
+      fullBoxTriplets[counter] = fullBoxMat[counter,3]+fullBoxMat[counter,4]+fullBoxMat[counter,5]
       atomMoveData = data[1:nData,:]
       atomMoveData = np.sum(atomMoveData,axis=0)
       atomMoveMat[counter,:] = atomMoveData
+      atomMoveTriplets[counter] = atomMoveMat[counter,3]#+atomMoveMat[counter,4]+atomMoveMat[counter,5]
       counter = counter + 1
   else:
     data = pa.read_csv(str(num)+string,  delim_whitespace=True, header=None)
     data = data.values
     nData = len(data)
     fullBoxMat[counter,:] = data[0,:]
+    fullBoxTriplets[counter] = fullBoxMat[counter,3]+fullBoxMat[counter,4]+fullBoxMat[counter,5]
     atomMoveData = data[1:nData,:]
     atomMoveData = np.sum(atomMoveData,axis=0)
     atomMoveMat[counter,:] = atomMoveData
+    atomMoveTriplets[counter] = atomMoveMat[counter,3]#+atomMoveMat[counter,4]+atomMoveMat[counter,5]
     counter = counter + 1
 
 fullT0 = fullBoxMat[0,0]
 moveT0 = atomMoveMat[0,0]
+tripT0 = atomMoveTriplets[0]
+fTripT0 = fullBoxTriplets[0]
 for j in range (0,iMax+1):
   fullBoxMat[j,0]=fullT0/fullBoxMat[j,0]
   atomMoveMat[j,0]=moveT0/atomMoveMat[j,0]
+  atomMoveTriplets[j] = tripT0/atomMoveTriplets[j]
+  fullBoxTriplets[j] = fTripT0/fullBoxTriplets[j]
 
 fullT0 = int(fullT0)
 moveT0 = int(moveT0)
+tripT0 = int(tripT0)
+fTripT0 = int(fTripT0)
 
 # Set font sizes for figure
 SMALL_SIZE = 17
@@ -92,3 +106,21 @@ mp.xlabel(r"$N_{p}}$")
 mp.ylabel(r"t$_1$ / t$_{N_{p}}$")
 mp.legend(loc="upper left")
 mp.savefig(dirString+'/'+'atomMoveSpeedUp.pdf',bbox_inches = "tight")
+
+figgg=mp.figure()
+ax3=figgg.add_subplot(111)
+ax3.scatter(nProcs,atomMoveTriplets,s=75,c="g",marker="o",label=r"t$_1$ = "+str(tripT0)+" s")
+mp.grid()
+mp.xlabel(r"$N_\mathrm{p}}$")
+mp.ylabel(r"t$_1$ / t$_{N_{\mathrm{p}}}$")
+mp.legend(loc="upper left")
+mp.savefig(dirString+'/'+'tripSumMoveSpeedUp.pdf',bbox_inches = "tight")
+
+figggg=mp.figure()
+ax4=figggg.add_subplot(111)
+ax4.scatter(nProcs,fullBoxTriplets,s=75,c="g",marker="o",label=r"t$_1$ = "+str(fTripT0)+" s")
+mp.grid()
+mp.xlabel(r"$N_\mathrm{p}}$")
+mp.ylabel(r"t$_1$ / t$_{N_{\mathrm{p}}}$")
+mp.legend(loc="upper left")
+mp.savefig(dirString+'/'+'tripSumFullBoxSpeedUp.pdf',bbox_inches = "tight")
