@@ -18,3 +18,15 @@ tmp*
 *.a
 *-data.txt
 *.err
+Move_Max-Min_Ncalc_Np=15.pdf
+Move_Max-Min_ttrip_Np=15.pdf
+N_calc-vs-R_cut.pdf
+OMP-MPI/
+calcsPerProc/
+myJob.she
+nExplicitPlot.py
+nTripPlot.py
+nTrips.pdf
+propCalculatedData/
+typeTwoIntegralData/
+withVersusWithoutConditionsPlot.py
