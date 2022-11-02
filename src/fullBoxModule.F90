@@ -317,4 +317,30 @@ return
 end function getAlphaBetaPairs
 
 
+real(dp) function calculateTwoBodyLRC()
+  implicit none
+  real(dp) :: Rcut_au, density_au
+  real(dp) :: Ar_disp_coeff = 65.8245721125
+  real(dp) :: pi = 3.1415926535897932
+
+  ! Convert cut-off distance to a.u.
+  Rcut_au = 1_dp/Rcut ! in Angstroms
+  Rcut_au = Rcut_au * 1.88973_dp ! in a.u.
+
+  ! Calculate number density of atoms in box (in atoms per A^-3)
+  density = currentPositionData%N_a / (sideLength**3_dp)
+
+  ! Convert density to a.u.
+  density_au = density * (1.88973_dp**(-3_dp))
+
+  ! Calculate LR correction for two-body interactions
+  calculateTwoBodyLRC = -1_dp * (4d0/3d0) * pi
+  calculateTwoBodyLRC = calculateTwoBodyLRC * density_au
+  calculateTwoBodyLRC = calculateTwoBodyLRC * Ar_disp_coeff
+  calculateTwoBodyLRC = calculateTwoBodyLRC * (Rcut_au**(-3_dp))
+
+return
+end function calculateTwoBodyLRC
+
+
 end module fullBoxModule

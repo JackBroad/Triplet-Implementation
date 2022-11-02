@@ -79,7 +79,7 @@ contains
     totTime = MPI_Wtime() - totTime
 
     if (processRank .eq. root) then
-       !call finalTextOutput() ! Prints times taken by each segment of code
+       call finalTextOutput() ! Prints times taken by each segment of code
     end if
 
     call finalAsserts(currentPositionData%N_a)

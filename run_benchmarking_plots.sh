@@ -18,6 +18,7 @@ module load matplotlib/3.2.1-intel-2020a-Python-3.8.2
 
 # Call the plotting script
 python benchmarkPlots.py $maxProcessors $maxNodes $dirName
+python contribPlot.py $maxProcessors $maxNodes $dirName
 
 # Unload all modules and re-load those used by the tmpi code only
 module purge

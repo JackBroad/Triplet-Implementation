@@ -33,33 +33,33 @@ for i in range (1,iMax+1):
     data = data.values
     nData = len(data)
     fullBoxMat[counter,:] = data[0,:]
-    fullBoxTriplets[counter] = fullBoxMat[counter,3]#+fullBoxMat[counter,4]+fullBoxMat[counter,5]
+    fullBoxTriplets[counter] = fullBoxMat[counter,3]+fullBoxMat[counter,4]+fullBoxMat[counter,5]
     atomMoveData = data[1:nData,:]
     atomMoveData = np.sum(atomMoveData,axis=0)
     atomMoveMat[counter,:] = atomMoveData
-    atomMoveTriplets[counter] = atomMoveMat[counter,3]#+atomMoveMat[counter,4]+atomMoveMat[counter,5]
+    atomMoveTriplets[counter] = atomMoveMat[counter,3]+atomMoveMat[counter,4]+atomMoveMat[counter,5]
     counter = counter + 1
     if (maxNodes > 1):
       data = pa.read_csv(str(num)+string,  delim_whitespace=True, header=None)
       data = data.values
       nData = len(data)
       fullBoxMat[counter,:] = data[0,:]
-      fullBoxTriplets[counter] = fullBoxMat[counter,3]#+fullBoxMat[counter,4]+fullBoxMat[counter,5]
+      fullBoxTriplets[counter] = fullBoxMat[counter,3]+fullBoxMat[counter,4]+fullBoxMat[counter,5]
       atomMoveData = data[1:nData,:]
       atomMoveData = np.sum(atomMoveData,axis=0)
       atomMoveMat[counter,:] = atomMoveData
-      atomMoveTriplets[counter] = atomMoveMat[counter,3]#+atomMoveMat[counter,4]+atomMoveMat[counter,5]
+      atomMoveTriplets[counter] = atomMoveMat[counter,3]+atomMoveMat[counter,4]+atomMoveMat[counter,5]
       counter = counter + 1
   else:
     data = pa.read_csv(str(num)+string,  delim_whitespace=True, header=None)
     data = data.values
     nData = len(data)
     fullBoxMat[counter,:] = data[0,:]
-    fullBoxTriplets[counter] = fullBoxMat[counter,3]#+fullBoxMat[counter,4]+fullBoxMat[counter,5]
+    fullBoxTriplets[counter] = fullBoxMat[counter,3]+fullBoxMat[counter,4]+fullBoxMat[counter,5]
     atomMoveData = data[1:nData,:]
     atomMoveData = np.sum(atomMoveData,axis=0)
     atomMoveMat[counter,:] = atomMoveData
-    atomMoveTriplets[counter] = atomMoveMat[counter,3]#+atomMoveMat[counter,4]+atomMoveMat[counter,5]
+    atomMoveTriplets[counter] = atomMoveMat[counter,3]+atomMoveMat[counter,4]+atomMoveMat[counter,5]
     counter = counter + 1
 
 fullT0 = fullBoxMat[0,0]
@@ -79,6 +79,7 @@ moveT0 = int(moveT0)
 tripT0 = int(tripT0)
 fTripT0 = int(fTripT0)
 '''
+#print(fullT0)#+' '+moveT0+' '+tripT0+' '+fTripT0)
 
 # Set font sizes for figure
 SMALL_SIZE = 17
@@ -92,7 +93,7 @@ mp.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 mp.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 
 # Plot the data
-a,b = np.polyfit(nProcs[0:3],fullBoxMat[0:3,0],1)
+a,b = np.polyfit(nProcs[0:5],fullBoxMat[0:5,0],1)
 print(a,b)
 aStr=str(round(a,2))
 bStr=str(round(b,2))
@@ -100,34 +101,31 @@ strFullT0=str(round(fullT0,2))
 fig=mp.figure()
 ax1=fig.add_subplot(111)
 ax1.scatter(nProcs,fullBoxMat[:,0],s=75,c="g",marker="o",label=r"t$_1$="+strFullT0+" s")
-ax1.scatter(nProcs[1],fullBoxMat[1,0],s=75,c="r",marker="o")
-ax1.scatter(nProcs[2],fullBoxMat[2,0],s=75,c="r",marker="o")
-ax1.scatter(nProcs[4],fullBoxMat[4,0],s=75,c="r",marker="o")
-ax1.scatter(nProcs[8],fullBoxMat[8,0],s=75,c="r",marker="o")
-ax1.scatter(nProcs[16],fullBoxMat[16,0],s=75,c="r",marker="o")
 ax1.plot(nProcs,a*nProcs+b,c='r',label=aStr+r"$x$"+r"+"+bStr)
+mp.ylim(0,25)
 mp.grid()
 mp.xlabel(r"$N_{p}}$")
 mp.ylabel(r"t$_1$ / t$_{N_{p}}$")
 mp.legend(loc="upper left")
-mp.savefig(dirString+'/'+'fullBoxSpeedUpHighlight_Np-120_normDens.pdf',bbox_inches = "tight")
+mp.savefig(dirString+'/'+'fullBoxSpeedUpConds_Np-40_normDens.pdf',bbox_inches = "tight")
 
-a,b = np.polyfit(nProcs[0:3],atomMoveMat[0:3,0],1)
+a,b = np.polyfit(nProcs[0:5],atomMoveMat[0:5,0],1)
 print(a,b)
 aStr=str(round(a,2))
 bStr=str(round(b,2))
-strMoveT0=str(round(fullT0,2))
+strMoveT0=str(round(moveT0,2))
 figg=mp.figure()
 ax2=figg.add_subplot(111)
 ax2.scatter(nProcs,atomMoveMat[:,0],s=75,c="g",marker="o",label=r"t$_1$="+strMoveT0+" s")
 ax2.plot(nProcs,a*nProcs+b,c='r',label=aStr+r"$x$"+r"+"+bStr)
+#mp.ylim(0,25)
 mp.grid()
 mp.xlabel(r"$N_{p}}$")
 mp.ylabel(r"t$_1$ / t$_{N_{p}}$")
 mp.legend(loc="upper left")
-mp.savefig(dirString+'/'+'atomMoveSpeedUpConds_Np-120_normDens.pdf',bbox_inches = "tight")
+mp.savefig(dirString+'/'+'atomMoveSpeedUpConds_Np-40_normDens.pdf',bbox_inches = "tight")
 
-a,b = np.polyfit(nProcs[0:6],atomMoveTriplets[0:6],1)
+a,b = np.polyfit(nProcs[0:5],atomMoveTriplets[0:5],1)
 print(a,b)
 aStr=str(round(a,2))
 bStr=str(round(b,2))
@@ -136,13 +134,14 @@ figgg=mp.figure()
 ax3=figgg.add_subplot(111)
 ax3.scatter(nProcs,atomMoveTriplets,s=75,c="g",marker="o",label=r"t$_1$="+strTripT0+" s")
 ax3.plot(nProcs,a*nProcs+b,c='r',label=aStr+r"$x$"+r"+"+bStr)
+#mp.ylim(0,40)
 mp.grid()
 mp.xlabel(r"$N_\mathrm{p}}$")
 mp.ylabel(r"t$_1$ / t$_{N_{\mathrm{p}}}$")
 mp.legend(loc="upper left")
-mp.savefig(dirString+'/'+'tripSumMoveSpeedUp_Np-120_normDens.pdf',bbox_inches = "tight")
+mp.savefig(dirString+'/'+'calc-barrier_moveSpeedUp_normDens.pdf',bbox_inches = "tight")
 
-a,b = np.polyfit(nProcs[0:3],fullBoxTriplets[0:3],1)
+a,b = np.polyfit(nProcs[0:5],fullBoxTriplets[0:5],1)
 print(a,b)
 aStr=str(round(a,2))
 bStr=str(round(b,2))
@@ -151,8 +150,9 @@ figggg=mp.figure()
 ax4=figggg.add_subplot(111)
 ax4.scatter(nProcs,fullBoxTriplets,s=75,c="g",marker="o",label=r"t$_1$="+strFTripT0+" s")
 ax4.plot(nProcs,a*nProcs+b,c='r',label=aStr+r"$x$"+r"+"+bStr)
+#mp.ylim(0,40)
 mp.grid()
 mp.xlabel(r"$N_\mathrm{p}}$")
 mp.ylabel(r"t$_1$ / t$_{N_{\mathrm{p}}}$")
 mp.legend(loc="upper left")
-mp.savefig(dirString+'/'+'tripFullBoxSpeedUp_Np-120_normDens.pdf',bbox_inches = "tight")
+mp.savefig(dirString+'/'+'calc-barrier_fullSpeedUp_normDens.pdf',bbox_inches = "tight")
